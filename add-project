@@ -6,23 +6,55 @@ WORKBENCH_DIR="$SCRIPT_DIR/_workbench"
 
 mkdir -p "$WORKBENCH_DIR"
 
-# Open project with yazi
-temp_file=$(mktemp)
-yazi --chooser-file="$temp_file" ~
+# Loop until valid git root is selected
+while true; do
+    # Open project with yazi
+    temp_file=$(mktemp)
+    yazi --chooser-file="$temp_file" ~
 
-if [ ! -s "$temp_file" ]; then
+    if [ ! -s "$temp_file" ]; then
+        rm -f "$temp_file"
+        echo "No directory selected."
+        exit 1
+    fi
+
+    selected_path=$(cat "$temp_file")
     rm -f "$temp_file"
-    echo "No directory selected."
-    exit 1
-fi
 
-selected_path=$(cat "$temp_file")
-rm -f "$temp_file"
+    if [ ! -d "$selected_path" ]; then
+        echo "Selected path is not a directory."
+        exit 1
+    fi
 
-if [ ! -d "$selected_path" ]; then
-    echo "Selected path is not a directory."
-    exit 1
-fi
+    # Check if it's a git repository root
+    git_root=$(git -C "$selected_path" rev-parse --show-toplevel 2>/dev/null)
+
+    if [ -z "$git_root" ]; then
+        echo ""
+        echo "⚠️  Warning: '$selected_path' is not a git repository."
+        echo "Please select a git project root directory."
+        echo ""
+        read -p "Press Enter to select again..."
+        continue
+    fi
+
+    # Normalize paths for comparison
+    selected_real=$(cd "$selected_path" && pwd -P)
+    git_root_real=$(cd "$git_root" && pwd -P)
+
+    if [ "$selected_real" != "$git_root_real" ]; then
+        echo ""
+        echo "⚠️  Warning: '$selected_path' is not the git root."
+        echo "Git root is: $git_root"
+        echo "Please select the git project root directory."
+        echo ""
+        read -p "Press Enter to select again..."
+        continue
+    fi
+
+    # Valid git root selected
+    break
+done
 
 dir_name=$(basename "$selected_path")
 project_dir="$PROJECTS_DIR/$dir_name"
