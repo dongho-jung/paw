@@ -17,15 +17,21 @@ workbench/
 │   ├── start                # 세션 시작 스크립트
 │   ├── bin/                 # 공용 실행 파일 (PATH에 추가됨)
 │   │   └── new-task         # 태스크 생성
+│   ├── claude/commands/     # 공용 slash commands
+│   │   ├── pr.md            # /pr - PR 생성
+│   │   └── done.md          # /done - 태스크 정리
 │   └── layout.kdl           # zellij 레이아웃
 └── projects/{프로젝트명}/
     ├── start                # -> _workbench/start
     ├── location             # -> 실제 프로젝트 경로
+    ├── .claude              # -> _workbench/claude
     ├── PROMPT.md            # 프로젝트별 프롬프트
     └── agents/{태스크명}/
         ├── task             # 태스크 내용
         ├── log              # 진행 로그
-        └── worktree/        # git worktree
+        ├── worktree/        # git worktree
+        ├── .tab-created     # 탭 생성 마커
+        └── .pr              # PR 번호 (생성 시)
 ```
 
 ## 사용법
@@ -48,6 +54,15 @@ cd projects/{프로젝트명} && ./start  # 기존 세션이 있으면 attach
 new-task  # $EDITOR에서 태스크 작성 → 자동으로 agent 시작
 ```
 
+### Slash Commands
+
+Agent가 사용할 수 있는 slash commands:
+
+| Command | 설명 |
+|---------|------|
+| `/pr` | PR 자동 생성 및 브라우저 열기 |
+| `/done` | 태스크 정리 (worktree, branch, 디렉토리, 탭) |
+
 ### 탭 상태
 
 - 🤖 작업 중
@@ -58,15 +73,17 @@ new-task  # $EDITOR에서 태스크 작성 → 자동으로 agent 시작
 
 - `_workbench/PROMPT.md`: 전역 에이전트 프롬프트
 - `{프로젝트}/PROMPT.md`: 프로젝트별 프롬프트
+- `_workbench/claude/commands/`: 공용 slash commands
 - `EDITOR` 환경변수: 태스크 작성 에디터 (기본: vim)
 
 ## 의존성
 
 ```bash
-brew install zellij fswatch yazi
+brew install zellij fswatch yazi gh
 ```
 
 ## zellij 단축키
 
 - `Ctrl+O, d`: detach
 - `Ctrl+O, w`: 탭 전환
+- `Ctrl+O, x`: 탭/pane 닫기
