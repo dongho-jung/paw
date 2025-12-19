@@ -222,9 +222,6 @@ if [ -n "$ZELLIJ" ]; then
     exit 0
 fi
 
-# Add _workbench/bin to PATH
-export PATH="$WORKBENCH_DIR/bin:$PATH"
-
 # Clean up dead session if exists
 cleanup_dead_session
 

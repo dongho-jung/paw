@@ -79,7 +79,11 @@ fi
 
 # Create symlink to start script
 rm -f "$project_dir/start" 2>/dev/null
-ln -s "$WORKBENCH_DIR/start" "$project_dir/start"
+ln -s "$WORKBENCH_DIR/bin/start" "$project_dir/start"
+
+# Create symlink to new-task
+rm -f "$project_dir/new-task" 2>/dev/null
+ln -s "$WORKBENCH_DIR/bin/new-task" "$project_dir/new-task"
 
 # Create symlink to .claude directory (for shared slash commands)
 rm -rf "$project_dir/.claude" 2>/dev/null
