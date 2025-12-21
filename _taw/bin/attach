@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# TAW Attach - Reattach to an existing task
+# Creates window with agent pane and starts claude
+
+set -e
+
+# Determine paths from script location
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)"
+AGENT_DIR="$SCRIPT_PATH"
+TASK_NAME="$(basename "$AGENT_DIR")"
+TAW_DIR="$(cd "$AGENT_DIR/../.." && pwd)"
+PROJECT_DIR="$(cd "$TAW_DIR/.." && pwd)"
+WORKTREE_DIR="$AGENT_DIR/worktree"
+
+# Find TAW_HOME by reading the symlink target of new-task
+if [ -L "$TAW_DIR/new-task" ]; then
+    NEW_TASK_TARGET="$(readlink "$TAW_DIR/new-task")"
+    TAW_HOME="$(cd "$(dirname "$NEW_TASK_TARGET")/../.." && pwd)"
+else
+    echo "Error: Cannot determine TAW_HOME"
+    exit 1
+fi
+
+PROJECT_NAME="$(basename "$PROJECT_DIR")"
+SESSION_NAME="$PROJECT_NAME"
+
+GLOBAL_PROMPT="$TAW_HOME/_taw/PROMPT.md"
+PROJECT_PROMPT="$TAW_DIR/PROMPT.md"
+
+# Check if inside tmux
+if [ -z "$TMUX" ]; then
+    echo "Error: Not inside tmux session."
+    echo "Run 'taw' first to start the session."
+    exit 1
+fi
+
+# Check if session matches
+CURRENT_SESSION="$(tmux display-message -p '#S')"
+if [ "$CURRENT_SESSION" != "$SESSION_NAME" ]; then
+    echo "Error: Current session '$CURRENT_SESSION' doesn't match project session '$SESSION_NAME'"
+    exit 1
+fi
+
+# Check if worktree exists, create if not
+if [ ! -d "$WORKTREE_DIR" ]; then
+    echo "Creating worktree..."
+    git -C "$PROJECT_DIR" worktree prune 2>/dev/null || true
+    if ! git -C "$PROJECT_DIR" worktree add "$WORKTREE_DIR" -b "$TASK_NAME" 2>/dev/null; then
+        if ! git -C "$PROJECT_DIR" worktree add "$WORKTREE_DIR" "$TASK_NAME" 2>/dev/null; then
+            echo "Error: Failed to create worktree"
+            exit 1
+        fi
+    fi
+fi
+
+# Build system prompt
+system_prompt=""
+if [ -f "$GLOBAL_PROMPT" ]; then
+    system_prompt=$(cat "$GLOBAL_PROMPT")
+fi
+if [ -f "$PROJECT_PROMPT" ]; then
+    if [ -n "$system_prompt" ]; then
+        system_prompt="$system_prompt"$'\n\n---\n\n'
+    fi
+    system_prompt="$system_prompt$(cat "$PROJECT_PROMPT")"
+fi
+
+# Save system prompt
+echo "$system_prompt" > "$AGENT_DIR/.system-prompt"
+
+# Truncate name for display
+truncate_name() {
+    local name="$1"
+    local max_len=32
+    local len=${#name}
+    if [ $len -le $max_len ]; then
+        echo "$name"
+    else
+        local keep=$(( (max_len - 3) / 2 ))
+        echo "${name:0:$keep}...${name: -$keep}"
+    fi
+}
+
+display_name=$(truncate_name "$TASK_NAME")
+window_name="🤖${display_name}"
+
+# Create new window
+window_id=$(tmux new-window -n "$window_name" -c "$WORKTREE_DIR" -P -F "#{window_id}")
+
+# Set remain-on-exit
+tmux setw -t "$window_id" remain-on-exit on
+sleep 0.3
+
+# Split horizontally for user pane
+tmux split-window -t "$window_id" -h -c "$WORKTREE_DIR"
+
+# Select agent pane (left)
+tmux select-pane -t "${window_id}.0"
+
+# Start claude with system prompt
+tmux send-keys -t "${window_id}.0" "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$WORKTREE_DIR' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $AGENT_DIR/.system-prompt)\"" Enter
+
+echo "Attached to task: $TASK_NAME"

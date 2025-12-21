@@ -3,6 +3,21 @@
 # TAW New Task Creator
 # Creates a new task in .taw/agents directory
 
+# Resolve symlinks (macOS compatible)
+resolve_path() {
+    local path="$1"
+    while [ -L "$path" ]; do
+        local dir="$(cd "$(dirname "$path")" && pwd)"
+        path="$(readlink "$path")"
+        [[ "$path" != /* ]] && path="$dir/$path"
+    done
+    echo "$(cd "$(dirname "$path")" && pwd)/$(basename "$path")"
+}
+
+# Get TAW_HOME from script location
+SCRIPT_PATH="$(resolve_path "$0")"
+TAW_HOME="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
+
 PROJECT_DIR="$(pwd)"
 TAW_DIR="$PROJECT_DIR/.taw"
 AGENTS_DIR="$TAW_DIR/agents"
@@ -24,22 +39,37 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
-# Create temp file for editing
+# Create temp file for editing with hint
 temp_file=$(mktemp)
 trap "rm -f '$temp_file'" EXIT
 
-# Open editor
-${EDITOR:-vim} "$temp_file"
+# Add hint comment
+cat > "$temp_file" << 'EOF'
+# 에이전트에게 시킬 일 적고 저장
 
-# Check if file has content
-if [ ! -s "$temp_file" ]; then
+EOF
+
+# Determine editor and options
+editor="${EDITOR:-vim}"
+
+# If editor is vi/vim/nvim, start on line 3 in insert mode
+editor_args=()
+if [[ "$editor" =~ (^|/)n?vim?$ ]]; then
+    editor_args+=("-c" "normal! 3G" "-c" "startinsert")
+fi
+
+# Open editor
+"$editor" "${editor_args[@]}" "$temp_file"
+
+# Read task content, filtering out comment lines (starting with #)
+task_content=$(grep -v '^[[:space:]]*#' "$temp_file")
+
+# Check if content exists after filtering (ignore empty lines for this check)
+if [ -z "$(echo "$task_content" | tr -d '[:space:]')" ]; then
     echo "No content written. Task cancelled."
     log "Task cancelled: no content"
     exit 1
 fi
-
-# Read task content into memory
-task_content=$(cat "$temp_file")
 
 log "Task content received, calling Claude CLI (haiku)..."
 
@@ -74,7 +104,9 @@ done
 # Create agent directory and save task content
 agent_dir="$AGENTS_DIR/$final_name"
 mkdir -p "$agent_dir"
-echo "$task_content" > "$agent_dir/.task"
+echo "$task_content" > "$agent_dir/task"
+ln -s ../../.. "$agent_dir/origin"
+ln -s "$TAW_HOME/_taw/bin/attach" "$agent_dir/attach"
 
 echo "Task created: $agent_dir"
 log "Task created: $final_name"
