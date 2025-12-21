@@ -1,57 +1,61 @@
-# Workbench
+# TAW (Tmux + Agent + Worktree)
 
 Claude Code 기반의 프로젝트 관리 시스템입니다.
 
 ## 개요
 
-- 프로젝트별로 tmux 세션 기반의 작업 환경을 제공합니다.
+- 각 git 프로젝트에서 `taw` 명령어로 tmux 세션 기반의 작업 환경을 시작합니다.
 - 태스크를 생성하면 자동으로 Claude Code agent가 시작됩니다.
+
+## 설치
+
+```bash
+./install    # ~/.local/bin/taw 설치
+./uninstall  # ~/.local/bin/taw 제거
+```
 
 ## 디렉토리 구조
 
 ```
-workbench/
-├── add-project              # 새 프로젝트 추가
-├── _workbench/              # 전역 설정
-│   ├── PROMPT.md            # 전역 에이전트 프롬프트
-│   ├── bin/                 # 공용 실행 파일
-│   │   ├── start            # 세션 시작 스크립트
-│   │   └── new-task         # 태스크 생성
-│   └── claude/commands/     # 공용 slash commands
-│       ├── pr.md            # /pr - PR 생성
-│       └── done.md          # /done - 태스크 정리
-└── projects/{프로젝트명}/
-    ├── start                # -> _workbench/bin/start
-    ├── new-task             # -> _workbench/bin/new-task
-    ├── location             # -> 실제 프로젝트 경로
-    ├── .claude              # -> _workbench/claude
-    ├── PROMPT.md            # 프로젝트별 프롬프트
-    └── agents/{태스크명}/
-        ├── task             # 태스크 내용
-        ├── log              # 진행 로그
-        ├── worktree/        # git worktree
-        ├── .tab-created     # 탭 생성 마커
-        └── .pr              # PR 번호 (생성 시)
+taw/                           # 이 레포
+├── install                    # taw 설치
+├── uninstall                  # taw 제거
+└── _taw/                      # 전역 설정
+    ├── PROMPT.md              # 전역 에이전트 프롬프트
+    ├── bin/                   # 실행 파일
+    │   ├── taw                # 메인 명령어
+    │   ├── start              # 세션 시작
+    │   └── new-task           # 태스크 생성
+    └── claude/commands/       # slash commands
+        ├── pr.md              # /pr - PR 생성
+        └── done.md            # /done - 태스크 정리
+
+{any-git-project}/             # 사용자 프로젝트
+└── .taw/                      # taw가 생성하는 디렉토리
+    ├── PROMPT.md              # 프로젝트별 프롬프트
+    ├── .claude                # -> _taw/claude (symlink)
+    ├── .metadata/             # 로그 및 상태
+    └── agents/{task-name}/    # 태스크별 작업 공간
+        ├── .task              # 태스크 내용
+        ├── .log               # 진행 로그
+        ├── .tab-created       # 탭 생성 마커
+        └── .pr                # PR 번호 (생성 시)
 ```
 
 ## 사용법
 
-### 프로젝트 추가
+### 프로젝트에서 taw 시작
 
 ```bash
-./add-project  # yazi에서 git 프로젝트 선택 → 자동으로 세션 시작
-```
-
-### 프로젝트 시작
-
-```bash
-cd projects/{프로젝트명} && ./start  # 기존 세션이 있으면 attach
+cd /path/to/your/git/project
+taw  # .taw 디렉토리 생성 및 tmux 세션 시작
 ```
 
 ### 태스크 생성
 
+tmux 세션 내에서:
 ```bash
-./new-task  # $EDITOR에서 태스크 작성 → 자동으로 agent 시작
+.taw/new-task  # $EDITOR에서 태스크 작성 → 자동으로 agent 시작
 ```
 
 ### Slash Commands
@@ -71,22 +75,21 @@ Agent가 사용할 수 있는 slash commands:
 
 ## 설정
 
-- `_workbench/PROMPT.md`: 전역 에이전트 프롬프트
-- `{프로젝트}/PROMPT.md`: 프로젝트별 프롬프트
-- `_workbench/claude/commands/`: 공용 slash commands
+- `_taw/PROMPT.md`: 전역 에이전트 프롬프트
+- `.taw/PROMPT.md`: 프로젝트별 프롬프트 (각 프로젝트 내)
+- `_taw/claude/commands/`: slash commands
 - `EDITOR` 환경변수: 태스크 작성 에디터 (기본: vim)
 
 ## 의존성
 
 ```bash
-brew install tmux fswatch yazi gh
+brew install tmux fswatch gh
 ```
 
 ## tmux 단축키
 
 | 동작 | 단축키 |
 |------|--------|
-| Pane 이동 | `Ctrl+B, 방향키` |
-| Window 이동 | `Ctrl+B, n` (다음) / `Ctrl+B, p` (이전) / `Ctrl+B, 숫자` |
-| Session 이동 | `Ctrl+B, s` (목록에서 선택) |
-| Session 나가기 | `Ctrl+B, d` (detach) |
+| Pane 이동 | `⌥ + ←/→` |
+| Window 이동 | `^⌥ + ←/→` |
+| Session 나가기 | `^q` (detach) |
