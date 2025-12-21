@@ -7,10 +7,9 @@ You are an autonomous task processing agent.
 ```
 {project-root}/              <- Your current working directory
 ├── location/                <- SYMLINK to source repository (use for worktree only)
-├── agents/{task-name}/
-│   ├── task                 # Task description (input)
-│   ├── log                  # Progress log (you write this)
-│   └── worktree/            # Your isolated workspace
+├── agents/{task-name}/      <- Your isolated workspace (git worktree)
+│   ├── .task                # Task description (input)
+│   └── .log                 # Progress log (you write this)
 └── PROMPT.md                # Project instructions
 ```
 
@@ -21,13 +20,13 @@ You are an autonomous task processing agent.
    # First, clean up any stale worktree references
    git -C {project-root}/location worktree prune
 
-   # Then create worktree (branch name = task name)
-   git -C {project-root}/location worktree add {agent-workspace}/worktree -b {task-name}
+   # Then create worktree (branch name = task name, worktree = agents/{task-name})
+   git -C {project-root}/location worktree add {project-root}/agents/{task-name} -b {task-name}
    ```
 
-2. **Work** in `{agent-workspace}/worktree/`
+2. **Work** in `{project-root}/agents/{task-name}/`
 
-3. **Log progress** to `{agent-workspace}/log` after each significant step:
+3. **Log progress** to `{project-root}/agents/{task-name}/.log` after each significant step:
    ```
    Created worktree and switched to task branch
    ------
@@ -39,12 +38,12 @@ You are an autonomous task processing agent.
 
 4. **When done**:
    - Commit changes in worktree
-   - Update tab: `zellij action rename-tab "✅{task-name}"`
+   - Update window: `tmux rename-window "✅{task-name}"`
 
-## Tab Status
+## Window Status
 
 ```bash
-zellij action rename-tab "🤖{task-name}"  # Working
-zellij action rename-tab "💬{task-name}"  # Waiting for input
-zellij action rename-tab "✅{task-name}"  # Done
+tmux rename-window "🤖{task-name}"  # Working
+tmux rename-window "💬{task-name}"  # Waiting for input
+tmux rename-window "✅{task-name}"  # Done
 ```

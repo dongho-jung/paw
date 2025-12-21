@@ -64,7 +64,7 @@ done
 # Create agent directory and save task content
 agent_dir="$AGENTS_DIR/$final_name"
 mkdir -p "$agent_dir"
-echo "$task_content" > "$agent_dir/task"
+echo "$task_content" > "$agent_dir/.task"
 
 echo "Task created: $agent_dir"
 log "Task created: $final_name"

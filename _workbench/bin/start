@@ -4,15 +4,22 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
 WORKBENCH_DIR="$(cd "$PROJECT_DIR/../.." && pwd)/_workbench"
 WATCHER_DIR="$PROJECT_DIR/.metadata/watcher"
+LOG_DIR="$PROJECT_DIR/.metadata/log"
+LOG_FILE="$LOG_DIR/start.log"
 AGENTS_DIR="$PROJECT_DIR/agents"
 SESSION_NAME="$PROJECT_NAME"
 
 GLOBAL_PROMPT="$WORKBENCH_DIR/PROMPT.md"
 PROJECT_PROMPT="$PROJECT_DIR/PROMPT.md"
 
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
+}
+
 check_dependencies() {
-    if ! command -v zellij &> /dev/null; then
-        echo "zellij is not installed. Install: brew install zellij"
+    if ! command -v tmux &> /dev/null; then
+        echo "tmux is not installed. Install: brew install tmux"
         exit 1
     fi
     if ! command -v fswatch &> /dev/null; then
@@ -22,25 +29,24 @@ check_dependencies() {
 }
 
 is_session_running() {
-    # Check if session exists and is not EXITED
-    zellij list-sessions 2>/dev/null | grep "$SESSION_NAME" | grep -qv "EXITED"
+    tmux has-session -t "$SESSION_NAME" 2>/dev/null
 }
 
 cleanup_dead_session() {
-    # Delete EXITED session if exists
-    if zellij list-sessions 2>/dev/null | grep "$SESSION_NAME" | grep -q "EXITED"; then
-        zellij delete-session "$SESSION_NAME" --force 2>/dev/null
-    fi
+    # tmux automatically cleans up dead sessions
+    :
 }
 
-zj() {
-    zellij --session "$SESSION_NAME" action "$@"
+tm() {
+    tmux "$@"
 }
 
 cleanup() {
+    log "Cleanup started"
     echo "Cleaning up..."
     pkill -f "fswatch.*$PROJECT_DIR/agents" 2>/dev/null
     rm -f "$WATCHER_DIR/watcher.pid"
+    log "Cleanup completed"
 }
 
 # Truncate tab name to 32 chars with ... in middle if needed
@@ -64,8 +70,8 @@ handle_task() {
     local agent_dir=$(dirname "$task_file")
     local task_name=$(basename "$agent_dir")
 
-    # Only process files named "task"
-    if [[ "$(basename "$task_file")" != "task" ]]; then
+    # Only process files named ".task"
+    if [[ "$(basename "$task_file")" != ".task" ]]; then
         return
     fi
 
@@ -104,51 +110,90 @@ handle_task() {
 
 $task_content"
 
-    # Save prompts to files
-    echo "$system_prompt" > "$agent_dir/system-prompt.txt"
-    echo "$user_prompt" > "$agent_dir/user-prompt.txt"
+    # Save prompts to files (hidden)
+    echo "$system_prompt" > "$agent_dir/.system-prompt"
+    echo "$user_prompt" > "$agent_dir/.user-prompt"
 
-    # Create new tab with truncated name and working emoji
+    # Create new window with truncated name and working emoji
     local display_name=$(truncate_tab_name "$task_name")
-    local tab_name="🤖${display_name}"
-    zj new-tab --name "$tab_name" --cwd "$PROJECT_DIR"
+    local window_name="🤖${display_name}"
+
+    # Get window ID for reliable targeting (emoji in name can cause issues)
+    local window_id
+    window_id=$(tm new-window -t "$SESSION_NAME" -n "$window_name" -c "$PROJECT_DIR" -P -F "#{window_id}")
     touch "$tab_marker"
+
+    # Set remain-on-exit for this window
+    tm setw -t "$window_id" remain-on-exit on
     sleep 0.5
 
-    # Name the left pane "agent"
-    zj rename-pane "agent"
+    # Split horizontally (creates right pane for user)
+    tm split-window -t "$window_id" -h -c "$PROJECT_DIR"
 
-    # Split vertically (creates right pane for user)
-    zj new-pane --direction right --name "user"
+    # Select left pane (agent pane)
+    tm select-pane -t "${window_id}.0"
 
-    # Helper to send text + Enter to agent pane
-    send_to_agent() {
-        zj go-to-tab-name "$tab_name" 2>/dev/null
-        zj move-focus left
-        sleep 0.1
-        zj write-chars "$1"
-        sleep 0.1
-        zj write 13  # Enter key
+    # Send shell command (normal Enter)
+    send_shell_cmd() {
+        tm send-keys -t "${window_id}.0" -l "$1"
+        tm send-keys -t "${window_id}.0" Enter
     }
 
-    # Start claude interactively with system prompt (export TASK_NAME and SESSION_NAME for /done command)
-    send_to_agent "export TASK_NAME='$task_name' ZELLIJ_SESSION_NAME='$SESSION_NAME' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $agent_dir/system-prompt.txt)\""
+    # Send input to claude code (Escape to exit multiline, then raw ASCII 13 to submit)
+    send_to_claude() {
+        tm send-keys -t "${window_id}.0" -l "$1"
+        sleep 0.1
+        tm send-keys -t "${window_id}.0" Escape
+        sleep 0.1
+        tm send-keys -t "${window_id}.0" -H 0d  # ASCII 13 (Carriage Return)
+    }
 
-    # Wait for claude to start
-    sleep 2
+    # Helper to get pane content
+    get_pane_content() {
+        tm capture-pane -t "${window_id}.0" -p 2>/dev/null || echo ""
+    }
+
+    # Wait for claude to be ready (poll until we see expected output)
+    wait_for_claude_ready() {
+        local max_attempts=60  # 30 seconds max
+        local attempt=0
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for claude to be ready..." >> "$WATCHER_DIR/watcher.log"
+        while [ $attempt -lt $max_attempts ]; do
+            local content=$(get_pane_content)
+            # Claude is ready when we see trust prompt or the input prompt (╭─)
+            if echo "$content" | grep -qE "Trust|trust|╭─"; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Claude ready after $attempt attempts" >> "$WATCHER_DIR/watcher.log"
+                return 0
+            fi
+            sleep 0.5
+            attempt=$((attempt + 1))
+        done
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Timeout waiting for claude" >> "$WATCHER_DIR/watcher.log"
+        return 1
+    }
+
+    # Start claude interactively with system prompt (export TASK_NAME for /done command)
+    send_shell_cmd "export TASK_NAME='$task_name' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $agent_dir/.system-prompt)\""
+
+    # Wait for claude to be ready
+    if ! wait_for_claude_ready; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Failed to start claude for $task_name" >> "$WATCHER_DIR/watcher.log"
+        return 1
+    fi
 
     # Check if confirmation is needed
     local screen_content
-    screen_content=$(zellij --session "$SESSION_NAME" action dump-screen 2>/dev/null || echo "")
+    screen_content=$(get_pane_content)
     if echo "$screen_content" | grep -qiE "trust|Trust this project|y/n|\[y\]|Are you sure"; then
-        send_to_agent "y"
-        sleep 1
+        send_shell_cmd "y"
+        # Wait for claude to be ready again after trust confirmation
+        wait_for_claude_ready
     fi
 
-    # Send the task instruction
-    send_to_agent "Read and execute the task from $agent_dir/user-prompt.txt"
+    # Send the task instruction to claude
+    send_to_claude "Read and execute the task from $agent_dir/.user-prompt"
 
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Created tab: $tab_name, sent task to claude" >> "$WATCHER_DIR/watcher.log"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Created window: $window_name, sent task to claude" >> "$WATCHER_DIR/watcher.log"
 }
 
 start_watcher() {
@@ -171,8 +216,8 @@ start_watcher() {
             continue
         fi
 
-        # Only process files named "task"
-        if [[ "$(basename "$changed_file")" != "task" ]]; then
+        # Only process files named ".task"
+        if [[ "$(basename "$changed_file")" != ".task" ]]; then
             continue
         fi
 
@@ -192,8 +237,13 @@ start_session() {
 
     # Create directories
     mkdir -p "$WATCHER_DIR"
+    mkdir -p "$LOG_DIR"
     mkdir -p "$AGENTS_DIR"
     touch "$WATCHER_DIR/watcher.log"
+
+    log "=== Session start ==="
+    log "Project: $PROJECT_NAME"
+    log "Directory: $PROJECT_DIR"
 
     # Clean up tab markers from previous session
     find "$AGENTS_DIR" -name ".tab-created" -delete 2>/dev/null
@@ -204,31 +254,67 @@ start_session() {
     start_watcher &
     local watcher_pid=$!
     echo "$watcher_pid" > "$WATCHER_DIR/watcher.pid"
+    log "Watcher started (PID: $watcher_pid)"
 
     # Cleanup on exit
     trap cleanup EXIT
 
-    # Start zellij session with layout
+    # Start tmux session with initial window (detached first to configure)
     cd "$PROJECT_DIR"
-    zellij -s "$SESSION_NAME" -n "$WORKBENCH_DIR/layout.kdl"
+    tm new-session -d -s "$SESSION_NAME" -n "_"
+    log "Tmux session created: $SESSION_NAME"
 
-    # This runs after zellij exits
+    # Configure tmux session
+    tm set -t "$SESSION_NAME" mouse on
+
+    # Pane persistence hook (session-level) - respawn the dead pane automatically
+    tm set-hook -t "$SESSION_NAME" pane-died 'respawn-pane -k -t "#{hook_pane}"'
+
+    # Set remain-on-exit for initial window
+    tm setw -t "$SESSION_NAME:_" remain-on-exit on
+
+    # Unbind all default keys and set minimal bindings
+    tm unbind-key -a
+    tm bind -n C-q detach
+    tm bind -n M-Left select-pane -L
+    tm bind -n M-Right select-pane -R
+    tm bind -n M-C-Left previous-window
+    tm bind -n M-C-Right next-window
+    log "Tmux configured"
+
+    # Status line: 2 lines - windows on top, hints on bottom
+    tm set -t "$SESSION_NAME" status 2
+    tm set -t "$SESSION_NAME" status-format[0] "#[align=left]#{W:#[fg=white bg=default] #W #[default],#[fg=white bg=blue bold] #W #[default]}"
+    tm set -t "$SESSION_NAME" status-format[1] "#[align=left fg=brightblack] ⌥←→:pane  ^⌥←→:window  ^q:detach"
+
+    # Show help in initial window
+    tm send-keys -t "$SESSION_NAME:_" "cat $WORKBENCH_DIR/HELP.md" Enter
+
+    # Attach to session
+    log "Attaching to session"
+    tm attach -t "$SESSION_NAME"
+
+    # This runs after tmux exits
     cleanup
 }
 
-# Check if already inside zellij session
-if [ -n "$ZELLIJ" ]; then
-    echo "Already inside zellij session. Ignoring."
+# Check if already inside tmux session
+if [ -n "$TMUX" ]; then
+    echo "Already inside tmux session. Ignoring."
     exit 0
 fi
+
+# Ensure log directory exists for reattach logging
+mkdir -p "$LOG_DIR"
 
 # Clean up dead session if exists
 cleanup_dead_session
 
 # If session exists, attach to it; otherwise start new
 if is_session_running; then
+    log "Reattaching to existing session: $SESSION_NAME"
     echo "Attaching to existing session '$SESSION_NAME'..."
-    zellij attach "$SESSION_NAME"
+    tm attach -t "$SESSION_NAME"
 else
     start_session
 fi

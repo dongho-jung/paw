@@ -4,13 +4,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECTS_DIR="$SCRIPT_DIR/projects"
 WORKBENCH_DIR="$SCRIPT_DIR/_workbench"
 
+# Start path: use argument if provided, otherwise home
+START_PATH="${1:-$HOME}"
+
 mkdir -p "$WORKBENCH_DIR"
 
 # Loop until valid git root is selected
 while true; do
     # Open project with yazi
     temp_file=$(mktemp)
-    yazi --chooser-file="$temp_file" ~
+    yazi --chooser-file="$temp_file" "$START_PATH"
 
     if [ ! -s "$temp_file" ]; then
         rm -f "$temp_file"

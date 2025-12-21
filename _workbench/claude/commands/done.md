@@ -1,6 +1,6 @@
 ---
-description: Clean up completed task (worktree, agent dir, tab)
-allowed-tools: Bash(git:*), Bash(rm:*), Bash(zellij:*), Bash(ls:*), Bash(cat:*), Bash(gh:*), Bash(echo:*), Bash(printenv:*), Bash(test:*), Bash(true:*)
+description: Clean up completed task (worktree, agent dir, window)
+allowed-tools: Bash(git:*), Bash(rm:*), Bash(tmux:*), Bash(ls:*), Bash(cat:*), Bash(gh:*), Bash(echo:*), Bash(printenv:*), Bash(test:*), Bash(true:*)
 ---
 
 # Task Cleanup
@@ -33,7 +33,7 @@ git -C location fetch origin main
 ```
 
 ```bash
-git -C agents/$TASK_NAME/worktree rev-parse HEAD
+git -C agents/$TASK_NAME rev-parse HEAD
 ```
 
 Then check if that commit is in main:
@@ -56,10 +56,10 @@ Execute these commands. Ignore errors - some resources may already be cleaned up
 git -C location worktree prune
 ```
 
-### 3.2 Remove worktree (if exists)
+### 3.2 Remove worktree (agents/$TASK_NAME is the worktree itself)
 
 ```bash
-test -d agents/$TASK_NAME/worktree && git -C location worktree remove $(pwd)/agents/$TASK_NAME/worktree --force || true
+test -d agents/$TASK_NAME && git -C location worktree remove $(pwd)/agents/$TASK_NAME --force || true
 ```
 
 ### 3.3 Delete local branch (if exists)
@@ -68,19 +68,11 @@ test -d agents/$TASK_NAME/worktree && git -C location worktree remove $(pwd)/age
 git -C location branch --list $TASK_NAME | grep -q $TASK_NAME && git -C location branch -D $TASK_NAME || true
 ```
 
-### 3.4 Remove agent directory (if exists)
+### 3.4 Close tmux window
 
 ```bash
-test -d agents/$TASK_NAME && rm -rf agents/$TASK_NAME || true
+tmux kill-window
 ```
-
-### 3.5 Close zellij tab
-
-```bash
-zellij --session $ZELLIJ_SESSION_NAME action close-tab
-```
-
-If this fails, tell the user to close the tab manually with `Ctrl+O, x`.
 
 ## Important
 
