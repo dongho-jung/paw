@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# TAW Cleanup Script
+# Usage: cleanup <task_name> <taw_dir> <project_dir> <worktree_dir>
+
+set -x  # Debug: show all commands
+
+TASK_NAME="$1"
+TAW_DIR="$2"
+PROJECT_DIR="$3"
+WORKTREE_DIR="$4"
+
+echo "=== TAW Cleanup ==="
+echo "TASK_NAME: $TASK_NAME"
+echo "TAW_DIR: $TAW_DIR"
+echo "PROJECT_DIR: $PROJECT_DIR"
+echo "WORKTREE_DIR: $WORKTREE_DIR"
+echo ""
+
+# 1. Remove worktree
+echo ">>> Removing worktree..."
+if [ -d "$WORKTREE_DIR" ]; then
+    git -C "$PROJECT_DIR" worktree remove "$WORKTREE_DIR" --force 2>&1 || true
+fi
+
+# 2. Prune worktree references
+echo ">>> Pruning worktree references..."
+git -C "$PROJECT_DIR" worktree prune 2>&1 || true
+
+# 3. Delete local branch
+echo ">>> Deleting local branch..."
+git -C "$PROJECT_DIR" branch -D "$TASK_NAME" 2>&1 || true
+
+# 4. Remove agent directory
+echo ">>> Removing agent directory..."
+rm -rf "$TAW_DIR/agents/$TASK_NAME" 2>&1 || true
+
+echo ""
+echo "=== Cleanup complete ==="
+
+# 5. Close tmux window (must be last, with delay)
+echo ">>> Closing tmux window in 1 second..."
+(sleep 1 && tmux kill-window) &
