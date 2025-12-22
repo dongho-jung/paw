@@ -1,24 +1,30 @@
 ---
 description: Auto-generate PR with title/body and open in browser
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(open:*), Bash(echo:*), Bash(tee:*)
 ---
 
 # Create Pull Request
 
-## Step 1: Check Current State
+## Step 1: Get Environment (REQUIRED)
+
+**You MUST run this first and save the values:**
 
 ```bash
-echo "TASK_NAME=$TASK_NAME"
-echo "WORKTREE_DIR=$WORKTREE_DIR"
-echo "TAW_DIR=$TAW_DIR"
+printenv | grep -E '^(TASK_NAME|TAW_DIR|WORKTREE_DIR)='
+```
+
+If any variable is empty, stop and inform the user.
+
+## Step 2: Check Current State
+
+```bash
+git branch --show-current
 ```
 
 ```bash
-echo "Current branch: $(git branch --show-current)"
 git status -sb | head -1
 ```
 
-## Step 2: Review Changes
+## Step 3: Review Changes
 
 ```bash
 git log --oneline main..HEAD 2>/dev/null || git log --oneline master..HEAD 2>/dev/null || git log --oneline -10
@@ -28,7 +34,7 @@ git log --oneline main..HEAD 2>/dev/null || git log --oneline master..HEAD 2>/de
 git diff --stat main..HEAD 2>/dev/null || git diff --stat master..HEAD 2>/dev/null || git diff --stat -10
 ```
 
-## Step 3: Create PR
+## Step 4: Create PR
 
 1. Analyze the commits and changes above to create PR title and body.
 
@@ -62,9 +68,9 @@ git diff --stat main..HEAD 2>/dev/null || git diff --stat master..HEAD 2>/dev/nu
    )"
    ```
 
-6. **IMPORTANT**: After PR is created, save the PR number for `/done` command:
+6. **IMPORTANT**: After PR is created, save the PR number using actual values from Step 1:
    ```bash
-   gh pr view --json number -q '.number' | tee $TAW_DIR/agents/$TASK_NAME/.pr
+   gh pr view --json number -q '.number' | tee {TAW_DIR}/agents/{TASK_NAME}/.pr
    ```
 
 7. Open the created PR URL in browser:

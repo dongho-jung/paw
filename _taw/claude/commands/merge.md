@@ -1,30 +1,36 @@
 ---
 description: Merge worktree branch into project's current branch
-allowed-tools: Bash(git:*), Bash(echo:*), Bash(cat:*)
 ---
 
 # Merge Branch
 
-## Step 1: Check Current State
+## Step 1: Get Environment (REQUIRED)
 
-Run these commands to understand the current state:
+**You MUST run this first and save the values:**
 
 ```bash
-echo "TASK_NAME=$TASK_NAME"
-echo "PROJECT_DIR=$PROJECT_DIR"
-echo "WORKTREE_DIR=$WORKTREE_DIR"
+printenv | grep -E '^(TASK_NAME|PROJECT_DIR|WORKTREE_DIR)='
+```
+
+If any variable is empty, stop and inform the user.
+
+## Step 2: Check Current State
+
+Using the actual values from Step 1, check:
+
+```bash
+git branch --show-current
 ```
 
 ```bash
-echo "Worktree branch: $(git branch --show-current)"
-echo "Project branch: $(git -C $PROJECT_DIR branch --show-current)"
+git -C {PROJECT_DIR} branch --show-current
 ```
 
 ```bash
 git status -s
 ```
 
-## Step 2: Pre-merge Checks
+## Step 3: Pre-merge Checks
 
 ### Check for uncommitted changes
 
@@ -42,30 +48,32 @@ The merge will be:
 
 Ask user to confirm before proceeding.
 
-## Step 3: Perform Merge
+## Step 4: Perform Merge
+
+Using actual values from Step 1:
 
 ```bash
-git -C $PROJECT_DIR merge $TASK_NAME --no-ff -m "Merge branch '$TASK_NAME'"
+git -C {PROJECT_DIR} merge {TASK_NAME} --no-ff -m "Merge branch '{TASK_NAME}'"
 ```
 
 Use `--no-ff` to preserve branch history.
 
-## Step 4: Handle Conflicts (if any)
+## Step 5: Handle Conflicts (if any)
 
 If merge conflicts occur:
 
 ```bash
-git -C $PROJECT_DIR diff --name-only --diff-filter=U
+git -C {PROJECT_DIR} diff --name-only --diff-filter=U
 ```
 
 - List conflicted files
 - Inform user about conflicts
 - Do NOT auto-resolve - let user decide
 
-## Step 5: Show Result
+## Step 6: Show Result
 
 ```bash
-git -C $PROJECT_DIR log --oneline -5
+git -C {PROJECT_DIR} log --oneline -5
 ```
 
 ## After Merge

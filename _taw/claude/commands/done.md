@@ -1,92 +1,63 @@
 ---
 description: Clean up completed task (worktree, agent dir, window)
-allowed-tools: Bash(git:*), Bash(rm:*), Bash(tmux:*), Bash(ls:*), Bash(cat:*), Bash(gh:*), Bash(echo:*), Bash(printenv:*), Bash(test:*), Bash(true:*)
 ---
 
 # Task Cleanup
 
 ## Step 1: Get Environment
 
-First, get the environment variables:
 ```bash
-echo "TASK_NAME=$TASK_NAME"
-echo "TAW_DIR=$TAW_DIR"
-echo "PROJECT_DIR=$PROJECT_DIR"
-echo "WORKTREE_DIR=$WORKTREE_DIR"
+printenv | grep -E '^(TASK_NAME|TAW_DIR|PROJECT_DIR|WORKTREE_DIR)='
 ```
+
+Save these values for later use.
 
 ## Step 2: Check Merge Status
 
-### Method A: Check saved PR number
+### Check if PR exists
 
 ```bash
-cat $TAW_DIR/agents/$TASK_NAME/.pr
+cat {TAW_DIR}/agents/{TASK_NAME}/.pr 2>/dev/null || echo "NO_PR"
 ```
 
-If PR number exists, check its merge status:
-```bash
-gh pr view <PR_NUMBER> --json merged,state -q '"\(.state) merged:\(.merged)"'
-```
-
-### Method B: Check if commits are in main (fallback)
-
-If no PR file exists:
-```bash
-git -C $PROJECT_DIR fetch origin main
-```
+### If PR number exists, check merge status:
 
 ```bash
-git -C $WORKTREE_DIR rev-parse HEAD
+gh pr view {PR_NUMBER} --json state,merged -q '"state: \(.state), merged: \(.merged)"'
 ```
 
-Then check if that commit is in main:
-```bash
-git -C $PROJECT_DIR branch -r --contains <COMMIT_HASH> | grep origin/main
-```
-
-## Decision Logic
-
-- **PR merged: true** OR **commit in main** → Proceed without confirmation
-- Otherwise → Ask user to confirm
-
-## Step 3: Cleanup
-
-Execute these commands. Ignore errors - some resources may already be cleaned up.
-
-### 3.1 Clean stale worktree references
+### If no PR, check if branch is merged to main:
 
 ```bash
-git -C $PROJECT_DIR worktree prune
+git -C {PROJECT_DIR} fetch origin main 2>/dev/null || true
 ```
-
-### 3.2 Remove worktree
 
 ```bash
-test -d $WORKTREE_DIR && git -C $PROJECT_DIR worktree remove $WORKTREE_DIR --force || true
+git -C {PROJECT_DIR} branch --merged main 2>/dev/null | grep -q {TASK_NAME} && echo "MERGED" || echo "NOT_MERGED"
 ```
 
-### 3.3 Remove agent directory
+## Step 3: Decision
+
+- **If PR merged OR branch merged to main**: Proceed to cleanup
+- **If NOT merged**: Ask user "This task is not merged yet. Proceed with cleanup anyway? (y/n)"
+  - If user says no, stop here
+  - If user says yes, proceed to cleanup
+
+## Step 4: Run Cleanup Script
+
+**Using the actual values from Step 1**, run the cleanup script:
 
 ```bash
-rm -rf $TAW_DIR/agents/$TASK_NAME || true
+{TAW_DIR}/cleanup "{TASK_NAME}" "{TAW_DIR}" "{PROJECT_DIR}" "{WORKTREE_DIR}"
 ```
 
-### 3.4 Delete local branch (if exists)
+Replace `{placeholders}` with actual values from Step 1.
 
-```bash
-git -C $PROJECT_DIR branch --list $TASK_NAME | grep -q $TASK_NAME && git -C $PROJECT_DIR branch -D $TASK_NAME || true
-```
+The script will:
+1. Remove the worktree
+2. Prune worktree references
+3. Delete the local branch
+4. Remove the agent directory
+5. Close the tmux window
 
-### 3.5 Close tmux window
-
-```bash
-tmux kill-window
-```
-
-## Important
-
-- Use `|| true` to prevent errors from stopping cleanup
-- If any command fails, continue with the next step
-- Report what was cleaned up at the end
-
-Proceed with cleanup.
+Report the cleanup result to user.
