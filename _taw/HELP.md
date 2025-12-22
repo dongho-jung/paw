@@ -53,6 +53,7 @@ Claude Code 기반 자율 에이전트 작업 환경
   TAW_DIR       .taw 디렉토리 경로
   PROJECT_DIR   프로젝트 루트 경로
   WORKTREE_DIR  worktree 경로
+  WINDOW_ID     tmux window ID (상태 갱신용)
 
 ---
 q 키로 나가기

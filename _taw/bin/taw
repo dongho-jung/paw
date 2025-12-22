@@ -82,6 +82,9 @@ init_taw_dir() {
     rm -f "$TAW_DIR/new-task" 2>/dev/null
     ln -s "$TAW_HOME/_taw/bin/new-task" "$TAW_DIR/new-task"
 
+    rm -f "$TAW_DIR/cleanup" 2>/dev/null
+    ln -s "$TAW_HOME/_taw/bin/cleanup" "$TAW_DIR/cleanup"
+
     # Create project PROMPT.md if not exists
     if [ ! -f "$TAW_DIR/PROMPT.md" ]; then
         cat > "$TAW_DIR/PROMPT.md" << 'EOF'
@@ -179,6 +182,14 @@ handle_task() {
     fi
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] New task detected: $task_name" >> "$WATCHER_DIR/watcher.log"
+
+    # Create origin and attach symlinks if they don't exist
+    if [ ! -L "$agent_dir/origin" ]; then
+        ln -s ../../.. "$agent_dir/origin" 2>/dev/null || true
+    fi
+    if [ ! -L "$agent_dir/attach" ]; then
+        ln -s "$TAW_HOME/_taw/bin/attach" "$agent_dir/attach" 2>/dev/null || true
+    fi
 
     # Create worktree for this task (enforced - agent cannot skip this)
     local worktree_dir="$agent_dir/worktree"
@@ -283,7 +294,7 @@ $task_content"
     }
 
     # Start claude interactively with system prompt (export env vars for slash commands)
-    send_shell_cmd "export TASK_NAME='$task_name' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$worktree_dir' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $agent_dir/.system-prompt)\""
+    send_shell_cmd "export TASK_NAME='$task_name' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$worktree_dir' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $agent_dir/.system-prompt)\""
 
     # Wait for claude to be ready
     if ! wait_for_claude_ready; then
@@ -341,7 +352,15 @@ start_watcher() {
 
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Task file detected: $changed_file" >> "$WATCHER_DIR/watcher.log"
 
-        handle_task "$changed_file"
+        # Use mkdir-based lock to serialize task handling (prevent race conditions)
+        # mkdir is atomic, so only one process can succeed
+        lock_dir="$WATCHER_DIR/.task.lock"
+        while ! mkdir "$lock_dir" 2>/dev/null; do
+            sleep 0.5
+        done
+        # Ensure lock is released even if handle_task fails
+        handle_task "$changed_file" || true
+        rmdir "$lock_dir" 2>/dev/null || true
     done
 }
 
@@ -399,7 +418,8 @@ start_session() {
     tm bind -n S-M-Left previous-window
     tm bind -n S-M-Right next-window
     # End task: Ctrl+E - send /done to agent pane (pane 0)
-    tm bind -n C-e run-shell "tmux send-keys -t .0 Escape; sleep 0.2; tmux send-keys -t .0 C-c; sleep 0.5; tmux send-keys -t .0 '/done' Escape; sleep 0.1; tmux send-keys -t .0 -H 0d"
+    # Sequence: Escape (exit multiline) -> Ctrl+C (cancel current) -> /done text -> Escape -> Enter
+    tm bind -n C-e run-shell "tmux send-keys -t .0 Escape; sleep 0.3; tmux send-keys -t .0 C-c; sleep 0.5; tmux send-keys -t .0 -l '/done'; sleep 0.2; tmux send-keys -t .0 Escape; sleep 0.2; tmux send-keys -t .0 -H 0d"
     # Help: Alt+/ - show help in temporary window
     tm bind -n M-/ new-window -n "HELP" "less '$TAW_HOME/_taw/HELP.md'"
     log "Tmux configured"
