@@ -105,8 +105,9 @@ done
 agent_dir="$AGENTS_DIR/$final_name"
 mkdir -p "$agent_dir"
 echo "$task_content" > "$agent_dir/task"
-ln -s ../../.. "$agent_dir/origin"
-ln -s "$TAW_HOME/_taw/bin/attach" "$agent_dir/attach"
 
 echo "Task created: $agent_dir"
 log "Task created: $final_name"
+
+# Start the agent (handle-task creates window and runs claude)
+"$TAW_HOME/_taw/bin/handle-task" "$agent_dir"

@@ -1,0 +1,242 @@
+#!/bin/bash
+
+# TAW Handle Task
+# Creates tmux window and starts claude agent for a task
+
+set -e
+
+# Arguments
+TASK_DIR="$1"
+
+if [ -z "$TASK_DIR" ] || [ ! -d "$TASK_DIR" ]; then
+    echo "Usage: handle-task <task-directory>"
+    exit 1
+fi
+
+TASK_FILE="$TASK_DIR/task"
+if [ ! -f "$TASK_FILE" ]; then
+    echo "Error: task file not found in $TASK_DIR"
+    exit 1
+fi
+
+# Resolve symlinks (macOS compatible)
+resolve_path() {
+    local path="$1"
+    while [ -L "$path" ]; do
+        local dir="$(cd "$(dirname "$path")" && pwd)"
+        path="$(readlink "$path")"
+        [[ "$path" != /* ]] && path="$dir/$path"
+    done
+    echo "$(cd "$(dirname "$path")" && pwd)/$(basename "$path")"
+}
+
+# Get TAW_HOME from script location
+SCRIPT_PATH="$(resolve_path "$0")"
+TAW_HOME="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
+
+# Derive paths from task directory
+# Task dir: /project/.taw/agents/task-name
+TASK_NAME=$(basename "$TASK_DIR")
+AGENTS_DIR=$(dirname "$TASK_DIR")
+TAW_DIR=$(dirname "$AGENTS_DIR")
+PROJECT_DIR=$(dirname "$TAW_DIR")
+PROJECT_NAME=$(basename "$PROJECT_DIR")
+SESSION_NAME="$PROJECT_NAME"
+
+LOG_DIR="$TAW_DIR/.metadata/log"
+mkdir -p "$LOG_DIR"
+
+# Check if this is a git repo (marker file created by taw)
+IS_GIT_REPO=false
+if [ -f "$TAW_DIR/.is-git-repo" ]; then
+    IS_GIT_REPO=true
+fi
+
+# Use .global-prompt symlink (points to appropriate PROMPT based on git mode)
+GLOBAL_PROMPT="$TAW_DIR/.global-prompt"
+PROJECT_PROMPT="$TAW_DIR/PROMPT.md"
+
+tm() {
+    tmux -L "taw-$SESSION_NAME" "$@"
+}
+
+# Truncate tab name to 32 chars with ... in middle if needed
+truncate_tab_name() {
+    local name="$1"
+    local max_len=32
+    local len=${#name}
+
+    if [ $len -le $max_len ]; then
+        echo "$name"
+    else
+        local keep=$(( (max_len - 3) / 2 ))
+        local left="${name:0:$keep}"
+        local right="${name: -$keep}"
+        echo "${left}...${right}"
+    fi
+}
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_DIR/handle-task.log"
+}
+
+# Check if tab already created
+TAB_MARKER="$TASK_DIR/.tab-created"
+if [ -f "$TAB_MARKER" ]; then
+    log "Task already processed: $TASK_NAME"
+    exit 0
+fi
+
+log "New task detected: $TASK_NAME"
+
+# Create origin and attach symlinks if they don't exist
+if [ ! -L "$TASK_DIR/origin" ]; then
+    ln -s ../../.. "$TASK_DIR/origin" 2>/dev/null || true
+fi
+if [ ! -L "$TASK_DIR/attach" ]; then
+    ln -s "$TAW_HOME/_taw/bin/attach" "$TASK_DIR/attach" 2>/dev/null || true
+fi
+
+# Set working directory based on git mode
+if [ "$IS_GIT_REPO" = true ]; then
+    # Create worktree for this task
+    WORK_DIR="$TASK_DIR/worktree"
+    if [ ! -d "$WORK_DIR" ]; then
+        log "Creating worktree: $WORK_DIR"
+        git -C "$PROJECT_DIR" worktree prune 2>/dev/null || true
+        if ! git -C "$PROJECT_DIR" worktree add "$WORK_DIR" -b "$TASK_NAME" 2>> "$LOG_DIR/handle-task.log"; then
+            # Branch might already exist, try without -b
+            if ! git -C "$PROJECT_DIR" worktree add "$WORK_DIR" "$TASK_NAME" 2>> "$LOG_DIR/handle-task.log"; then
+                log "Failed to create worktree for $TASK_NAME"
+                exit 1
+            fi
+        fi
+        log "Worktree created: $WORK_DIR"
+    fi
+else
+    # Non-git mode: work directly in project directory
+    WORK_DIR="$PROJECT_DIR"
+    log "Non-git mode: working in $WORK_DIR"
+fi
+
+# Build system prompt from global and project PROMPT files
+system_prompt=""
+if [ -f "$GLOBAL_PROMPT" ]; then
+    system_prompt=$(cat "$GLOBAL_PROMPT")
+fi
+if [ -f "$PROJECT_PROMPT" ]; then
+    if [ -n "$system_prompt" ]; then
+        system_prompt="$system_prompt"$'\n\n---\n\n'
+    fi
+    system_prompt="$system_prompt$(cat "$PROJECT_PROMPT")"
+fi
+
+# Read task content
+task_content=""
+if [ -f "$TASK_FILE" ]; then
+    task_content=$(cat "$TASK_FILE")
+fi
+
+# Build the user prompt with task context
+if [ "$IS_GIT_REPO" = true ]; then
+    user_prompt="# Task: $TASK_NAME
+
+**Worktree**: $WORK_DIR
+**Project**: $PROJECT_DIR
+
+$task_content"
+else
+    user_prompt="# Task: $TASK_NAME
+
+**Project**: $PROJECT_DIR
+
+$task_content"
+fi
+
+# Save prompts to files (hidden)
+echo "$system_prompt" > "$TASK_DIR/.system-prompt"
+echo "$user_prompt" > "$TASK_DIR/.user-prompt"
+
+# Create new window with truncated name and working emoji
+display_name=$(truncate_tab_name "$TASK_NAME")
+window_name="🤖${display_name}"
+
+# Get window ID for reliable targeting
+window_id=$(tm new-window -t "$SESSION_NAME" -n "$window_name" -c "$WORK_DIR" -P -F "#{window_id}")
+touch "$TAB_MARKER"
+
+sleep 0.5
+
+# Split horizontally (creates right pane for user)
+tm split-window -t "$window_id" -h -c "$WORK_DIR"
+
+# Select left pane (agent pane)
+tm select-pane -t "${window_id}.0"
+
+# Send shell command (normal Enter)
+send_shell_cmd() {
+    tm send-keys -t "${window_id}.0" -l "$1"
+    tm send-keys -t "${window_id}.0" Enter
+}
+
+# Send input to claude code (Escape to exit multiline, then raw ASCII 13 to submit)
+send_to_claude() {
+    tm send-keys -t "${window_id}.0" -l "$1"
+    sleep 0.1
+    tm send-keys -t "${window_id}.0" Escape
+    sleep 0.1
+    tm send-keys -t "${window_id}.0" -H 0d  # ASCII 13 (Carriage Return)
+}
+
+# Helper to get pane content
+get_pane_content() {
+    tm capture-pane -t "${window_id}.0" -p 2>/dev/null || echo ""
+}
+
+# Wait for claude to be ready (poll until we see expected output)
+wait_for_claude_ready() {
+    local max_attempts=60  # 30 seconds max
+    local attempt=0
+    log "Waiting for claude to be ready..."
+    while [ $attempt -lt $max_attempts ]; do
+        local content=$(get_pane_content)
+        # Claude is ready when we see trust prompt or the input prompt (╭─)
+        if echo "$content" | grep -qE "Trust|trust|╭─"; then
+            log "Claude ready after $attempt attempts"
+            return 0
+        fi
+        sleep 0.5
+        attempt=$((attempt + 1))
+    done
+    log "Timeout waiting for claude"
+    return 1
+}
+
+# Start claude interactively with system prompt
+# Set environment variables (WORKTREE_DIR only in git mode)
+if [ "$IS_GIT_REPO" = true ]; then
+    send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$WORK_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $TASK_DIR/.system-prompt)\""
+else
+    send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $TASK_DIR/.system-prompt)\""
+fi
+
+# Wait for claude to be ready
+if ! wait_for_claude_ready; then
+    log "Failed to start claude for $TASK_NAME"
+    exit 1
+fi
+
+# Check if confirmation is needed
+screen_content=$(get_pane_content)
+if echo "$screen_content" | grep -qiE "trust|Trust this project|y/n|\[y\]|Are you sure"; then
+    send_shell_cmd "y"
+    wait_for_claude_ready
+fi
+
+# Send the task instruction to claude
+send_to_claude "ultrathink Read and execute the task from $TASK_DIR/.user-prompt"
+
+log "Created window: $window_name, sent task to claude"
+
+# Kill the temporary "_" window if it exists
+tm kill-window -t "$SESSION_NAME:_" 2>/dev/null || true
