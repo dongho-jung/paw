@@ -179,6 +179,12 @@ else
     debug "Non-git mode: WORK_DIR=$WORK_DIR"
 fi
 
+# Ensure .claude symlink exists in WORK_DIR for slash commands
+if [ ! -L "$WORK_DIR/.claude" ] && [ ! -d "$WORK_DIR/.claude" ]; then
+    debug "Creating .claude symlink in WORK_DIR"
+    ln -s "$TAW_DIR/.claude" "$WORK_DIR/.claude" 2>/dev/null || true
+fi
+
 # Build system prompt from global and project PROMPT files
 system_prompt=""
 if [ -f "$GLOBAL_PROMPT" ]; then
@@ -228,15 +234,14 @@ debug "Window created: $window_id"
 # Save window_id for cleanup - store in lock directory
 echo "$window_id" > "$TAB_MARKER/window_id"
 
-sleep 0.5
+sleep 0.3
 
 # Split horizontally (creates right pane for user)
 debug "Splitting window horizontally..."
 tm split-window -t "$window_id" -h -c "$WORK_DIR"
+sleep 0.2
 
-# Select left pane (agent pane)
-tm select-pane -t "${window_id}.0"
-debug "Selected pane 0 (agent pane)"
+debug "Agent pane: ${window_id}.0"
 
 # Send shell command (normal Enter)
 send_shell_cmd() {
@@ -246,11 +251,14 @@ send_shell_cmd() {
 
 # Send input to claude code (Escape to exit multiline, then raw ASCII 13 to submit)
 send_to_claude() {
+    # Ensure pane is ready to receive input
+    sleep 0.3
     tm send-keys -t "${window_id}.0" -l "$1"
-    sleep 0.1
+    sleep 0.2
     tm send-keys -t "${window_id}.0" Escape
-    sleep 0.1
+    sleep 0.2
     tm send-keys -t "${window_id}.0" -H 0d  # ASCII 13 (Carriage Return)
+    debug "Sent input to claude: ${1:0:50}..."
 }
 
 # Helper to get pane content
@@ -315,6 +323,9 @@ if echo "$screen_content" | grep -qiE "trust|Trust this project|y/n|\[y\]|Are yo
     debug "Waiting for claude to be ready again..."
     wait_for_claude_ready
 fi
+
+# Wait a bit more to ensure claude is fully ready for input
+sleep 0.5
 
 # Send the task instruction to claude
 debug "Sending task instruction to claude..."
