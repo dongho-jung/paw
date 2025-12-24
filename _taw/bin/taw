@@ -8,15 +8,20 @@ set -e
 
 # Parse arguments
 TAW_DEBUG=0
+COMMAND=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -d|--debug)
             TAW_DEBUG=1
             shift
             ;;
+        clean)
+            COMMAND="clean"
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: taw [-d|--debug]"
+            echo "Usage: taw [-d|--debug] [clean]"
             exit 1
             ;;
     esac
@@ -172,6 +177,108 @@ cleanup() {
     log "Cleanup completed"
 }
 
+# Full cleanup: remove everything taw-related for this project
+clean_all() {
+    echo "=== TAW Clean ==="
+    echo "Project: $PROJECT_NAME"
+    echo "Directory: $PROJECT_DIR"
+    echo ""
+
+    # Check what will be cleaned
+    local has_session=false
+    local has_taw_dir=false
+    local worktrees=()
+    local branches=()
+
+    # Check tmux session
+    if tmux -L "taw-$SESSION_NAME" has-session -t "$SESSION_NAME" 2>/dev/null; then
+        has_session=true
+        echo "• Tmux session: taw-$SESSION_NAME"
+    fi
+
+    # Check .taw directory
+    if [ -d "$TAW_DIR" ]; then
+        has_taw_dir=true
+        echo "• Directory: $TAW_DIR"
+
+        # Find worktrees and branches from agents
+        if [ -d "$AGENTS_DIR" ]; then
+            for agent_dir in "$AGENTS_DIR"/*/; do
+                [ -d "$agent_dir" ] || continue
+                local task_name=$(basename "$agent_dir")
+
+                # Check if worktree exists
+                if [ -d "$agent_dir/worktree" ]; then
+                    worktrees+=("$agent_dir/worktree")
+                    echo "• Worktree: $agent_dir/worktree"
+                fi
+
+                # Check if branch exists
+                if git -C "$PROJECT_DIR" rev-parse --verify "$task_name" &>/dev/null; then
+                    branches+=("$task_name")
+                    echo "• Branch: $task_name"
+                fi
+            done
+        fi
+    fi
+
+    # Nothing to clean
+    if ! $has_session && ! $has_taw_dir && [ ${#worktrees[@]} -eq 0 ] && [ ${#branches[@]} -eq 0 ]; then
+        echo "Nothing to clean."
+        exit 0
+    fi
+
+    echo ""
+    read -p "Delete all? [y/N] " -n 1 -r
+    echo ""
+
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Cancelled."
+        exit 0
+    fi
+
+    echo ""
+
+    # 1. Kill tmux session first
+    if $has_session; then
+        echo "Killing tmux session..."
+        tmux -L "taw-$SESSION_NAME" kill-server 2>/dev/null || true
+    fi
+
+    # 2. Remove worktrees
+    for wt in "${worktrees[@]}"; do
+        echo "Removing worktree: $wt"
+        git -C "$PROJECT_DIR" worktree remove "$wt" --force 2>/dev/null || true
+    done
+
+    # 3. Prune worktree references
+    git -C "$PROJECT_DIR" worktree prune 2>/dev/null || true
+
+    # 4. Delete branches
+    for branch in "${branches[@]}"; do
+        echo "Deleting branch: $branch"
+        git -C "$PROJECT_DIR" branch -D "$branch" 2>/dev/null || true
+    done
+
+    # 5. Remove .taw directory
+    if $has_taw_dir; then
+        echo "Removing $TAW_DIR..."
+        rm -rf "$TAW_DIR"
+    fi
+
+    # 6. Remove .claude symlink in PROJECT_DIR if it points to .taw/.claude
+    if [ -L "$PROJECT_DIR/.claude" ]; then
+        local link_target=$(readlink "$PROJECT_DIR/.claude")
+        if [[ "$link_target" == *".taw/.claude"* ]] || [[ "$link_target" == "$TAW_DIR/.claude" ]]; then
+            echo "Removing $PROJECT_DIR/.claude symlink..."
+            rm -f "$PROJECT_DIR/.claude"
+        fi
+    fi
+
+    echo ""
+    echo "Done."
+}
+
 start_session() {
     check_dependencies
 
@@ -243,6 +350,12 @@ start_session() {
 }
 
 # === Main ===
+
+# Handle clean command (can run inside tmux)
+if [ "$COMMAND" = "clean" ]; then
+    clean_all
+    exit 0
+fi
 
 # Check if already inside tmux session
 if [ -n "$TMUX" ]; then
