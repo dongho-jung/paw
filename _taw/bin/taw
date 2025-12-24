@@ -6,6 +6,29 @@
 
 set -e
 
+# Parse arguments
+TAW_DEBUG=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -d|--debug)
+            TAW_DEBUG=1
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: taw [-d|--debug]"
+            exit 1
+            ;;
+    esac
+done
+
+# Debug output function
+debug() {
+    if [ "$TAW_DEBUG" = "1" ]; then
+        echo "[DEBUG] $*" >&2
+    fi
+}
+
 # Resolve symlinks (macOS compatible)
 resolve_path() {
     local path="$1"
@@ -207,6 +230,7 @@ start_session() {
     tm set -t "$SESSION_NAME" status-format[1] "#[align=left fg=brightblack] ^n:new-task  ^e:end-task  ⌥←→↑↓:move-pane  ⌥hjkl:split-pane  ⌥x:close-pane  ⇧⌥←→:move-window  ^q:quit  ⌥/:help"
 
     # Run new-task in the initial window (will be killed after first task is created)
+    debug "Running new-task in initial window..."
     tm send-keys -t "$SESSION_NAME:_" "$TAW_HOME/_taw/bin/new-task" Enter
 
     # Attach to session
@@ -227,8 +251,12 @@ if [ -n "$TMUX" ]; then
 fi
 
 # Detect git repo and initialize
+debug "Detecting git repo..."
 detect_git_repo
+debug "IS_GIT_REPO=$IS_GIT_REPO"
+debug "Initializing taw directory..."
 init_taw_dir
+debug "TAW_DIR=$TAW_DIR"
 if [ "$IS_GIT_REPO" = true ]; then
     update_gitignore
 fi
@@ -236,8 +264,8 @@ fi
 # Ensure log directory exists for reattach logging
 mkdir -p "$LOG_DIR"
 
-# Export TAW_HOME for child scripts
-export TAW_HOME
+# Export TAW_HOME and TAW_DEBUG for child scripts
+export TAW_HOME TAW_DEBUG
 
 # If session exists, attach to it; otherwise start new
 if is_session_running; then

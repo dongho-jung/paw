@@ -80,15 +80,25 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_DIR/handle-task.log"
 }
 
+# Debug output function (uses TAW_DEBUG env var from parent)
+debug() {
+    if [ "${TAW_DEBUG:-0}" = "1" ]; then
+        echo "[DEBUG handle-task] $*" >&2
+    fi
+}
+
 # Atomic check-and-create using mkdir (prevents race conditions)
 # mkdir fails if directory already exists, making it safe for concurrent access
 TAB_MARKER="$TASK_DIR/.tab-lock"
+debug "Checking tab marker: $TAB_MARKER"
 if ! mkdir "$TAB_MARKER" 2>/dev/null; then
     log "Task already being processed: $TASK_NAME"
+    debug "Task already processed, exiting"
     exit 0
 fi
 
 log "New task detected: $TASK_NAME"
+debug "New task: $TASK_NAME (IS_GIT_REPO=$IS_GIT_REPO)"
 
 # Create origin and attach symlinks if they don't exist
 if [ ! -L "$TASK_DIR/origin" ]; then
@@ -99,25 +109,34 @@ if [ ! -L "$TASK_DIR/attach" ]; then
 fi
 
 # Set working directory based on git mode
+debug "Setting up working directory..."
 if [ "$IS_GIT_REPO" = true ]; then
     # Create worktree for this task
     WORK_DIR="$TASK_DIR/worktree"
     if [ ! -d "$WORK_DIR" ]; then
         log "Creating worktree: $WORK_DIR"
+        debug "Creating worktree: $WORK_DIR"
         git -C "$PROJECT_DIR" worktree prune 2>/dev/null || true
+        debug "Running: git worktree add $WORK_DIR -b $TASK_NAME"
         if ! git -C "$PROJECT_DIR" worktree add "$WORK_DIR" -b "$TASK_NAME" 2>> "$LOG_DIR/handle-task.log"; then
             # Branch might already exist, try without -b
+            debug "First attempt failed, trying without -b flag..."
             if ! git -C "$PROJECT_DIR" worktree add "$WORK_DIR" "$TASK_NAME" 2>> "$LOG_DIR/handle-task.log"; then
                 log "Failed to create worktree for $TASK_NAME"
+                debug "Failed to create worktree!"
                 exit 1
             fi
         fi
         log "Worktree created: $WORK_DIR"
+        debug "Worktree created successfully"
+    else
+        debug "Worktree already exists: $WORK_DIR"
     fi
 else
     # Non-git mode: work directly in project directory
     WORK_DIR="$PROJECT_DIR"
     log "Non-git mode: working in $WORK_DIR"
+    debug "Non-git mode: WORK_DIR=$WORK_DIR"
 fi
 
 # Build system prompt from global and project PROMPT files
@@ -161,19 +180,23 @@ echo "$user_prompt" > "$TASK_DIR/.user-prompt"
 # Create new window with truncated name and working emoji
 display_name=$(truncate_tab_name "$TASK_NAME")
 window_name="🤖${display_name}"
+debug "Creating tmux window: $window_name"
 
 # Get window ID for reliable targeting (-d: don't switch focus to new window)
 window_id=$(tm new-window -d -t "$SESSION_NAME" -n "$window_name" -c "$WORK_DIR" -P -F "#{window_id}")
+debug "Window created: $window_id"
 # Save window_id for cleanup - store in lock directory
 echo "$window_id" > "$TAB_MARKER/window_id"
 
 sleep 0.5
 
 # Split horizontally (creates right pane for user)
+debug "Splitting window horizontally..."
 tm split-window -t "$window_id" -h -c "$WORK_DIR"
 
 # Select left pane (agent pane)
 tm select-pane -t "${window_id}.0"
+debug "Selected pane 0 (agent pane)"
 
 # Send shell command (normal Enter)
 send_shell_cmd() {
@@ -200,42 +223,62 @@ wait_for_claude_ready() {
     local max_attempts=60  # 30 seconds max
     local attempt=0
     log "Waiting for claude to be ready..."
+    debug "Waiting for claude to be ready (max $max_attempts attempts)..."
     while [ $attempt -lt $max_attempts ]; do
         local content=$(get_pane_content)
         # Claude is ready when we see trust prompt or the input prompt (╭─)
         if echo "$content" | grep -qE "Trust|trust|╭─"; then
             log "Claude ready after $attempt attempts"
+            debug "Claude ready after $attempt attempts"
             return 0
+        fi
+        # Show progress every 10 attempts in debug mode
+        if [ "${TAW_DEBUG:-0}" = "1" ] && [ $((attempt % 10)) -eq 0 ]; then
+            debug "Attempt $attempt: waiting for claude... (last 3 lines of pane):"
+            echo "$content" | tail -3 | sed 's/^/  [pane] /' >&2
         fi
         sleep 0.5
         attempt=$((attempt + 1))
     done
     log "Timeout waiting for claude"
+    debug "TIMEOUT waiting for claude after $max_attempts attempts"
+    debug "Final pane content:"
+    get_pane_content | sed 's/^/  [pane] /' >&2
     return 1
 }
 
 # Start claude interactively with system prompt
 # Set environment variables (WORKTREE_DIR only in git mode)
+debug "Starting claude with system prompt..."
 if [ "$IS_GIT_REPO" = true ]; then
+    debug "Git mode: setting WORKTREE_DIR"
     send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$WORK_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $TASK_DIR/.system-prompt)\""
 else
+    debug "Non-git mode: no WORKTREE_DIR"
     send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $TASK_DIR/.system-prompt)\""
 fi
 
 # Wait for claude to be ready
+debug "Waiting for claude to start..."
 if ! wait_for_claude_ready; then
     log "Failed to start claude for $TASK_NAME"
+    debug "FAILED: claude did not start properly"
     exit 1
 fi
 
 # Check if confirmation is needed
+debug "Checking for trust confirmation..."
 screen_content=$(get_pane_content)
 if echo "$screen_content" | grep -qiE "trust|Trust this project|y/n|\[y\]|Are you sure"; then
+    debug "Trust confirmation needed, sending 'y'"
     send_shell_cmd "y"
+    debug "Waiting for claude to be ready again..."
     wait_for_claude_ready
 fi
 
 # Send the task instruction to claude
+debug "Sending task instruction to claude..."
 send_to_claude "ultrathink Read and execute the task from $TASK_DIR/.user-prompt"
 
 log "Created window: $window_name, sent task to claude"
+debug "Task sent successfully. Window: $window_name"

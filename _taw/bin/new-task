@@ -39,9 +39,17 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
+# Debug output function (uses TAW_DEBUG env var from parent)
+debug() {
+    if [ "${TAW_DEBUG:-0}" = "1" ]; then
+        echo "[DEBUG new-task] $*" >&2
+    fi
+}
+
 # Create temp file for editing with hint
 temp_file=$(mktemp)
 trap "rm -f '$temp_file'" EXIT
+debug "Created temp file: $temp_file"
 
 # Add hint comment
 cat > "$temp_file" << 'EOF'
@@ -51,6 +59,7 @@ EOF
 
 # Determine editor and options
 editor="${EDITOR:-vim}"
+debug "Using editor: $editor"
 
 # If editor is vi/vim/nvim, start on line 3 in insert mode
 editor_args=()
@@ -59,7 +68,9 @@ if [[ "$editor" =~ (^|/)n?vim?$ ]]; then
 fi
 
 # Open editor
+debug "Opening editor..."
 "$editor" "${editor_args[@]}" "$temp_file"
+debug "Editor closed"
 
 # Read task content, filtering out comment lines (starting with #)
 task_content=$(grep -v '^[[:space:]]*#' "$temp_file")
@@ -72,6 +83,7 @@ if [ -z "$(echo "$task_content" | tr -d '[:space:]')" ]; then
 fi
 
 log "Task content received, calling Claude CLI (haiku)..."
+debug "Task content: $task_content"
 
 # Call Claude CLI to generate task name
 prompt="Generate a task name (8-32 chars, lowercase, hyphens ok).
@@ -81,7 +93,13 @@ Output ONLY the name.
 Task:
 $task_content"
 
-task_name=$(claude --print --model haiku "$prompt" 2>/dev/null | tr -d '[:space:]')
+debug "Calling claude CLI to generate task name..."
+if [ "${TAW_DEBUG:-0}" = "1" ]; then
+    task_name=$(echo "$prompt" | claude --print --model haiku 2>&1 | tee /dev/stderr | tr -d '[:space:]')
+else
+    task_name=$(echo "$prompt" | claude --print --model haiku 2>/dev/null | tr -d '[:space:]')
+fi
+debug "Claude CLI returned: '$task_name'"
 
 log "Generated task name: $task_name"
 
@@ -104,6 +122,7 @@ create_task_atomically() {
 
     while [ $counter -le $max_attempts ]; do
         local agent_dir="$AGENTS_DIR/$final_name"
+        debug "Trying to create agent directory: $agent_dir"
         # mkdir without -p fails if directory exists (atomic check-and-create)
         if mkdir "$agent_dir" 2>/dev/null; then
             echo "$content" > "$agent_dir/task"
@@ -111,6 +130,7 @@ create_task_atomically() {
             return 0
         fi
         # Directory exists, try next name
+        debug "Directory exists, trying next name"
         final_name="${base_name}-${counter}"
         counter=$((counter + 1))
     done
@@ -132,4 +152,6 @@ echo "Task created: $agent_dir"
 log "Task created: $final_name"
 
 # Start the agent (handle-task creates window and runs claude)
+debug "Calling handle-task: $agent_dir"
 "$TAW_HOME/_taw/bin/handle-task" "$agent_dir"
+debug "handle-task completed"
