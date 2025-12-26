@@ -51,15 +51,8 @@ case "$SHELL_NAME" in
 # Source user's zshrc for full environment
 [[ -f ~/.zshrc ]] && source ~/.zshrc
 
-# Override prompt for popup identification
-PROMPT='%F{cyan}popup%f:%F{blue}%1~%f%# '
-
 # Bind Alt+P to exit (toggle close from inside popup)
-# This disables the default paste behavior and enables toggle
 bindkey -s '\ep' '\C-u exit\n'
-
-# Show hint on start
-echo -e "\033[90m(Alt+P to close)\033[0m"
 RCFILE
         ;;
     *)
@@ -68,15 +61,8 @@ RCFILE
 # Load user's bashrc if exists
 [ -f ~/.bashrc ] && source ~/.bashrc
 
-# Custom prompt for popup
-PS1='\[\033[1;36m\]popup\[\033[0m\]:\[\033[1;34m\]\W\[\033[0m\]\$ '
-
 # Bind Alt+P to exit (toggle close from inside popup)
-# This disables the default paste behavior and enables toggle
 bind '"\ep": "\C-u exit\n"'
-
-# Show hint on start
-echo -e "\033[90m(Alt+P to close)\033[0m"
 RCFILE
         ;;
 esac
@@ -100,12 +86,12 @@ esac
 
 # Show popup with interactive shell
 # - 80% width, 60% height
-# - Title shows current directory
+# - Uses user's default shell config (no custom prompt)
 # - -E flag makes popup close when shell exits
 # When popup exits (naturally or via Alt+P), clean up the state
 tmux -L "taw-$SESSION_NAME" display-popup \
     -E \
     -w 80% -h 60% \
     -d "$PANE_PATH" \
-    -T " Popup Shell (Alt+P to close) " \
+    -T " Shell " \
     "$SHELL_CMD; tmux -L 'taw-$SESSION_NAME' set-option -g @taw_popup_open '' 2>/dev/null || true"
