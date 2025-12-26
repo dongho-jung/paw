@@ -3,20 +3,12 @@
 # TAW New Task Creator
 # Creates a new task in .taw/agents directory
 
-# Resolve symlinks (macOS compatible)
-resolve_path() {
-    local path="$1"
-    while [ -L "$path" ]; do
-        local dir="$(cd "$(dirname "$path")" && pwd)"
-        path="$(readlink "$path")"
-        [[ "$path" != /* ]] && path="$dir/$path"
-    done
-    echo "$(cd "$(dirname "$path")" && pwd)/$(basename "$path")"
-}
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/_common.sh"
 
-# Get TAW_HOME from script location
-SCRIPT_PATH="$(resolve_path "$0")"
-TAW_HOME="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
+TAW_HOME=$(get_taw_home)
+export TAW_HOME  # Export for child processes (handle-task)
 
 PROJECT_DIR="$(pwd)"
 TAW_DIR="$PROJECT_DIR/.taw"
@@ -34,17 +26,6 @@ fi
 # Ensure directories exist
 mkdir -p "$AGENTS_DIR"
 mkdir -p "$LOG_DIR"
-
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
-}
-
-# Debug output function (uses TAW_DEBUG env var from parent)
-debug() {
-    if [ "${TAW_DEBUG:-0}" = "1" ]; then
-        echo "[DEBUG new-task] $*" >&2
-    fi
-}
 
 # Create temp file for editing with hint
 temp_file=$(mktemp)

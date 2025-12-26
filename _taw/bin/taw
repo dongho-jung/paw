@@ -171,12 +171,6 @@ tm() {
     tmux -L "taw-$SESSION_NAME" "$@"
 }
 
-cleanup() {
-    log "Cleanup started"
-    echo "Cleaning up..."
-    log "Cleanup completed"
-}
-
 # Full cleanup: remove everything taw-related for this project
 clean_all() {
     echo "=== TAW Clean ==="
@@ -296,9 +290,6 @@ start_session() {
 
     echo "Starting session '$SESSION_NAME'..."
 
-    # Cleanup on exit
-    trap cleanup EXIT
-
     # Start tmux session with temporary window
     cd "$PROJECT_DIR"
     tm new-session -d -s "$SESSION_NAME" -n "_" -c "$PROJECT_DIR"
@@ -343,9 +334,6 @@ start_session() {
     log "Attaching to session"
     printf '\e]1;%s\a' "taw: $SESSION_NAME"
     tm attach -t "$SESSION_NAME"
-
-    # This runs after tmux exits
-    cleanup
 }
 
 # === Main ===

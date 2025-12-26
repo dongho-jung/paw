@@ -5,6 +5,10 @@
 
 set -e
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/_common.sh"
+
 # Arguments
 TASK_DIR="$1"
 
@@ -19,20 +23,7 @@ if [ ! -f "$TASK_FILE" ]; then
     exit 1
 fi
 
-# Resolve symlinks (macOS compatible)
-resolve_path() {
-    local path="$1"
-    while [ -L "$path" ]; do
-        local dir="$(cd "$(dirname "$path")" && pwd)"
-        path="$(readlink "$path")"
-        [[ "$path" != /* ]] && path="$dir/$path"
-    done
-    echo "$(cd "$(dirname "$path")" && pwd)/$(basename "$path")"
-}
-
-# Get TAW_HOME from script location
-SCRIPT_PATH="$(resolve_path "$0")"
-TAW_HOME="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
+TAW_HOME=$(get_taw_home)
 
 # Derive paths from task directory
 # Task dir: /project/.taw/agents/task-name
@@ -55,49 +46,29 @@ fi
 # Use .global-prompt symlink (points to appropriate PROMPT based on git mode)
 GLOBAL_PROMPT="$TAW_DIR/.global-prompt"
 PROJECT_PROMPT="$TAW_DIR/PROMPT.md"
-
-tm() {
-    tmux -L "taw-$SESSION_NAME" "$@"
-}
-
-# Truncate tab name to 32 chars with ... in middle if needed
-truncate_tab_name() {
-    local name="$1"
-    local max_len=32
-    local len=${#name}
-
-    if [ $len -le $max_len ]; then
-        echo "$name"
-    else
-        local keep=$(( (max_len - 3) / 2 ))
-        local left="${name:0:$keep}"
-        local right="${name: -$keep}"
-        echo "${left}...${right}"
-    fi
-}
-
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_DIR/handle-task.log"
-}
-
-# Debug output function (uses TAW_DEBUG env var from parent)
-debug() {
-    if [ "${TAW_DEBUG:-0}" = "1" ]; then
-        echo "[DEBUG handle-task] $*" >&2
-    fi
-}
+LOG_FILE="$LOG_DIR/handle-task.log"
 
 # Atomic check-and-create using mkdir (prevents race conditions)
 # mkdir fails if directory already exists, making it safe for concurrent access
 TAB_MARKER="$TASK_DIR/.tab-lock"
 debug "Checking tab marker: $TAB_MARKER"
 if ! mkdir "$TAB_MARKER" 2>/dev/null; then
-    log "Task already being processed: $TASK_NAME"
+    log "Task already being processed: $TASK_NAME" "$LOG_FILE"
     debug "Task already processed, exiting"
     exit 0
 fi
 
-log "New task detected: $TASK_NAME"
+# Clean up .tab-lock on error (but keep it on success for window_id)
+TASK_COMPLETED=false
+cleanup_on_error() {
+    if [ "$TASK_COMPLETED" = false ] && [ -d "$TAB_MARKER" ]; then
+        debug "Cleaning up .tab-lock due to error"
+        rm -rf "$TAB_MARKER"
+    fi
+}
+trap cleanup_on_error EXIT
+
+log "New task detected: $TASK_NAME" "$LOG_FILE"
 debug "New task: $TASK_NAME (IS_GIT_REPO=$IS_GIT_REPO)"
 
 # Create origin and attach symlinks if they don't exist
@@ -114,7 +85,7 @@ if [ "$IS_GIT_REPO" = true ]; then
     # Create worktree for this task
     WORK_DIR="$TASK_DIR/worktree"
     if [ ! -d "$WORK_DIR" ]; then
-        log "Creating worktree: $WORK_DIR"
+        log "Creating worktree: $WORK_DIR" "$LOG_FILE"
         debug "Creating worktree: $WORK_DIR"
         git -C "$PROJECT_DIR" worktree prune 2>/dev/null || true
 
@@ -143,7 +114,7 @@ if [ "$IS_GIT_REPO" = true ]; then
             # Branch might already exist, try without -b
             debug "First attempt failed, trying without -b flag..."
             if ! git -C "$PROJECT_DIR" worktree add "$WORK_DIR" "$TASK_NAME" 2>> "$LOG_DIR/handle-task.log"; then
-                log "Failed to create worktree for $TASK_NAME"
+                log "Failed to create worktree for $TASK_NAME" "$LOG_FILE"
                 debug "Failed to create worktree!"
                 exit 1
             fi
@@ -153,7 +124,7 @@ if [ "$IS_GIT_REPO" = true ]; then
         if [ -n "$STASH_HASH" ]; then
             debug "Applying stash $STASH_HASH to worktree..."
             if ! git -C "$WORK_DIR" stash apply "$STASH_HASH" 2>> "$LOG_DIR/handle-task.log"; then
-                log "Warning: stash apply had conflicts in $TASK_NAME"
+                log "Warning: stash apply had conflicts in $TASK_NAME" "$LOG_FILE"
                 echo "⚠️  Warning: Uncommitted changes may have conflicts. Check worktree." >> "$TASK_DIR/log"
             fi
         fi
@@ -170,7 +141,7 @@ if [ "$IS_GIT_REPO" = true ]; then
         fi
         rm -f "$UNTRACKED_LIST"
 
-        log "Worktree created: $WORK_DIR"
+        log "Worktree created: $WORK_DIR" "$LOG_FILE"
         debug "Worktree created successfully"
     else
         debug "Worktree already exists: $WORK_DIR"
@@ -178,7 +149,7 @@ if [ "$IS_GIT_REPO" = true ]; then
 else
     # Non-git mode: work directly in project directory
     WORK_DIR="$PROJECT_DIR"
-    log "Non-git mode: working in $WORK_DIR"
+    log "Non-git mode: working in $WORK_DIR" "$LOG_FILE"
     debug "Non-git mode: WORK_DIR=$WORK_DIR"
 fi
 
@@ -227,12 +198,12 @@ echo "$system_prompt" > "$TASK_DIR/.system-prompt"
 echo "$user_prompt" > "$TASK_DIR/.user-prompt"
 
 # Create new window with truncated name and working emoji
-display_name=$(truncate_tab_name "$TASK_NAME")
-window_name="🤖${display_name}"
+display_name=$(truncate_name "$TASK_NAME")
+window_name="${EMOJI_WORKING}${display_name}"
 debug "Creating tmux window: $window_name"
 
 # Get window ID for reliable targeting (-d: don't switch focus to new window)
-window_id=$(tm new-window -d -t "$SESSION_NAME" -n "$window_name" -c "$WORK_DIR" -P -F "#{window_id}")
+window_id=$(tm "$SESSION_NAME" new-window -d -t "$SESSION_NAME" -n "$window_name" -c "$WORK_DIR" -P -F "#{window_id}")
 debug "Window created: $window_id"
 # Save window_id for cleanup - store in lock directory
 echo "$window_id" > "$TAB_MARKER/window_id"
@@ -241,45 +212,45 @@ sleep 0.3
 
 # Split horizontally (creates right pane for user)
 debug "Splitting window horizontally..."
-tm split-window -t "$window_id" -h -c "$WORK_DIR"
+tm "$SESSION_NAME" split-window -t "$window_id" -h -c "$WORK_DIR"
 sleep 0.2
 
 debug "Agent pane: ${window_id}.0"
 
 # Send shell command (normal Enter)
 send_shell_cmd() {
-    tm send-keys -t "${window_id}.0" -l "$1"
-    tm send-keys -t "${window_id}.0" Enter
+    tm "$SESSION_NAME" send-keys -t "${window_id}.0" -l "$1"
+    tm "$SESSION_NAME" send-keys -t "${window_id}.0" Enter
 }
 
 # Send input to claude code (Escape to exit multiline, then raw ASCII 13 to submit)
 send_to_claude() {
     # Ensure pane is ready to receive input
     sleep 0.3
-    tm send-keys -t "${window_id}.0" -l "$1"
+    tm "$SESSION_NAME" send-keys -t "${window_id}.0" -l "$1"
     sleep 0.2
-    tm send-keys -t "${window_id}.0" Escape
+    tm "$SESSION_NAME" send-keys -t "${window_id}.0" Escape
     sleep 0.2
-    tm send-keys -t "${window_id}.0" -H 0d  # ASCII 13 (Carriage Return)
+    tm "$SESSION_NAME" send-keys -t "${window_id}.0" -H 0d  # ASCII 13 (Carriage Return)
     debug "Sent input to claude: ${1:0:50}..."
 }
 
 # Helper to get pane content
 get_pane_content() {
-    tm capture-pane -t "${window_id}.0" -p 2>/dev/null || echo ""
+    tm "$SESSION_NAME" capture-pane -t "${window_id}.0" -p 2>/dev/null || echo ""
 }
 
 # Wait for claude to be ready (poll until we see expected output)
 wait_for_claude_ready() {
     local max_attempts=60  # 30 seconds max
     local attempt=0
-    log "Waiting for claude to be ready..."
+    log "Waiting for claude to be ready..." "$LOG_FILE"
     debug "Waiting for claude to be ready (max $max_attempts attempts)..."
     while [ $attempt -lt $max_attempts ]; do
         local content=$(get_pane_content)
         # Claude is ready when we see trust prompt or the input prompt (╭─)
         if echo "$content" | grep -qE "Trust|trust|╭─"; then
-            log "Claude ready after $attempt attempts"
+            log "Claude ready after $attempt attempts" "$LOG_FILE"
             debug "Claude ready after $attempt attempts"
             return 0
         fi
@@ -291,7 +262,7 @@ wait_for_claude_ready() {
         sleep 0.5
         attempt=$((attempt + 1))
     done
-    log "Timeout waiting for claude"
+    log "Timeout waiting for claude" "$LOG_FILE"
     debug "TIMEOUT waiting for claude after $max_attempts attempts"
     debug "Final pane content:"
     get_pane_content | sed 's/^/  [pane] /' >&2
@@ -312,7 +283,7 @@ fi
 # Wait for claude to be ready
 debug "Waiting for claude to start..."
 if ! wait_for_claude_ready; then
-    log "Failed to start claude for $TASK_NAME"
+    log "Failed to start claude for $TASK_NAME" "$LOG_FILE"
     debug "FAILED: claude did not start properly"
     exit 1
 fi
@@ -334,5 +305,8 @@ sleep 0.5
 debug "Sending task instruction to claude..."
 send_to_claude "ultrathink Read and execute the task from $TASK_DIR/.user-prompt"
 
-log "Created window: $window_name, sent task to claude"
+# Mark task as completed (prevents cleanup_on_error from removing .tab-lock)
+TASK_COMPLETED=true
+
+log "Created window: $window_name, sent task to claude" "$LOG_FILE"
 debug "Task sent successfully. Window: $window_name"
