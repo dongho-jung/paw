@@ -123,18 +123,32 @@ if [ "$IS_GIT_MODE" = true ] && [ "$FORCE_MODE" != "--force" ] && [ -d "$WORK_DI
             # Get main branch name
             MAIN_BRANCH=$(git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main")
 
-            # Fetch and merge
+            # Save current branch in PROJECT_DIR before switching
+            CURRENT_BRANCH=$(git -C "$PROJECT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+
+            # Fetch latest main
             git -C "$PROJECT_DIR" fetch origin "$MAIN_BRANCH" 2>/dev/null || true
+
+            # Checkout main branch in PROJECT_DIR
+            if ! git -C "$PROJECT_DIR" checkout "$MAIN_BRANCH" 2>/dev/null; then
+                log "Failed to checkout $MAIN_BRANCH" "$LOG_FILE"
+                tm "$SESSION_NAME" display-message "Failed to checkout $MAIN_BRANCH. Resolve manually."
+                exit 0
+            fi
+
+            # Pull latest main
+            git -C "$PROJECT_DIR" pull origin "$MAIN_BRANCH" 2>/dev/null || true
 
             if git -C "$PROJECT_DIR" merge "$TASK_NAME" --no-ff -m "Merge branch '$TASK_NAME'" 2>/dev/null; then
                 git -C "$PROJECT_DIR" push origin "$MAIN_BRANCH" 2>/dev/null || true
                 MERGED=true
                 log "Merged to $MAIN_BRANCH" "$LOG_FILE"
             else
-                # Merge conflict - abort and ask
+                # Merge conflict - abort, notify, and EXIT (don't cleanup)
                 git -C "$PROJECT_DIR" merge --abort 2>/dev/null || true
-                log "Merge conflict, manual resolution needed" "$LOG_FILE"
-                tm "$SESSION_NAME" display-message "Merge conflict! Resolve manually or use --force to skip"
+                log "Merge conflict, stopping without cleanup" "$LOG_FILE"
+                tm "$SESSION_NAME" display-message "Merge conflict! Resolve manually or use ⌥ e --force to skip"
+                exit 0
             fi
             ;;
 
