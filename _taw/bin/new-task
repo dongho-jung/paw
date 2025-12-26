@@ -34,7 +34,7 @@ temp_file=$(mktemp) || {
     echo "Error: Failed to create temp file"
     exit 1
 }
-trap "rm -f '$temp_file'" EXIT
+trap "stop_spinner; rm -f '$temp_file'" EXIT
 debug "Created temp file: $temp_file"
 
 # Add hint comment
@@ -80,6 +80,9 @@ fi
 
 log "Task content received, calling Claude CLI (haiku)..."
 debug "Task content: $task_content"
+
+# Start spinner while generating task name
+start_spinner "태스크 이름 생성 중..."
 
 # Call Claude CLI to generate task name
 # Use single-line prompt for reliability
@@ -129,6 +132,9 @@ if [ -z "$task_name" ]; then
     log "All attempts failed, using fallback: task-$timestamp"
     task_name="task-$timestamp"
 fi
+
+# Stop spinner - task name generation complete
+stop_spinner
 
 # Atomic directory creation - mkdir (without -p) fails if directory exists
 # This prevents race conditions when multiple tasks are created simultaneously

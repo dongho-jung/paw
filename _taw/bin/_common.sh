@@ -153,6 +153,44 @@ find_incomplete_tasks() {
 }
 
 # ============================================================================
+# Spinner (Loading Indicator)
+# ============================================================================
+
+# Global variable to track spinner PID
+SPINNER_PID=""
+
+# Start a spinner with message
+# Usage: start_spinner "Processing..."
+# Note: Caller should ensure stop_spinner is called on exit (e.g., in a trap)
+start_spinner() {
+    local message="${1:-Working...}"
+    local delay=0.1
+    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+
+    # Run spinner in background
+    (
+        local i=0
+        while true; do
+            printf "\r%s %s" "${frames[i % ${#frames[@]}]}" "$message"
+            sleep "$delay"
+            i=$((i + 1))
+        done
+    ) &
+    SPINNER_PID=$!
+}
+
+# Stop the spinner
+# Usage: stop_spinner
+stop_spinner() {
+    if [ -n "$SPINNER_PID" ] && kill -0 "$SPINNER_PID" 2>/dev/null; then
+        kill "$SPINNER_PID" 2>/dev/null
+        wait "$SPINNER_PID" 2>/dev/null || true
+        printf "\r\033[K"  # Clear the spinner line
+        SPINNER_PID=""
+    fi
+}
+
+# ============================================================================
 # Task Cleanup (shared between end-task and /done)
 # ============================================================================
 
