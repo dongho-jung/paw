@@ -30,8 +30,8 @@ fi
 get_task_name() {
     local window_name
     window_name=$(tm "$SESSION_NAME" display-message -t "$WINDOW_ID" -p '#{window_name}' 2>/dev/null) || return 1
-    # Remove emoji prefix (🤖 💬 ✅)
-    echo "$window_name" | sed 's/^[🤖💬✅]*//'
+    # Remove emoji prefix (🤖 💬 ✅ ⚠️)
+    echo "$window_name" | sed 's/^[🤖💬✅⚠️]*//'
 }
 
 # Find .taw directory by walking up from path

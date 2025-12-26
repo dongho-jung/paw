@@ -65,7 +65,13 @@ The script will:
 Before cleanup completes, check if there are queued tasks:
 
 ```bash
-{TAW_DIR}/../_taw/bin/process-queue "$(basename {PROJECT_DIR})"
+$TAW_HOME/_taw/bin/process-queue "$(basename {PROJECT_DIR})"
+```
+
+If TAW_HOME is not available, find it from the new-task symlink:
+```bash
+TAW_HOME=$(cd "$(dirname "$(readlink {TAW_DIR}/new-task)")/../.." && pwd)
+$TAW_HOME/_taw/bin/process-queue "$(basename {PROJECT_DIR})"
 ```
 
 This will automatically start the next task from the queue if any exists.

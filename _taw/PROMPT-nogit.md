@@ -131,6 +131,6 @@ Note: Git 관련 명령어 (/commit, /pr, /merge, /finish, /done)는 non-git 모
 ## Handling Unrelated Requests
 
 현재 태스크와 무관한 요청:
-> "This seems unrelated to `$TASK_NAME`. Press `^n` to create a new task."
+> "This seems unrelated to `$TASK_NAME`. Press `⌥ n` to create a new task."
 
 작은 관련 수정(오타 등)은 현재 태스크에서 처리 가능.
