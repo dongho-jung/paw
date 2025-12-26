@@ -237,6 +237,112 @@ config_exists() {
 
 
 # ============================================================================
+# Corrupted Worktree Detection
+# ============================================================================
+
+# Check if a worktree is corrupted/invalid
+# Returns: "ok", "missing_worktree", "not_in_git", "invalid_git", "missing_branch"
+# Usage: status=$(check_worktree_status "$PROJECT_DIR" "$WORKTREE_DIR" "$TASK_NAME")
+check_worktree_status() {
+    local project_dir="$1"
+    local worktree_dir="$2"
+    local task_name="$3"
+
+    # Check if worktree directory exists
+    if [ ! -d "$worktree_dir" ]; then
+        echo "missing_worktree"
+        return 0
+    fi
+
+    # Check if worktree has valid .git file
+    if [ ! -f "$worktree_dir/.git" ]; then
+        echo "invalid_git"
+        return 0
+    fi
+
+    # Check if worktree is registered in git
+    if ! git -C "$project_dir" worktree list 2>/dev/null | grep -q "$worktree_dir"; then
+        echo "not_in_git"
+        return 0
+    fi
+
+    # Check if branch exists
+    if ! git -C "$project_dir" rev-parse --verify "$task_name" &>/dev/null; then
+        echo "missing_branch"
+        return 0
+    fi
+
+    echo "ok"
+}
+
+# Find corrupted tasks: tasks where worktree state is invalid
+# Usage: corrupted_tasks=$(find_corrupted_tasks "$AGENTS_DIR" "$PROJECT_DIR" "$SESSION_NAME")
+# Returns: newline-separated list of "task_dir|status" pairs
+find_corrupted_tasks() {
+    local agents_dir="$1"
+    local project_dir="$2"
+    local session_name="${3:-}"
+    local result=""
+
+    [ -d "$agents_dir" ] || return 0
+
+    for agent_dir in "$agents_dir"/*/; do
+        [ -d "$agent_dir" ] || continue
+
+        local task_name=$(basename "$agent_dir")
+        local worktree_dir="$agent_dir/worktree"
+        local tab_lock="$agent_dir/.tab-lock"
+
+        # Skip tasks that have an active window (if session_name provided)
+        if [ -n "$session_name" ] && [ -d "$tab_lock" ] && [ -f "$tab_lock/window_id" ]; then
+            local window_id=$(cat "$tab_lock/window_id")
+            # Check if window actually exists
+            if tmux -L "taw-$session_name" list-windows -F "#{window_id}" 2>/dev/null | grep -q "^${window_id}$"; then
+                # Window still exists, skip this task
+                continue
+            fi
+        fi
+
+        # Check worktree status (only for git mode tasks with worktree dir or task file)
+        if [ -d "$worktree_dir" ] || [ -f "$agent_dir/task" ]; then
+            local status=$(check_worktree_status "$project_dir" "$worktree_dir" "$task_name")
+            if [ "$status" != "ok" ]; then
+                if [ -n "$result" ]; then
+                    result="$result"$'\n'"$agent_dir|$status"
+                else
+                    result="$agent_dir|$status"
+                fi
+            fi
+        fi
+    done
+
+    echo "$result"
+}
+
+# Get human-readable description of worktree status
+# Usage: desc=$(get_worktree_status_description "$status")
+get_worktree_status_description() {
+    local status="$1"
+    case "$status" in
+        missing_worktree)
+            echo "worktree 디렉토리가 없습니다 (외부에서 삭제됨)"
+            ;;
+        not_in_git)
+            echo "worktree가 git에 등록되어 있지 않습니다 (외부에서 정리됨)"
+            ;;
+        invalid_git)
+            echo "worktree의 .git 파일이 손상되었습니다"
+            ;;
+        missing_branch)
+            echo "branch가 없습니다 (외부에서 삭제됨)"
+            ;;
+        *)
+            echo "알 수 없는 상태: $status"
+            ;;
+    esac
+}
+
+# ============================================================================
 # Task Cleanup (shared between end-task and /done)
 # ============================================================================
 
