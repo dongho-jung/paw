@@ -399,15 +399,8 @@ find_merged_tasks() {
         local task_name=$(basename "$agent_dir")
         local tab_lock="$agent_dir/.tab-lock"
 
-        # Skip tasks that have an active window (if session_name provided)
-        if [ -n "$session_name" ] && [ -d "$tab_lock" ] && [ -f "$tab_lock/window_id" ]; then
-            local window_id=$(cat "$tab_lock/window_id")
-            # Check if window actually exists
-            if tmux -L "taw-$session_name" list-windows -F "#{window_id}" 2>/dev/null | grep -q "^${window_id}$"; then
-                # Window still exists, skip this task
-                continue
-            fi
-        fi
+        # Note: We don't skip tasks with active windows here.
+        # auto_cleanup_merged_tasks() will close the window before cleanup.
 
         # Check if task is merged
         local status=$(check_task_merged "$project_dir" "$task_name" "$agent_dir")

@@ -330,6 +330,48 @@ auto_cleanup_merged_tasks() {
     done
 }
 
+# Cleanup orphan windows (windows where agent_dir was deleted but window still exists)
+cleanup_orphan_windows() {
+    # Get all known window_ids from agent directories
+    local known_window_ids=""
+    if [ -d "$AGENTS_DIR" ]; then
+        for agent_dir in "$AGENTS_DIR"/*/; do
+            [ -d "$agent_dir" ] || continue
+            local window_id_file="$agent_dir/.tab-lock/window_id"
+            if [ -f "$window_id_file" ]; then
+                local wid=$(cat "$window_id_file")
+                known_window_ids="$known_window_ids $wid"
+            fi
+        done
+    fi
+
+    # Get all windows and check for orphans
+    local windows
+    windows=$(tm list-windows -F "#{window_id} #{window_name}" 2>/dev/null) || return 0
+
+    echo "$windows" | while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        local window_id=$(echo "$line" | awk '{print $1}')
+        local window_name=$(echo "$line" | cut -d' ' -f2-)
+
+        # Skip if not a task window (task windows start with emoji)
+        case "$window_name" in
+            ${EMOJI_WORKING}*|${EMOJI_WAITING}*|${EMOJI_DONE}*|${EMOJI_WARNING}*) ;;
+            *) continue ;;
+        esac
+
+        # Check if this window_id is known
+        if ! echo "$known_window_ids" | grep -q "$window_id"; then
+            log "Closing orphan window: $window_name"
+            debug "Orphan window_id: $window_id (not in known: $known_window_ids)"
+            tm send-keys -t "${window_id}.0" C-c 2>/dev/null || true
+            sleep 0.2
+            tm kill-window -t "$window_id" 2>/dev/null || true
+            echo "✅ Closed orphan window: $window_name"
+        fi
+    done
+}
+
 # Reopen incomplete tasks (tasks where window was closed but not done)
 reopen_incomplete_tasks() {
     local incomplete_tasks
@@ -432,6 +474,10 @@ start_session() {
     debug "Checking for merged tasks to cleanup..."
     auto_cleanup_merged_tasks
 
+    # Cleanup orphan windows (agent_dir deleted but window still open)
+    debug "Checking for orphan windows..."
+    cleanup_orphan_windows
+
     # Reopen any incomplete tasks from previous sessions
     debug "Checking for incomplete tasks..."
     reopen_incomplete_tasks
@@ -497,16 +543,26 @@ if is_session_running; then
     debug "Checking for merged tasks to cleanup..."
     auto_cleanup_merged_tasks
 
-    # Reopen any incomplete tasks
-    debug "Checking for incomplete tasks..."
-    reopen_incomplete_tasks
+    # Cleanup orphan windows (agent_dir deleted but window still open)
+    debug "Checking for orphan windows..."
+    cleanup_orphan_windows
 
-    # Check for corrupted worktree states
-    debug "Checking for corrupted worktrees..."
-    reopen_corrupted_tasks
+    # Check if session still exists after cleanup (all windows might have been closed)
+    if ! is_session_running; then
+        log "Session terminated after cleanup, starting fresh..."
+        start_session
+    else
+        # Reopen any incomplete tasks
+        debug "Checking for incomplete tasks..."
+        reopen_incomplete_tasks
 
-    printf '\e]1;%s\a' "taw: $SESSION_NAME"
-    tm attach -t "$SESSION_NAME"
+        # Check for corrupted worktree states
+        debug "Checking for corrupted worktrees..."
+        reopen_corrupted_tasks
+
+        printf '\e]1;%s\a' "taw: $SESSION_NAME"
+        tm attach -t "$SESSION_NAME"
+    fi
 else
     start_session
 fi
