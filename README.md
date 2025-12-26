@@ -37,6 +37,7 @@ taw/                           # 이 레포
     │   ├── quick-task         # 빠른 태스크 큐 추가 (^⌥a)
     │   ├── popup-shell        # 팝업 쉘 (^a로 토글)
     │   ├── process-queue      # 큐 처리 (태스크 완료 후 자동 실행)
+    │   ├── recover-task       # 손상된 태스크 복구/정리
     │   └── _common.sh         # 공통 유틸리티 (상수, 함수, 설정)
     └── claude/commands/       # slash commands
         ├── commit.md          # /commit - 스마트 커밋
@@ -111,11 +112,28 @@ Agent가 사용할 수 있는 slash commands:
 - Claude에 새로운 입력을 보내지 않고 이전 상태 그대로 복원
 - 수동으로 이어서 작업할 수 있도록 준비됨
 
+### 손상된 Worktree 복구
+
+외부에서 worktree가 삭제되거나 git 상태가 꼬인 경우, `taw`를 실행하면 자동으로 감지하여 복구 옵션을 제공합니다.
+
+감지되는 상태:
+- `missing_worktree`: worktree 디렉토리가 없음 (외부에서 삭제됨)
+- `not_in_git`: worktree가 git에 등록되어 있지 않음 (외부에서 정리됨)
+- `invalid_git`: worktree의 .git 파일이 손상됨
+- `missing_branch`: branch가 없음 (외부에서 삭제됨)
+
+복구 옵션:
+- **Recover**: worktree를 재생성하고 작업 계속
+- **Cleanup**: 태스크와 관련 리소스(worktree, branch) 정리
+
+손상된 태스크는 ⚠️ 이모지와 함께 window가 열리고, 사용자가 복구 또는 정리를 선택할 수 있습니다.
+
 ### Window 상태
 
 - 🤖 작업 중
-- 💬 대기 중
+- 💬 대기 중 (사용자 입력 필요)
 - ✅ 완료
+- ⚠️ 손상됨 (복구 또는 정리 필요)
 
 ## 설정
 

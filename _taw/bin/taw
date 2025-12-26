@@ -311,6 +311,32 @@ reopen_incomplete_tasks() {
     done
 }
 
+# Reopen corrupted tasks (tasks where worktree state is invalid)
+reopen_corrupted_tasks() {
+    # Only check in git mode
+    [ "$IS_GIT_REPO" = true ] || return 0
+
+    local corrupted_tasks
+    corrupted_tasks=$(find_corrupted_tasks "$AGENTS_DIR" "$PROJECT_DIR" "$SESSION_NAME")
+
+    [ -z "$corrupted_tasks" ] && return 0
+
+    echo "$corrupted_tasks" | while IFS='|' read -r agent_dir status; do
+        [ -z "$agent_dir" ] && continue
+        local task_name=$(basename "$agent_dir")
+        log "Found corrupted task: $task_name (status: $status)"
+        debug "Corrupted task: $agent_dir (status: $status)"
+
+        # Create warning window with recovery script
+        local display_name=$(truncate_name "$task_name")
+        local window_name="${EMOJI_WARNING}${display_name}"
+
+        debug "Creating warning window for corrupted task..."
+        tm new-window -d -t "$SESSION_NAME" -n "$window_name" -c "$PROJECT_DIR" \
+            "$TAW_HOME/_taw/bin/recover-task '$agent_dir' '$status'"
+    done
+}
+
 start_session() {
     check_dependencies
 
@@ -376,6 +402,10 @@ start_session() {
     debug "Checking for incomplete tasks..."
     reopen_incomplete_tasks
 
+    # Check for corrupted worktree states
+    debug "Checking for corrupted worktrees..."
+    reopen_corrupted_tasks
+
     # Attach to session
     log "Attaching to session"
     printf '\e]1;%s\a' "taw: $SESSION_NAME"
@@ -432,6 +462,10 @@ if is_session_running; then
     # Reopen any incomplete tasks
     debug "Checking for incomplete tasks..."
     reopen_incomplete_tasks
+
+    # Check for corrupted worktree states
+    debug "Checking for corrupted worktrees..."
+    reopen_corrupted_tasks
 
     printf '\e]1;%s\a' "taw: $SESSION_NAME"
     tm attach -t "$SESSION_NAME"
