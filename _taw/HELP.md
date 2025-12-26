@@ -6,7 +6,7 @@ Claude Code 기반 자율 에이전트 작업 환경
 
 ### 태스크 관리
   ^n          새 태스크 생성 (에디터 열림)
-  ^x          현재 태스크 종료 (/done 실행)
+  ^x          현재 태스크 종료 (worktree/branch 정리)
 
 ### Pane 조작
   ⌥ ←/→/↑/↓   pane 이동

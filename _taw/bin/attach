@@ -2,6 +2,7 @@
 
 # TAW Attach - Reattach to an existing task
 # Creates window with agent pane and starts claude
+# Works with both git and non-git modes
 
 set -e
 
@@ -25,7 +26,14 @@ fi
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
 SESSION_NAME="$PROJECT_NAME"
 
-GLOBAL_PROMPT="$TAW_HOME/_taw/PROMPT.md"
+# Check if this is git mode
+IS_GIT_MODE=false
+if [ -f "$TAW_DIR/.is-git-repo" ]; then
+    IS_GIT_MODE=true
+fi
+
+# Use .global-prompt symlink (consistent with handle-task)
+GLOBAL_PROMPT="$TAW_DIR/.global-prompt"
 PROJECT_PROMPT="$TAW_DIR/PROMPT.md"
 
 # Check if inside tmux
@@ -42,16 +50,23 @@ if [ "$CURRENT_SESSION" != "$SESSION_NAME" ]; then
     exit 1
 fi
 
-# Check if worktree exists, create if not
-if [ ! -d "$WORKTREE_DIR" ]; then
-    echo "Creating worktree..."
-    git -C "$PROJECT_DIR" worktree prune 2>/dev/null || true
-    if ! git -C "$PROJECT_DIR" worktree add "$WORKTREE_DIR" -b "$TASK_NAME" 2>/dev/null; then
-        if ! git -C "$PROJECT_DIR" worktree add "$WORKTREE_DIR" "$TASK_NAME" 2>/dev/null; then
-            echo "Error: Failed to create worktree"
-            exit 1
+# Set working directory based on git mode
+if [ "$IS_GIT_MODE" = true ]; then
+    WORK_DIR="$WORKTREE_DIR"
+    # Check if worktree exists, create if not
+    if [ ! -d "$WORKTREE_DIR" ]; then
+        echo "Creating worktree..."
+        git -C "$PROJECT_DIR" worktree prune 2>/dev/null || true
+        if ! git -C "$PROJECT_DIR" worktree add "$WORKTREE_DIR" -b "$TASK_NAME" 2>/dev/null; then
+            if ! git -C "$PROJECT_DIR" worktree add "$WORKTREE_DIR" "$TASK_NAME" 2>/dev/null; then
+                echo "Error: Failed to create worktree"
+                exit 1
+            fi
         fi
     fi
+else
+    # Non-git mode: work directly in project directory
+    WORK_DIR="$PROJECT_DIR"
 fi
 
 # Build system prompt
@@ -86,19 +101,23 @@ display_name=$(truncate_name "$TASK_NAME")
 window_name="🤖${display_name}"
 
 # Create new window
-window_id=$(tmux new-window -n "$window_name" -c "$WORKTREE_DIR" -P -F "#{window_id}")
+window_id=$(tmux new-window -n "$window_name" -c "$WORK_DIR" -P -F "#{window_id}")
 
 # Set remain-on-exit
 tmux setw -t "$window_id" remain-on-exit on
 sleep 0.3
 
 # Split horizontally for user pane
-tmux split-window -t "$window_id" -h -c "$WORKTREE_DIR"
+tmux split-window -t "$window_id" -h -c "$WORK_DIR"
 
 # Select agent pane (left)
 tmux select-pane -t "${window_id}.0"
 
-# Start claude with system prompt
-tmux send-keys -t "${window_id}.0" "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$WORKTREE_DIR' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $AGENT_DIR/.system-prompt)\"" Enter
+# Start claude with system prompt (include WINDOW_ID, WORKTREE_DIR only in git mode)
+if [ "$IS_GIT_MODE" = true ]; then
+    tmux send-keys -t "${window_id}.0" "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$WORK_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $AGENT_DIR/.system-prompt)\"" Enter
+else
+    tmux send-keys -t "${window_id}.0" "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat $AGENT_DIR/.system-prompt)\"" Enter
+fi
 
 echo "Attached to task: $TASK_NAME"

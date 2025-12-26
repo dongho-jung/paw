@@ -152,7 +152,10 @@ if [ "$IS_GIT_REPO" = true ]; then
         # Apply stashed changes to worktree using hash (original dir unchanged)
         if [ -n "$STASH_HASH" ]; then
             debug "Applying stash $STASH_HASH to worktree..."
-            git -C "$WORK_DIR" stash apply "$STASH_HASH" 2>> "$LOG_DIR/handle-task.log" || true
+            if ! git -C "$WORK_DIR" stash apply "$STASH_HASH" 2>> "$LOG_DIR/handle-task.log"; then
+                log "Warning: stash apply had conflicts in $TASK_NAME"
+                echo "⚠️  Warning: Uncommitted changes may have conflicts. Check worktree." >> "$TASK_DIR/log"
+            fi
         fi
 
         # Copy untracked files to worktree

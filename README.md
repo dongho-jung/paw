@@ -23,12 +23,19 @@ taw/                           # 이 레포
 ├── install                    # taw 설치
 ├── uninstall                  # taw 제거
 └── _taw/                      # 전역 설정
-    ├── PROMPT.md              # 전역 에이전트 프롬프트
+    ├── PROMPT.md              # 전역 에이전트 프롬프트 (git 모드)
+    ├── PROMPT-nogit.md        # 전역 에이전트 프롬프트 (non-git 모드)
+    ├── HELP.md                # 도움말 (⌥ + / 로 열람)
     ├── bin/                   # 실행 파일
     │   ├── taw                # 메인 명령어 (세션 시작)
-    │   └── new-task           # 태스크 생성
+    │   ├── new-task           # 태스크 생성
+    │   ├── handle-task        # 태스크 처리 (worktree 생성, agent 시작)
+    │   ├── end-task           # 태스크 종료 (^x)
+    │   ├── attach             # 태스크 재연결
+    │   └── cleanup            # 정리 스크립트 (/done에서 사용)
     └── claude/commands/       # slash commands
         ├── pr.md              # /pr - PR 생성
+        ├── merge.md           # /merge - 브랜치 머지
         └── done.md            # /done - 태스크 정리
 
 {any-project}/                 # 사용자 프로젝트 (git 또는 일반 디렉토리)
@@ -106,7 +113,7 @@ brew install tmux gh
 | 동작 | 단축키 |
 |------|--------|
 | 새 태스크 | `^n` |
-| 태스크 종료 | `^e` (agent에 /done 전송) |
+| 태스크 종료 | `^x` (worktree/branch 정리 및 창 닫기) |
 | Pane 이동 | `⌥ + ←/→/↑/↓` |
 | Pane 분할 | `⌥ + h/j/k/l` (좌/하/상/우) |
 | Pane 닫기 | `⌥ + x` |

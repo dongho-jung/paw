@@ -71,19 +71,8 @@ If the user asks you to do something **unrelated to the current task**, you shou
 1. **Recognize it's unrelated** - Is the request significantly different from what's in your task file?
 
 2. **Suggest a new task** - Tell the user:
-   > "This seems unrelated to the current task (`$TASK_NAME`). Should I create a new task for this instead?"
+   > "This seems unrelated to the current task (`$TASK_NAME`). Would you like to press `^n` (Ctrl+N) to create a new task for this?"
 
-3. **Create new task if agreed** - Just create the task file:
-   ```bash
-   new_task_name="descriptive-name-for-new-task"
-   mkdir -p $TAW_DIR/agents/$new_task_name
-   cat > $TAW_DIR/agents/$new_task_name/task << 'EOF'
-   Description of what the user wants to do...
-   EOF
-   ```
-
-   **A new window will automatically appear once the `task` file is created.**
-
-4. **Then tell the user**: "I've created a new task window `$new_task_name`. You can switch to it."
+3. **Wait for the user** - The user will press `^n` to create a new task, which opens an editor for them to describe the new task.
 
 **When in doubt, ask the user.**

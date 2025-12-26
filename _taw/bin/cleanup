@@ -2,8 +2,7 @@
 
 # TAW Cleanup Script
 # Usage: cleanup <task_name> <taw_dir> <project_dir> <worktree_dir>
-
-set -x  # Debug: show all commands
+# Called by /done slash command when agent completes a task
 
 TASK_NAME="$1"
 TAW_DIR="$2"
