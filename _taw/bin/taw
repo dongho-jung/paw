@@ -376,6 +376,7 @@ start_session() {
     tm bind -n M-e run-shell "$TAW_HOME/_taw/bin/end-task '$SESSION_NAME' '#{window_id}'"
     tm bind -n M-p run-shell "$TAW_HOME/_taw/bin/popup-shell '$SESSION_NAME'"
     tm bind -n M-u run-shell "$TAW_HOME/_taw/bin/quick-task '$SESSION_NAME'"
+    tm bind -n M-m run-shell "$TAW_HOME/_taw/bin/merge-completed '$SESSION_NAME'"
     tm bind -n M-q detach
     tm bind -n M-/ new-window -n "HELP" "less '$TAW_HOME/_taw/HELP.md'"
 
@@ -387,7 +388,7 @@ start_session() {
     # Status line: 2 lines - windows on top, hints on bottom
     tm set -t "$SESSION_NAME" status 2
     tm set -t "$SESSION_NAME" status-format[0] "#[align=left]#{W:#[fg=white bg=default] #W #[default],#[fg=white bg=blue bold] #W #[default]}"
-    tm set -t "$SESSION_NAME" status-format[1] "#[align=left fg=brightblack] ⌥tab:pane  ⌥←→:window  ⌥n:new  ⌥e:end  ⌥p:popup  ⌥u:queue  ⌥q:quit  ⌥/:help"
+    tm set -t "$SESSION_NAME" status-format[1] "#[align=left fg=brightblack] ⌥tab:pane  ⌥←→:window  ⌥n:new  ⌥e:end  ⌥m:merge  ⌥p:popup  ⌥u:queue  ⌥q:quit  ⌥/:help"
 
     # Run new-task in the initial window, then exit to close _ window
     debug "Running new-task in initial window..."
