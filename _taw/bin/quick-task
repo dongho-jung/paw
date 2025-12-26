@@ -69,7 +69,7 @@ case "$COMMAND" in
         else
             for task_file in "$QUEUE_DIR"/*.task; do
                 [ -f "$task_file" ] || continue
-                local num=$(basename "$task_file" .task)
+                num=$(basename "$task_file" .task)
                 echo "[$num] $(cat "$task_file")"
             done
         fi

@@ -103,11 +103,12 @@ echo "작업 완료 - PR 생성됨" >> {TAW_DIR}/agents/{TASK_NAME}/log
 Check if there are queued tasks and start the next one:
 
 ```bash
-{TAW_DIR}/../_taw/bin/process-queue "$(basename {PROJECT_DIR})"
+$TAW_HOME/_taw/bin/process-queue "$(basename {PROJECT_DIR})"
 ```
 
-Or if TAW_HOME is available:
+If TAW_HOME is not available, find it from the new-task symlink:
 ```bash
+TAW_HOME=$(cd "$(dirname "$(readlink {TAW_DIR}/new-task)")/../.." && pwd)
 $TAW_HOME/_taw/bin/process-queue "$(basename {PROJECT_DIR})"
 ```
 

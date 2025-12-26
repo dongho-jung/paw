@@ -20,8 +20,23 @@ fi
 
 CONFIG_FILE="$TAW_DIR/config"
 
-# Colors (if terminal supports them)
-if [ -t 1 ]; then
+# Colors (check if terminal supports them)
+# Check stderr since menu output goes there (stdout is captured for return values)
+supports_color() {
+    # Respect NO_COLOR standard (https://no-color.org/)
+    [ -n "${NO_COLOR:-}" ] && return 1
+    # Force color if requested
+    [ -n "${FORCE_COLOR:-}" ] && return 0
+    # Check if stderr is a terminal
+    [ -t 2 ] && return 0
+    # Check TERM for color support
+    case "${TERM:-}" in
+        xterm*|screen*|tmux*|vt100*|rxvt*|linux*|cygwin*|ansi) return 0 ;;
+    esac
+    return 1
+}
+
+if supports_color; then
     BOLD='\033[1m'
     DIM='\033[2m'
     CYAN='\033[36m'
@@ -33,9 +48,9 @@ else
 fi
 
 print_header() {
-    echo ""
-    echo -e "${BOLD}${CYAN}=== TAW Initial Setup ===${RESET}"
-    echo ""
+    echo "" >&2
+    echo -e "${BOLD}${CYAN}=== TAW Initial Setup ===${RESET}" >&2
+    echo "" >&2
 }
 
 print_option() {
@@ -45,23 +60,23 @@ print_option() {
     local selected="${4:-false}"
 
     if [ "$selected" = "true" ]; then
-        echo -e "  ${GREEN}→ ${num}) ${label}${RESET} ${DIM}${desc}${RESET}"
+        echo -e "  ${GREEN}→ ${num}) ${label}${RESET} ${DIM}${desc}${RESET}" >&2
     else
-        echo -e "    ${num}) ${label} ${DIM}${desc}${RESET}"
+        echo -e "    ${num}) ${label} ${DIM}${desc}${RESET}" >&2
     fi
 }
 
 # Select work mode (git repos only)
 select_work_mode() {
-    echo -e "${BOLD}Work Mode${RESET}"
-    echo -e "${DIM}How should taw create working directories for tasks?${RESET}"
-    echo ""
+    echo -e "${BOLD}Work Mode${RESET}" >&2
+    echo -e "${DIM}How should taw create working directories for tasks?${RESET}" >&2
+    echo "" >&2
     print_option "1" "worktree" "- Create git worktree per task (isolated, recommended)" "true"
     print_option "2" "main" "- Work directly on current branch (simpler)"
-    echo ""
+    echo "" >&2
 
     while true; do
-        read -p "Select [1-2, default: 1]: " choice
+        read -p "Select [1-2, default: 1]: " choice </dev/tty
         case "${choice:-1}" in
             1) echo "worktree"; return ;;
             2) echo "main"; return ;;
@@ -72,17 +87,17 @@ select_work_mode() {
 
 # Select on-complete behavior
 select_on_complete() {
-    echo -e "${BOLD}On Task Complete${RESET}"
-    echo -e "${DIM}What should happen when a task is finished?${RESET}"
-    echo ""
+    echo -e "${BOLD}On Task Complete${RESET}" >&2
+    echo -e "${DIM}What should happen when a task is finished?${RESET}" >&2
+    echo "" >&2
     print_option "1" "confirm" "- Ask before each action (safest)" "true"
     print_option "2" "auto-commit" "- Automatically commit changes"
     print_option "3" "auto-merge" "- Auto commit + merge to main"
     print_option "4" "auto-pr" "- Auto commit + create PR (recommended for teams)"
-    echo ""
+    echo "" >&2
 
     while true; do
-        read -p "Select [1-4, default: 1]: " choice
+        read -p "Select [1-4, default: 1]: " choice </dev/tty
         case "${choice:-1}" in
             1) echo "confirm"; return ;;
             2) echo "auto-commit"; return ;;
@@ -146,13 +161,13 @@ main() {
 
     # Check if config already exists
     if [ -f "$CONFIG_FILE" ]; then
-        echo -e "${YELLOW}Configuration already exists at: $CONFIG_FILE${RESET}"
-        read -p "Reconfigure? [y/N]: " reconfigure
+        echo -e "${YELLOW}Configuration already exists at: $CONFIG_FILE${RESET}" >&2
+        read -p "Reconfigure? [y/N]: " reconfigure </dev/tty
         if [[ ! "$reconfigure" =~ ^[Yy]$ ]]; then
-            echo "Keeping existing configuration."
+            echo "Keeping existing configuration." >&2
             return 0
         fi
-        echo ""
+        echo "" >&2
     fi
 
     # Collect settings
@@ -162,22 +177,22 @@ main() {
     # Only ask about work mode for git repos
     if [ "$IS_GIT_REPO" = "true" ]; then
         work_mode=$(select_work_mode)
-        echo ""
+        echo "" >&2
     else
-        echo -e "${DIM}Non-git repository detected. Work mode: main (fixed)${RESET}"
+        echo -e "${DIM}Non-git repository detected. Work mode: main (fixed)${RESET}" >&2
         work_mode="main"
-        echo ""
+        echo "" >&2
     fi
 
     on_complete=$(select_on_complete)
-    echo ""
+    echo "" >&2
 
     # Generate config
     generate_config "$work_mode" "$on_complete"
 
-    echo -e "${GREEN}Configuration saved to: $CONFIG_FILE${RESET}"
-    echo -e "${DIM}You can edit this file directly to change settings.${RESET}"
-    echo ""
+    echo -e "${GREEN}Configuration saved to: $CONFIG_FILE${RESET}" >&2
+    echo -e "${DIM}You can edit this file directly to change settings.${RESET}" >&2
+    echo "" >&2
 }
 
 # Run main
