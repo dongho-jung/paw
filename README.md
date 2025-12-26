@@ -101,7 +101,9 @@ Agent가 사용할 수 있는 slash commands:
 | `/pr` | PR 자동 생성 및 브라우저 열기 |
 | `/merge` | worktree 브랜치를 프로젝트의 현재 브랜치에 머지 |
 
-**태스크 종료**: `⌥ e`를 누르면 자동으로 커밋 → PR/머지(ON_COMPLETE 설정에 따라) → 정리가 수행됩니다.
+**태스크 종료**:
+- `auto-merge` 모드: 태스크 완료 시 **자동으로** 커밋 → 머지 → 정리 → window 닫기 (⌥e 불필요)
+- 다른 모드: `⌥ e`를 누르면 ON_COMPLETE 설정에 따라 커밋 → PR/머지 → 정리 수행
 
 ### 불완전한 태스크 자동 재오픈
 
@@ -186,7 +188,7 @@ work_mode: worktree
 # Options: confirm | auto-commit | auto-merge | auto-pr
 #   confirm     - Ask before each action (commit, merge, PR)
 #   auto-commit - Automatically commit changes (manual merge/PR)
-#   auto-merge  - Auto commit + merge + auto cleanup (closes window)
+#   auto-merge  - Task completes -> auto commit + merge + cleanup + close window (no ⌥e needed)
 #   auto-pr     - Auto commit + create Pull Request (for teams)
 on_complete: confirm
 ```
@@ -199,7 +201,7 @@ on_complete: confirm
 |             | `main` | 현재 브랜치에서 직접 작업 (단순) |
 | `on_complete` | `confirm` | 각 작업 전 확인 (안전) |
 |               | `auto-commit` | 자동 커밋 (머지/PR은 수동) |
-|               | `auto-merge` | 자동 커밋 + 머지 + 자동 정리 (worktree, window 삭제) |
+|               | `auto-merge` | **태스크 완료 시 자동** 커밋 + 머지 + 정리 + window 닫기 (⌥e 불필요) |
 |               | `auto-pr` | 자동 커밋 + PR 생성 (팀 협업용) |
 
 ### 기타 설정

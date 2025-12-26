@@ -92,7 +92,7 @@ select_on_complete() {
     echo "" >&2
     print_option "1" "confirm" "- Ask before each action (safest)" "true"
     print_option "2" "auto-commit" "- Automatically commit changes"
-    print_option "3" "auto-merge" "- Auto commit + merge to main"
+    print_option "3" "auto-merge" "- Task done → auto merge + cleanup + close (no ⌥e)"
     print_option "4" "auto-pr" "- Auto commit + create PR (recommended for teams)"
     echo "" >&2
 
@@ -139,7 +139,7 @@ work_mode: $work_mode
 # Options:
 #   confirm     - Ask before each action (commit, merge, PR)
 #   auto-commit - Automatically commit changes (manual merge/PR)
-#   auto-merge  - Auto commit + merge to current branch
+#   auto-merge  - Task done → auto merge + cleanup + close window (no ⌥e needed)
 #   auto-pr     - Auto commit + create Pull Request (for teams)
 #
 on_complete: $on_complete

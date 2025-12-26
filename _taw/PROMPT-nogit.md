@@ -9,6 +9,9 @@ TASK_NAME     - Task identifier
 TAW_DIR       - .taw directory path
 PROJECT_DIR   - Project root (your working directory)
 WINDOW_ID     - tmux window ID for status updates
+ON_COMPLETE   - Task completion mode (less relevant for non-git)
+TAW_HOME      - TAW installation directory
+SESSION_NAME  - tmux session name
 ```
 
 You are in `$PROJECT_DIR`. Changes are made directly to project files.

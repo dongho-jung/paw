@@ -10,6 +10,9 @@ TAW_DIR       - .taw directory path
 PROJECT_DIR   - Original project root
 WORKTREE_DIR  - Your isolated working directory (git worktree)
 WINDOW_ID     - tmux window ID for status updates
+ON_COMPLETE   - Task completion mode: auto-merge | auto-pr | auto-commit | confirm
+TAW_HOME      - TAW installation directory (for calling scripts)
+SESSION_NAME  - tmux session name
 ```
 
 You are in `$WORKTREE_DIR` on branch `$TASK_NAME`. Changes are isolated from main.
@@ -43,9 +46,10 @@ $TAW_DIR/agents/$TASK_NAME/
 
 ### Phase 3: Complete
 1. Ensure all tests pass
-2. Push branch and create PR
-3. Update window status to ✅
-4. Log: "작업 완료 - PR #N 생성"
+2. Commit all changes
+3. **Check `$ON_COMPLETE` and act accordingly** (see below)
+4. Update window status to ✅
+5. Log completion
 
 ---
 
@@ -60,12 +64,33 @@ $TAW_DIR/agents/$TASK_NAME/
 - 테스트 실패: 에러 분석 → 수정 시도 → 재실행 (최대 3회)
 - 테스트 성공: conventional commit으로 커밋 (feat/fix/refactor/docs/test/chore)
 
-### 작업 완료 시 자동 실행
-```
-최종 테스트 → 커밋 → push → PR 생성 → 상태 업데이트
+### 작업 완료 시 자동 실행 (ON_COMPLETE 설정에 따라 다름)
+
+**CRITICAL: `$ON_COMPLETE` 환경변수를 확인하고 해당 모드에 맞게 동작하세요!**
+
+```bash
+echo "ON_COMPLETE=$ON_COMPLETE"  # 먼저 확인
 ```
 
-1. 모든 변경사항 커밋 확인
+#### `auto-merge` 모드 (완전 자동)
+```
+커밋 → push → end-task 호출 → (자동으로 merge + cleanup + window 닫기)
+```
+1. 모든 변경사항 커밋
+2. `git push -u origin $TASK_NAME`
+3. Log: "작업 완료 - end-task 호출"
+4. **end-task 호출** (이게 merge, cleanup, window 닫기를 자동으로 처리):
+   ```bash
+   "$TAW_HOME/_taw/bin/end-task" "$SESSION_NAME" "$WINDOW_ID"
+   ```
+
+**CRITICAL**: `auto-merge`에서는 PR 생성 안 함! end-task가 자동으로 main에 merge하고 정리합니다.
+
+#### `auto-pr` 모드
+```
+커밋 → push → PR 생성 → 상태 업데이트
+```
+1. 모든 변경사항 커밋
 2. `git push -u origin $TASK_NAME`
 3. PR 생성:
    ```bash
@@ -77,6 +102,16 @@ $TAW_DIR/agents/$TASK_NAME/
    ```
 4. `tmux rename-window -t $WINDOW_ID "✅..."`
 5. PR 번호 저장: `gh pr view --json number -q '.number' > $TAW_DIR/agents/$TASK_NAME/.pr`
+6. Log: "작업 완료 - PR #N 생성"
+
+#### `auto-commit` 또는 `confirm` 모드
+```
+커밋 → push → 상태 업데이트 (PR/머지 없음)
+```
+1. 모든 변경사항 커밋
+2. `git push -u origin $TASK_NAME`
+3. `tmux rename-window -t $WINDOW_ID "✅..."`
+4. Log: "작업 완료 - 브랜치 push됨"
 
 ### 에러 발생 시 자동 실행
 - **빌드 에러**: 에러 메시지 분석 → 수정 시도
@@ -144,7 +179,9 @@ tmux rename-window -t $WINDOW_ID "✅${TASK_NAME:0:12}"  # Done
 | `/pr` | 수동 PR 생성 |
 | `/merge` | main에 머지 (PROJECT_DIR에서) |
 
-**태스크 종료**: 사용자가 `⌥ e`를 누르면 자동으로 커밋 → PR/머지 → 정리가 수행됩니다.
+**태스크 종료**:
+- `auto-merge` 모드: 위에서 설명한 대로 end-task 호출하면 자동 완료
+- 다른 모드: 사용자가 `⌥ e`를 누르면 커밋 → PR/머지 → 정리 수행
 
 ---
 
