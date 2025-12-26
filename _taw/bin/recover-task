@@ -145,7 +145,7 @@ perform_recovery() {
                 else
                     echo "  ${EMOJI_WARNING} Cannot determine worktree HEAD. Creating from main branch..."
                     local main_branch
-                    main_branch=$(git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@') || main_branch="main"
+                    main_branch=$(get_main_branch "$PROJECT_DIR")
                     git -C "$PROJECT_DIR" branch "$TASK_NAME" "$main_branch" 2>/dev/null || true
                     create_attach_and_prompt
                 fi

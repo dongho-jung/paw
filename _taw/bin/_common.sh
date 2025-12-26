@@ -25,6 +25,13 @@ readonly WORKTREE_TIMEOUT=30               # git worktree operations
 readonly WINDOW_CREATION_TIMEOUT=30        # wait for tmux window creation
 readonly TASK_NAME_TIMEOUTS=(3 5 10)       # retry timeouts for task name generation
 
+# Task name constraints
+readonly TASK_NAME_MIN_LEN=8
+readonly TASK_NAME_MAX_LEN=32
+
+# Git defaults
+readonly DEFAULT_MAIN_BRANCH="main"
+
 # ============================================================================
 # Path Utilities
 # ============================================================================
@@ -414,6 +421,154 @@ find_merged_tasks() {
     done
 
     echo "$result"
+}
+
+# ============================================================================
+# Git Helpers
+# ============================================================================
+
+# Get the main branch name for a repository
+# Usage: main_branch=$(get_main_branch "$PROJECT_DIR")
+# Returns: main branch name (defaults to "main" if can't detect)
+get_main_branch() {
+    local project_dir="$1"
+    local branch
+
+    # Try to get from remote HEAD reference
+    branch=$(git -C "$project_dir" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+
+    if [ -z "$branch" ]; then
+        # Fallback: check for common branch names
+        for candidate in main master; do
+            if git -C "$project_dir" rev-parse --verify "$candidate" &>/dev/null; then
+                branch="$candidate"
+                break
+            fi
+        done
+    fi
+
+    echo "${branch:-$DEFAULT_MAIN_BRANCH}"
+}
+
+# Check if current directory is a git repo root
+# Usage: if is_git_repo_root "$dir"; then ...
+is_git_repo_root() {
+    local dir="$1"
+    local git_root
+
+    git_root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || return 1
+
+    local dir_real git_root_real
+    dir_real=$(cd "$dir" && pwd -P)
+    git_root_real=$(cd "$git_root" && pwd -P)
+
+    [ "$dir_real" = "$git_root_real" ]
+}
+
+# ============================================================================
+# Project Directory Discovery
+# ============================================================================
+
+# Find project directory by walking up from a path until .taw is found
+# Usage: project_dir=$(find_project_dir "$path")
+# Returns: Project directory path, or empty string if not found
+find_project_dir_from_path() {
+    local dir="$1"
+    while [ "$dir" != "/" ]; do
+        if [ -d "$dir/.taw" ]; then
+            echo "$dir"
+            return 0
+        fi
+        dir=$(dirname "$dir")
+    done
+    return 1
+}
+
+# Find project directory from tmux session name
+# Usage: project_dir=$(find_project_dir_from_session "$session_name")
+# Returns: Project directory path, or empty string if not found
+find_project_dir_from_session() {
+    local session="$1"
+    local pane_path
+    pane_path=$(tmux -L "taw-$session" list-panes -s -F '#{pane_current_path}' 2>/dev/null | head -1)
+
+    if [ -n "$pane_path" ]; then
+        find_project_dir_from_path "$pane_path"
+    else
+        return 1
+    fi
+}
+
+# ============================================================================
+# Claude Interaction Helpers
+# ============================================================================
+
+# Get content from a tmux pane
+# Usage: content=$(get_pane_content "$session_name" "$window_id" "$pane_id")
+get_pane_content() {
+    local session="$1"
+    local window_id="$2"
+    local pane_id="${3:-0}"
+    tmux -L "taw-$session" capture-pane -t "${window_id}.${pane_id}" -p 2>/dev/null || echo ""
+}
+
+# Send a shell command to a pane (with Enter key)
+# Usage: send_shell_cmd "$session_name" "$window_id" "$command"
+send_shell_cmd() {
+    local session="$1"
+    local window_id="$2"
+    local cmd="$3"
+    tmux -L "taw-$session" send-keys -t "${window_id}.0" -l "$cmd"
+    tmux -L "taw-$session" send-keys -t "${window_id}.0" Enter
+}
+
+# Send input to Claude Code (Escape + CR for multiline submit)
+# Usage: send_to_claude "$session_name" "$window_id" "$input"
+send_to_claude() {
+    local session="$1"
+    local window_id="$2"
+    local input="$3"
+
+    sleep 0.3
+    tmux -L "taw-$session" send-keys -t "${window_id}.0" -l "$input"
+    sleep 0.2
+    tmux -L "taw-$session" send-keys -t "${window_id}.0" Escape
+    sleep 0.2
+    tmux -L "taw-$session" send-keys -t "${window_id}.0" -H 0d  # ASCII 13 (Carriage Return)
+    debug "Sent input to claude: ${input:0:50}..."
+}
+
+# Wait for Claude to be ready (poll until expected output is seen)
+# Usage: wait_for_claude_ready "$session_name" "$window_id" [max_attempts]
+# Returns: 0 if ready, 1 if timeout
+wait_for_claude_ready() {
+    local session="$1"
+    local window_id="$2"
+    local max_attempts="${3:-$CLAUDE_READY_MAX_ATTEMPTS}"
+    local attempt=0
+
+    debug "Waiting for claude to be ready (max $max_attempts attempts)..."
+    while [ $attempt -lt $max_attempts ]; do
+        local content
+        content=$(get_pane_content "$session" "$window_id")
+
+        # Claude is ready when we see trust prompt, input prompt, or bypass permissions
+        if echo "$content" | grep -qE "Trust|trust|╭─|^> $|bypass permissions"; then
+            debug "Claude ready after $attempt attempts"
+            return 0
+        fi
+
+        # Show progress every 10 attempts in debug mode
+        if [ "${TAW_DEBUG:-0}" = "1" ] && [ $((attempt % 10)) -eq 0 ]; then
+            debug "Attempt $attempt: waiting for claude..."
+        fi
+
+        sleep "$CLAUDE_READY_POLL_INTERVAL"
+        attempt=$((attempt + 1))
+    done
+
+    debug "TIMEOUT waiting for claude after $max_attempts attempts"
+    return 1
 }
 
 # ============================================================================

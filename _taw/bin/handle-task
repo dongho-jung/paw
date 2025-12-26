@@ -262,57 +262,26 @@ sleep 0.2
 
 debug "Agent pane: ${window_id}.0"
 
-# Send shell command (normal Enter)
-send_shell_cmd() {
-    tm "$SESSION_NAME" send-keys -t "${window_id}.0" -l "$1"
-    tm "$SESSION_NAME" send-keys -t "${window_id}.0" Enter
+# Local wrapper for send_shell_cmd (uses common function with session/window context)
+_send_shell_cmd() {
+    send_shell_cmd "$SESSION_NAME" "$window_id" "$1"
 }
 
-# Send input to claude code (Escape to exit multiline, then raw ASCII 13 to submit)
-send_to_claude() {
-    # Ensure pane is ready to receive input
-    sleep 0.3
-    tm "$SESSION_NAME" send-keys -t "${window_id}.0" -l "$1"
-    sleep 0.2
-    tm "$SESSION_NAME" send-keys -t "${window_id}.0" Escape
-    sleep 0.2
-    tm "$SESSION_NAME" send-keys -t "${window_id}.0" -H 0d  # ASCII 13 (Carriage Return)
-    debug "Sent input to claude: ${1:0:50}..."
+# Local wrapper for send_to_claude (uses common function with session/window context)
+_send_to_claude() {
+    send_to_claude "$SESSION_NAME" "$window_id" "$1"
 }
 
-# Helper to get pane content
-get_pane_content() {
-    tm "$SESSION_NAME" capture-pane -t "${window_id}.0" -p 2>/dev/null || echo ""
-}
-
-# Wait for claude to be ready (poll until we see expected output)
-wait_for_claude_ready() {
-    local max_attempts=60  # 30 seconds max
-    local attempt=0
+# Local wrapper for wait_for_claude_ready with logging
+_wait_for_claude_ready() {
     log "Waiting for claude to be ready..." "$LOG_FILE"
-    debug "Waiting for claude to be ready (max $max_attempts attempts)..."
-    while [ $attempt -lt $max_attempts ]; do
-        local content=$(get_pane_content)
-        # Claude is ready when we see trust prompt, input prompt (> ), or bypass permissions
-        # Patterns: Trust prompt, old UI (╭─), new UI (> with ────), bypass permissions
-        if echo "$content" | grep -qE "Trust|trust|╭─|^> $|bypass permissions"; then
-            log "Claude ready after $attempt attempts" "$LOG_FILE"
-            debug "Claude ready after $attempt attempts"
-            return 0
-        fi
-        # Show progress every 10 attempts in debug mode
-        if [ "${TAW_DEBUG:-0}" = "1" ] && [ $((attempt % 10)) -eq 0 ]; then
-            debug "Attempt $attempt: waiting for claude... (last 3 lines of pane):"
-            echo "$content" | tail -3 | sed 's/^/  [pane] /' >&2
-        fi
-        sleep 0.5
-        attempt=$((attempt + 1))
-    done
-    log "Timeout waiting for claude" "$LOG_FILE"
-    debug "TIMEOUT waiting for claude after $max_attempts attempts"
-    debug "Final pane content:"
-    get_pane_content | sed 's/^/  [pane] /' >&2
-    return 1
+    if wait_for_claude_ready "$SESSION_NAME" "$window_id"; then
+        log "Claude ready" "$LOG_FILE"
+        return 0
+    else
+        log "Timeout waiting for claude" "$LOG_FILE"
+        return 1
+    fi
 }
 
 # Helper to kill orphaned pane on failure
@@ -328,15 +297,15 @@ kill_agent_pane() {
 debug "Starting claude with system prompt..."
 if [ "$USE_WORKTREE" = true ]; then
     debug "Worktree mode: setting WORKTREE_DIR"
-    send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$WORK_DIR' WINDOW_ID='$window_id' ON_COMPLETE='$ON_COMPLETE' && claude --dangerously-skip-permissions --system-prompt \"\$(cat '$TASK_DIR/.system-prompt')\""
+    _send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$WORK_DIR' WINDOW_ID='$window_id' ON_COMPLETE='$ON_COMPLETE' && claude --dangerously-skip-permissions --system-prompt \"\$(cat '$TASK_DIR/.system-prompt')\""
 else
     debug "Main/non-git mode: no WORKTREE_DIR"
-    send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WINDOW_ID='$window_id' ON_COMPLETE='$ON_COMPLETE' && claude --dangerously-skip-permissions --system-prompt \"\$(cat '$TASK_DIR/.system-prompt')\""
+    _send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WINDOW_ID='$window_id' ON_COMPLETE='$ON_COMPLETE' && claude --dangerously-skip-permissions --system-prompt \"\$(cat '$TASK_DIR/.system-prompt')\""
 fi
 
 # Wait for claude to be ready
 debug "Waiting for claude to start..."
-if ! wait_for_claude_ready; then
+if ! _wait_for_claude_ready; then
     log "Failed to start claude for $TASK_NAME - killing orphaned pane" "$LOG_FILE"
     debug "FAILED: claude did not start properly"
     kill_agent_pane
@@ -345,12 +314,12 @@ fi
 
 # Check if confirmation is needed
 debug "Checking for trust confirmation..."
-screen_content=$(get_pane_content)
+screen_content=$(get_pane_content "$SESSION_NAME" "$window_id")
 if echo "$screen_content" | grep -qiE "trust|Trust this project|y/n|\[y\]|Are you sure"; then
     debug "Trust confirmation needed, sending 'y'"
-    send_shell_cmd "y"
+    _send_shell_cmd "y"
     debug "Waiting for claude to be ready again..."
-    if ! wait_for_claude_ready; then
+    if ! _wait_for_claude_ready; then
         log "Failed after trust confirmation for $TASK_NAME" "$LOG_FILE"
         kill_agent_pane
         exit 1
@@ -366,7 +335,7 @@ if [ "$NO_INPUT" = true ]; then
     log "Created window: $window_name (no input sent - reopen mode)" "$LOG_FILE"
 else
     debug "Sending task instruction to claude..."
-    send_to_claude "ultrathink Read and execute the task from '$TASK_DIR/.user-prompt'"
+    _send_to_claude "ultrathink Read and execute the task from '$TASK_DIR/.user-prompt'"
     log "Created window: $window_name, sent task to claude" "$LOG_FILE"
     debug "Task sent successfully. Window: $window_name"
 fi

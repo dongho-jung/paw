@@ -34,28 +34,15 @@ get_task_name() {
     echo "$window_name" | sed 's/^[🤖💬✅⚠️]*//'
 }
 
-# Find .taw directory by walking up from path
-find_taw_dir() {
-    local dir="$1"
-    while [ "$dir" != "/" ]; do
-        if [ -d "$dir/.taw" ]; then
-            echo "$dir"
-            return 0
-        fi
-        dir=$(dirname "$dir")
-    done
-    return 1
-}
-
 TASK_NAME=$(get_task_name)
 if [ -z "$TASK_NAME" ]; then
     echo "Could not determine task name from window"
     exit 1
 fi
 
-# Get pane path and find project directory
+# Get pane path and find project directory (uses common function)
 PANE_PATH=$(tm "$SESSION_NAME" display-message -t "$WINDOW_ID" -p '#{pane_current_path}' 2>/dev/null)
-PROJECT_DIR=$(find_taw_dir "$PANE_PATH")
+PROJECT_DIR=$(find_project_dir_from_path "$PANE_PATH")
 
 if [ -z "$PROJECT_DIR" ]; then
     echo "Could not find .taw directory"

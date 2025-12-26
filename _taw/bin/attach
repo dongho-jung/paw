@@ -46,10 +46,11 @@ if [ -z "$TMUX" ]; then
     exit 1
 fi
 
-# Check if session matches
-CURRENT_SESSION="$(tmux display-message -p '#S')"
+# Check if session matches (use taw-specific socket)
+CURRENT_SESSION="$(tm "$SESSION_NAME" display-message -p '#S' 2>/dev/null)" || CURRENT_SESSION=""
 if [ "$CURRENT_SESSION" != "$SESSION_NAME" ]; then
     echo "Error: Current session '$CURRENT_SESSION' doesn't match project session '$SESSION_NAME'"
+    echo "Make sure the tmux session 'taw-$SESSION_NAME' is running."
     exit 1
 fi
 
@@ -90,65 +91,37 @@ echo "$system_prompt" > "$AGENT_DIR/.system-prompt"
 display_name=$(truncate_name "$TASK_NAME")
 window_name="${EMOJI_WORKING}${display_name}"
 
-# Create new window
-window_id=$(tmux new-window -n "$window_name" -c "$WORK_DIR" -P -F "#{window_id}")
+# Create new window (use taw-specific socket via tm helper)
+window_id=$(tm "$SESSION_NAME" new-window -n "$window_name" -c "$WORK_DIR" -P -F "#{window_id}")
 sleep 0.3
 
 # Split horizontally for user pane
-tmux split-window -t "$window_id" -h -c "$WORK_DIR"
+tm "$SESSION_NAME" split-window -t "$window_id" -h -c "$WORK_DIR"
 
 # Select agent pane (left)
-tmux select-pane -t "${window_id}.0"
-
-# Helper functions for claude interaction
-get_pane_content() {
-    tmux capture-pane -t "${window_id}.0" -p 2>/dev/null || echo ""
-}
-
-wait_for_claude_ready() {
-    local max_attempts=$CLAUDE_READY_MAX_ATTEMPTS
-    local attempt=0
-    debug "Waiting for claude to be ready (max $max_attempts attempts)..."
-    while [ $attempt -lt $max_attempts ]; do
-        local content=$(get_pane_content)
-        # Claude is ready when we see trust prompt, input prompt, or bypass permissions
-        if echo "$content" | grep -qE "Trust|trust|╭─|^> $|bypass permissions"; then
-            debug "Claude ready after $attempt attempts"
-            return 0
-        fi
-        sleep $CLAUDE_READY_POLL_INTERVAL
-        attempt=$((attempt + 1))
-    done
-    debug "TIMEOUT waiting for claude after $max_attempts attempts"
-    return 1
-}
-
-send_shell_cmd() {
-    tmux send-keys -t "${window_id}.0" -l "$1"
-    tmux send-keys -t "${window_id}.0" Enter
-}
+tm "$SESSION_NAME" select-pane -t "${window_id}.0"
 
 # Start claude with system prompt (include WINDOW_ID, WORKTREE_DIR only in git mode)
 # Note: paths are single-quoted to handle spaces correctly
 debug "Starting claude with system prompt..."
 if [ "$IS_GIT_MODE" = true ]; then
-    send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$WORK_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat '$AGENT_DIR/.system-prompt')\""
+    send_shell_cmd "$SESSION_NAME" "$window_id" "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$WORK_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat '$AGENT_DIR/.system-prompt')\""
 else
-    send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat '$AGENT_DIR/.system-prompt')\""
+    send_shell_cmd "$SESSION_NAME" "$window_id" "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat '$AGENT_DIR/.system-prompt')\""
 fi
 
-# Wait for claude to be ready
+# Wait for claude to be ready (uses common function)
 debug "Waiting for claude to start..."
-if ! wait_for_claude_ready; then
+if ! wait_for_claude_ready "$SESSION_NAME" "$window_id"; then
     warn "Timeout waiting for claude to start"
 fi
 
 # Check if trust confirmation is needed
-screen_content=$(get_pane_content)
+screen_content=$(get_pane_content "$SESSION_NAME" "$window_id")
 if echo "$screen_content" | grep -qiE "trust|Trust this project|y/n|\[y\]|Are you sure"; then
     debug "Trust confirmation needed, sending 'y'"
-    send_shell_cmd "y"
-    wait_for_claude_ready || true
+    send_shell_cmd "$SESSION_NAME" "$window_id" "y"
+    wait_for_claude_ready "$SESSION_NAME" "$window_id" || true
 fi
 
 echo "Attached to task: $TASK_NAME"

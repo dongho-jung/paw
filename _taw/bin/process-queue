@@ -23,26 +23,8 @@ if [ -z "$SESSION_NAME" ]; then
     exit 1
 fi
 
-# Find project directory from session name
-find_project_dir() {
-    local session="$1"
-    local pane_path
-    pane_path=$(tmux -L "taw-$session" list-panes -s -F '#{pane_current_path}' 2>/dev/null | head -1)
-
-    if [ -n "$pane_path" ]; then
-        local dir="$pane_path"
-        while [ "$dir" != "/" ]; do
-            if [ -d "$dir/.taw" ]; then
-                echo "$dir"
-                return 0
-            fi
-            dir=$(dirname "$dir")
-        done
-    fi
-    return 1
-}
-
-PROJECT_DIR=$(find_project_dir "$SESSION_NAME")
+# Find project directory from session name (uses common function)
+PROJECT_DIR=$(find_project_dir_from_session "$SESSION_NAME")
 if [ -z "$PROJECT_DIR" ]; then
     debug "Could not find project directory for session: $SESSION_NAME"
     exit 0
