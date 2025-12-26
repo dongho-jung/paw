@@ -35,7 +35,7 @@ taw/                           # 이 레포
     │   ├── attach             # 태스크 재연결
     │   ├── cleanup            # 정리 스크립트 (/done에서 사용)
     │   ├── quick-task         # 빠른 태스크 큐 추가 (^⌥a)
-    │   ├── popup-shell        # 팝업 쉘 (^a로 토글)
+    │   ├── popup-shell        # 팝업 쉘 (⌥p로 열고, ⌥q로 닫기)
     │   ├── process-queue      # 큐 처리 (태스크 완료 후 자동 실행)
     │   ├── recover-task       # 손상된 태스크 복구/정리
     │   └── _common.sh         # 공통 유틸리티 (상수, 함수, 설정)

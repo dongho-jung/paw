@@ -2,7 +2,7 @@
 
 # TAW Popup Shell
 # Opens a toggleable popup shell in the current worktree directory
-# Ctrl+A closes the popup from inside
+# Alt+Q closes the popup from inside
 #
 # Usage:
 #   popup-shell <session_name>
@@ -29,7 +29,7 @@ if [ -z "$PANE_PATH" ]; then
 fi
 
 # Create temporary rcfile for popup shell
-# This binds Ctrl+A to exit the shell
+# This binds Alt+Q to exit the shell
 TMP_RCFILE=$(mktemp)
 cat > "$TMP_RCFILE" << 'RCFILE'
 # Load user's bashrc if exists
@@ -38,11 +38,11 @@ cat > "$TMP_RCFILE" << 'RCFILE'
 # Custom prompt for popup
 PS1='\[\033[1;36m\]popup\[\033[0m\]:\[\033[1;34m\]\W\[\033[0m\]\$ '
 
-# Bind Ctrl+A to exit (close popup)
-bind '"\C-a": "\C-u exit\n"'
+# Bind Alt+Q to exit (close popup)
+bind '"\eq": "\C-u exit\n"'
 
 # Show hint on start
-echo -e "\033[90m(Ctrl+A to close)\033[0m"
+echo -e "\033[90m(Alt+Q to close)\033[0m"
 RCFILE
 
 # Show popup with interactive shell
@@ -53,5 +53,5 @@ tmux -L "taw-$SESSION_NAME" display-popup \
     -E \
     -w 80% -h 60% \
     -d "$PANE_PATH" \
-    -T " Popup Shell (Ctrl+A to close) " \
+    -T " Popup Shell (Alt+Q to close) " \
     "bash --rcfile '$TMP_RCFILE'; rm -f '$TMP_RCFILE'"
