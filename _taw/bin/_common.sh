@@ -153,6 +153,51 @@ find_incomplete_tasks() {
 }
 
 # ============================================================================
+# Configuration
+# ============================================================================
+
+# Default configuration values
+readonly DEFAULT_WORK_MODE="worktree"           # worktree | main
+readonly DEFAULT_ON_COMPLETE="confirm"          # auto-commit | auto-merge | auto-pr | confirm
+
+# Get config file path
+# Usage: config_file=$(get_config_path "$TAW_DIR")
+get_config_path() {
+    local taw_dir="$1"
+    echo "$taw_dir/config"
+}
+
+# Read a config value (simple YAML parser for key: value format)
+# Usage: value=$(read_config "$TAW_DIR" "work_mode" "default_value")
+read_config() {
+    local taw_dir="$1"
+    local key="$2"
+    local default="$3"
+    local config_file="$taw_dir/config"
+
+    if [ ! -f "$config_file" ]; then
+        echo "$default"
+        return 0
+    fi
+
+    # Parse YAML: find key, extract value, strip quotes and whitespace
+    local value=$(grep -E "^${key}:" "$config_file" 2>/dev/null | head -1 | cut -d':' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/^["'"'"']//;s/["'"'"']$//')
+
+    if [ -z "$value" ]; then
+        echo "$default"
+    else
+        echo "$value"
+    fi
+}
+
+# Check if config exists
+# Usage: if config_exists "$TAW_DIR"; then ...
+config_exists() {
+    local taw_dir="$1"
+    [ -f "$taw_dir/config" ]
+}
+
+# ============================================================================
 # Task Cleanup (shared between end-task and /done)
 # ============================================================================
 

@@ -28,6 +28,7 @@ taw/                           # 이 레포
     ├── HELP.md                # 도움말 (⌥ + / 로 열람)
     ├── bin/                   # 실행 파일
     │   ├── taw                # 메인 명령어 (세션 시작)
+    │   ├── setup              # 초기 설정 마법사
     │   ├── new-task           # 태스크 생성
     │   ├── handle-task        # 태스크 처리 (worktree 생성, agent 시작)
     │   ├── end-task           # 태스크 종료 (^x)
@@ -35,7 +36,7 @@ taw/                           # 이 레포
     │   ├── cleanup            # 정리 스크립트 (/done에서 사용)
     │   ├── quick-task         # 빠른 태스크 큐 추가 (^⌥a)
     │   ├── process-queue      # 큐 처리 (태스크 완료 후 자동 실행)
-    │   └── _common.sh         # 공통 유틸리티 (상수, 함수)
+    │   └── _common.sh         # 공통 유틸리티 (상수, 함수, 설정)
     └── claude/commands/       # slash commands
         ├── commit.md          # /commit - 스마트 커밋
         ├── test.md            # /test - 테스트 실행
@@ -46,6 +47,7 @@ taw/                           # 이 레포
 
 {any-project}/                 # 사용자 프로젝트 (git 또는 일반 디렉토리)
 └── .taw/                      # taw가 생성하는 디렉토리
+    ├── config                 # 프로젝트 설정 (YAML, 초기 설정 시 생성)
     ├── PROMPT.md              # 프로젝트별 프롬프트
     ├── .global-prompt         # -> 전역 프롬프트 (symlink, git 모드에 따라 다름)
     ├── .is-git-repo           # git 모드 마커 (git 레포일 때만 존재)
@@ -115,6 +117,64 @@ Agent가 사용할 수 있는 slash commands:
 - ✅ 완료
 
 ## 설정
+
+### 초기 설정 (Initial Setup)
+
+처음 `taw`를 실행하면 설정 마법사가 나타납니다:
+
+```
+=== TAW Initial Setup ===
+
+Work Mode
+How should taw create working directories for tasks?
+
+  → 1) worktree - Create git worktree per task (isolated, recommended)
+    2) main     - Work directly on current branch (simpler)
+
+Select [1-2, default: 1]:
+```
+
+설정은 `.taw/config` 파일에 YAML 형식으로 저장됩니다.
+
+### 설정 재실행
+
+```bash
+taw setup  # 설정 마법사 다시 실행
+```
+
+### 설정 파일 (.taw/config)
+
+```yaml
+# TAW Configuration
+# Edit this file directly to change settings
+
+# Work Mode (git repositories only)
+# Options: worktree | main
+#   worktree - Create a git worktree per task (recommended)
+#   main     - Work directly on current branch
+work_mode: worktree
+
+# On Complete Behavior
+# Options: confirm | auto-commit | auto-merge | auto-pr
+#   confirm     - Ask before each action (commit, merge, PR)
+#   auto-commit - Automatically commit changes (manual merge/PR)
+#   auto-merge  - Auto commit + merge to current branch
+#   auto-pr     - Auto commit + create Pull Request (for teams)
+on_complete: confirm
+```
+
+### 설정 옵션
+
+| 설정 | 옵션 | 설명 |
+|------|------|------|
+| `work_mode` | `worktree` | 태스크마다 git worktree 생성 (격리, 권장) |
+|             | `main` | 현재 브랜치에서 직접 작업 (단순) |
+| `on_complete` | `confirm` | 각 작업 전 확인 (안전) |
+|               | `auto-commit` | 자동 커밋 (머지/PR은 수동) |
+|               | `auto-merge` | 자동 커밋 + 현재 브랜치에 머지 |
+|               | `auto-pr` | 자동 커밋 + PR 생성 (팀 협업용) |
+
+### 기타 설정
 
 - `_taw/PROMPT.md`: 전역 에이전트 프롬프트
 - `.taw/PROMPT.md`: 프로젝트별 프롬프트 (각 프로젝트 내)

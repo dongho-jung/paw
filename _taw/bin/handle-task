@@ -62,6 +62,11 @@ if [ -f "$TAW_DIR/.is-git-repo" ]; then
     IS_GIT_REPO=true
 fi
 
+# Read config settings
+WORK_MODE=$(read_config "$TAW_DIR" "work_mode" "$DEFAULT_WORK_MODE")
+ON_COMPLETE=$(read_config "$TAW_DIR" "on_complete" "$DEFAULT_ON_COMPLETE")
+debug "Config: work_mode=$WORK_MODE, on_complete=$ON_COMPLETE"
+
 # Use .global-prompt symlink (points to appropriate PROMPT based on git mode)
 GLOBAL_PROMPT="$TAW_DIR/.global-prompt"
 PROJECT_PROMPT="$TAW_DIR/PROMPT.md"
@@ -101,9 +106,16 @@ debug "New task: $TASK_NAME (IS_GIT_REPO=$IS_GIT_REPO)"
 ln -sf ../../.. "$TASK_DIR/origin" 2>/dev/null || warn "Failed to create origin symlink"
 ln -sf "$TAW_HOME/_taw/bin/attach" "$TASK_DIR/attach" 2>/dev/null || warn "Failed to create attach symlink"
 
-# Set working directory based on git mode
+# Set working directory based on git mode and config
 debug "Setting up working directory..."
-if [ "$IS_GIT_REPO" = true ]; then
+# Use worktree only if: git repo + work_mode is worktree
+USE_WORKTREE=false
+if [ "$IS_GIT_REPO" = true ] && [ "$WORK_MODE" = "worktree" ]; then
+    USE_WORKTREE=true
+fi
+debug "USE_WORKTREE=$USE_WORKTREE"
+
+if [ "$USE_WORKTREE" = true ]; then
     # Create worktree for this task
     WORK_DIR="$TASK_DIR/worktree"
     if [ ! -d "$WORK_DIR" ]; then
@@ -170,10 +182,15 @@ if [ "$IS_GIT_REPO" = true ]; then
         debug "Worktree already exists: $WORK_DIR"
     fi
 else
-    # Non-git mode: work directly in project directory
+    # Main mode or non-git: work directly in project directory
     WORK_DIR="$PROJECT_DIR"
-    log "Non-git mode: working in $WORK_DIR" "$LOG_FILE"
-    debug "Non-git mode: WORK_DIR=$WORK_DIR"
+    if [ "$IS_GIT_REPO" = true ]; then
+        log "Main mode: working in $WORK_DIR" "$LOG_FILE"
+        debug "Main mode (work_mode=main): WORK_DIR=$WORK_DIR"
+    else
+        log "Non-git mode: working in $WORK_DIR" "$LOG_FILE"
+        debug "Non-git mode: WORK_DIR=$WORK_DIR"
+    fi
 fi
 
 # Ensure .claude symlink exists in WORK_DIR for slash commands
@@ -206,7 +223,7 @@ if [ -f "$TASK_FILE" ]; then
 fi
 
 # Build the user prompt with task context
-if [ "$IS_GIT_REPO" = true ]; then
+if [ "$USE_WORKTREE" = true ]; then
     user_prompt="# Task: $TASK_NAME
 
 **Worktree**: $WORK_DIR
@@ -307,13 +324,13 @@ kill_agent_pane() {
 }
 
 # Start claude interactively with system prompt
-# Set environment variables (WORKTREE_DIR only in git mode)
+# Set environment variables (WORKTREE_DIR only in worktree mode)
 debug "Starting claude with system prompt..."
-if [ "$IS_GIT_REPO" = true ]; then
-    debug "Git mode: setting WORKTREE_DIR"
+if [ "$USE_WORKTREE" = true ]; then
+    debug "Worktree mode: setting WORKTREE_DIR"
     send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WORKTREE_DIR='$WORK_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat '$TASK_DIR/.system-prompt')\""
 else
-    debug "Non-git mode: no WORKTREE_DIR"
+    debug "Main/non-git mode: no WORKTREE_DIR"
     send_shell_cmd "export TASK_NAME='$TASK_NAME' TAW_DIR='$TAW_DIR' PROJECT_DIR='$PROJECT_DIR' WINDOW_ID='$window_id' && claude --dangerously-skip-permissions --system-prompt \"\$(cat '$TASK_DIR/.system-prompt')\""
 fi
 

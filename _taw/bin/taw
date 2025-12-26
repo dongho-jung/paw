@@ -19,9 +19,13 @@ while [[ $# -gt 0 ]]; do
             COMMAND="clean"
             shift
             ;;
+        setup)
+            COMMAND="setup"
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: taw [-d|--debug] [clean]"
+            echo "Usage: taw [-d|--debug] [clean|setup]"
             exit 1
             ;;
     esac
@@ -85,6 +89,25 @@ detect_git_repo() {
     IS_GIT_REPO=true
 }
 
+# Run initial setup wizard (only for new directories)
+run_setup() {
+    debug "Running initial setup wizard..."
+    if [ -t 0 ] && [ -t 1 ]; then
+        # Interactive mode - run setup
+        "$TAW_HOME/_taw/bin/setup" "$TAW_DIR" "$IS_GIT_REPO"
+    else
+        # Non-interactive mode - create default config
+        debug "Non-interactive mode, creating default config"
+        cat > "$TAW_DIR/config" << 'EOF'
+# TAW Configuration (auto-generated with defaults)
+# Run 'taw' again to reconfigure interactively
+
+work_mode: worktree
+on_complete: confirm
+EOF
+    fi
+}
+
 # Initialize .taw directory structure
 init_taw_dir() {
     local is_new=false
@@ -129,6 +152,10 @@ EOF
 
     if [ "$is_new" = true ]; then
         echo "Initialized .taw directory."
+        # Run setup wizard for new directories (if config doesn't exist)
+        if [ ! -f "$TAW_DIR/config" ]; then
+            run_setup
+        fi
     fi
 }
 
@@ -358,6 +385,17 @@ start_session() {
 # Handle clean command (can run inside tmux)
 if [ "$COMMAND" = "clean" ]; then
     clean_all
+    exit 0
+fi
+
+# Handle setup command (reconfigure existing project)
+if [ "$COMMAND" = "setup" ]; then
+    detect_git_repo
+    if [ ! -d "$TAW_DIR" ]; then
+        echo "Error: .taw directory not found. Run 'taw' first to initialize."
+        exit 1
+    fi
+    "$TAW_HOME/_taw/bin/setup" "$TAW_DIR" "$IS_GIT_REPO"
     exit 0
 fi
 
