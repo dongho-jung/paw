@@ -445,11 +445,12 @@ setup_tmux_config() {
     tm bind -n M-m run-shell "$TAW_HOME/_taw/bin/merge-completed '$SESSION_NAME'"
     tm bind -n M-q detach
     tm bind -n M-/ run-shell "$TAW_HOME/_taw/bin/toggle-help '$SESSION_NAME'"
+    tm bind -n M-h run-shell "$TAW_HOME/_taw/bin/toggle-help '$SESSION_NAME'"
 
     # Status line: 2 lines - windows on top, hints on bottom
     tm set -t "$SESSION_NAME" status 2
     tm set -t "$SESSION_NAME" status-format[0] "#[align=left]#{W:#[fg=white bg=default] #W #[default],#[fg=white bg=blue bold] #W #[default]}"
-    tm set -t "$SESSION_NAME" status-format[1] "#[align=left fg=brightblack] ⌥tab:pane  ⌥←→:window  ⌥n:new  ⌥e:end  ⌥m:merge  ⌥p:popup  ⌥u:queue  ⌥q:quit  ⌥/:help"
+    tm set -t "$SESSION_NAME" status-format[1] "#[align=left fg=brightblack] ⌥tab:pane  ⌥←→:window  ⌥n:new  ⌥e:end  ⌥m:merge  ⌥p:popup  ⌥u:queue  ⌥q:quit  ⌥h:help"
 
     debug "Tmux config and keybindings applied"
 }
