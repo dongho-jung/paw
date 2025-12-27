@@ -35,7 +35,11 @@ if [ "$HELP_OPEN" = "1" ]; then
 else
     # Help is not shown - open it
     tm set-option -g @taw_help_open "1"
-    # When less exits (user presses q or popup is closed), clean up the state
-    tm display-popup -E -w 80% -h 80% -T " Help (⌥/ to close) " \
-        "less '$TAW_HOME/_taw/HELP.md'; tmux -L 'taw-$SESSION_NAME' set-option -g @taw_help_open '' 2>/dev/null || true"
+
+    # Create lesskey configuration inside the popup command
+    # This binds Alt+H (\eh) and Alt+/ (\e/) to quit, allowing toggle with same key
+    # Uses LESSKEYIN (for less 5.6+) to pass the source file directly
+    # The lesskey file is created, used, and cleaned up all within the popup shell
+    tm display-popup -E -w 80% -h 80% -T " Help (⌥h or q to close) " \
+        "KEYFILE=\$(mktemp) && printf '#command\n\\\\eh quit\n\\\\e/ quit\n' > \"\$KEYFILE\" && LESSKEYIN=\"\$KEYFILE\" less '$TAW_HOME/_taw/HELP.md'; tmux -L 'taw-$SESSION_NAME' set-option -g @taw_help_open '' 2>/dev/null || true; rm -f \"\$KEYFILE\""
 fi
