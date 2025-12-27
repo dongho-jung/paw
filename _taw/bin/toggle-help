@@ -27,19 +27,21 @@ tm() {
 HELP_OPEN=$(tm show-options -gqv @taw_help_open 2>/dev/null || echo "")
 
 if [ "$HELP_OPEN" = "1" ]; then
-    # Help is currently shown - close it
-    # Note: display-popup -C only works from inside the popup
-    # Opening a new popup that immediately exits will close the existing one
+    # Help is currently shown - close it using display-popup -C
+    # This is the proper way to close a popup (same as popup-shell)
     tm set-option -g @taw_help_open ""
-    tm display-popup -E "true" 2>/dev/null || true
+    tm display-popup -C 2>/dev/null || true
 else
     # Help is not shown - open it
+    # First ensure state is clean, then set it
+    tm set-option -g @taw_help_open ""
     tm set-option -g @taw_help_open "1"
 
     # Create lesskey configuration inside the popup command
     # This binds Alt+H (\eh) and Alt+/ (\e/) to quit, allowing toggle with same key
     # Uses LESSKEYIN (for less 5.6+) to pass the source file directly
     # The lesskey file is created, used, and cleaned up all within the popup shell
+    # Note: The cleanup command runs when less exits (naturally or via key binding)
     tm display-popup -E -w 80% -h 80% -T " Help (⌥h or q to close) " \
-        "KEYFILE=\$(mktemp) && printf '#command\n\\\\eh quit\n\\\\e/ quit\n' > \"\$KEYFILE\" && LESSKEYIN=\"\$KEYFILE\" less '$TAW_HOME/_taw/HELP.md'; tmux -L 'taw-$SESSION_NAME' set-option -g @taw_help_open '' 2>/dev/null || true; rm -f \"\$KEYFILE\""
+        "KEYFILE=\$(mktemp) && printf '#command\n\\\\eh quit\n\\\\e/ quit\n' > \"\$KEYFILE\" && LESSKEYIN=\"\$KEYFILE\" less '$TAW_HOME/_taw/HELP.md'; tmux -L 'taw-$SESSION_NAME' set-option -g @taw_help_open '' 2>/dev/null || true; rm -f \"\$KEYFILE\" 2>/dev/null || true"
 fi

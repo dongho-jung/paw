@@ -2,7 +2,7 @@
 
 # Toggle live log popup window
 # If log popup is open, close it. If closed, open it.
-# Uses tmux user option for reliable state tracking (same pattern as toggle-help)
+# Uses tmux user option for reliable state tracking
 # Shows tail -f style log with scroll capability using less +F
 
 set -e
@@ -49,10 +49,10 @@ find_project_dir() {
 LOG_OPEN=$(tm show-options -gqv @taw_log_open 2>/dev/null || echo "")
 
 if [ "$LOG_OPEN" = "1" ]; then
-    # Log popup is currently shown - close it
-    # Opening a new popup that immediately exits will close the existing one
+    # Log popup is currently shown - close it using display-popup -C
+    # This is the proper way to close a popup (same as popup-shell)
     tm set-option -g @taw_log_open ""
-    tm display-popup -E "true" 2>/dev/null || true
+    tm display-popup -C 2>/dev/null || true
 else
     # Log popup is not shown - open it
     PROJECT_DIR=$(find_project_dir)
@@ -64,11 +64,14 @@ else
 
     LOG_FILE="$PROJECT_DIR/.taw/log"
 
+    # Create log file if it doesn't exist (prevents errors on fresh projects)
     if [ ! -f "$LOG_FILE" ]; then
-        tm display-message "Error: Log file not found: $LOG_FILE"
-        exit 1
+        mkdir -p "$(dirname "$LOG_FILE")"
+        touch "$LOG_FILE"
     fi
 
+    # First ensure state is clean, then set it
+    tm set-option -g @taw_log_open ""
     tm set-option -g @taw_log_open "1"
 
     # Use less +F for tail -f like behavior with scroll capability
@@ -76,6 +79,7 @@ else
     # Press F to resume following
     # Alt+L (\el) and q to quit
     # Create lesskey configuration inside the popup command
+    # Note: The cleanup command runs when less exits (naturally or via key binding)
     tm display-popup -E -w 90% -h 80% -T " Live Log (F=follow, Ctrl+C=scroll, ⌥l or q to close) " \
-        "KEYFILE=\$(mktemp) && printf '#command\n\\\\el quit\n' > \"\$KEYFILE\" && LESSKEYIN=\"\$KEYFILE\" less +F '$LOG_FILE'; tmux -L 'taw-$SESSION_NAME' set-option -g @taw_log_open '' 2>/dev/null || true; rm -f \"\$KEYFILE\""
+        "KEYFILE=\$(mktemp) && printf '#command\n\\\\el quit\n' > \"\$KEYFILE\" && LESSKEYIN=\"\$KEYFILE\" less +F '$LOG_FILE'; tmux -L 'taw-$SESSION_NAME' set-option -g @taw_log_open '' 2>/dev/null || true; rm -f \"\$KEYFILE\" 2>/dev/null || true"
 fi
