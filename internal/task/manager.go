@@ -406,3 +406,50 @@ func (m *Manager) GetWorkingDirectory(task *Task) string {
 	}
 	return m.projectDir
 }
+
+// FindOrphanedWindows finds tmux windows that have no corresponding agent directory.
+// These are windows left behind after cleanup.
+func (m *Manager) FindOrphanedWindows() ([]string, error) {
+	if m.tmuxClient == nil {
+		return nil, fmt.Errorf("tmux client not set")
+	}
+
+	windows, err := m.tmuxClient.ListWindows()
+	if err != nil {
+		return nil, err
+	}
+
+	var orphaned []string
+	taskEmojis := []string{
+		constants.EmojiWorking,
+		constants.EmojiWaiting,
+		constants.EmojiDone,
+		constants.EmojiWarning,
+	}
+
+	for _, w := range windows {
+		// Check if it's a task window (starts with task emoji)
+		isTaskWindow := false
+		taskName := ""
+		for _, emoji := range taskEmojis {
+			if strings.HasPrefix(w.Name, emoji) {
+				isTaskWindow = true
+				taskName = strings.TrimPrefix(w.Name, emoji)
+				break
+			}
+		}
+
+		if !isTaskWindow {
+			continue
+		}
+
+		// Check if agent directory exists
+		agentDir := filepath.Join(m.agentsDir, taskName)
+		if _, err := os.Stat(agentDir); os.IsNotExist(err) {
+			// No agent directory - orphaned window
+			orphaned = append(orphaned, w.ID)
+		}
+	}
+
+	return orphaned, nil
+}

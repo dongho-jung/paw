@@ -664,15 +664,45 @@ var popupShellCmd = &cobra.Command{
 		if shell == "" {
 			shell = "/bin/bash"
 		}
+		shellName := filepath.Base(shell)
 
-		// Build shell command that clears state on exit
-		shellCmd := fmt.Sprintf("%s; tmux -L 'taw-%s' set-option -g @taw_popup_open '' 2>/dev/null || true",
-			shell, sessionName)
+		// Build shell command with Alt+P binding to close popup
+		// We create a temporary rcfile that binds Alt+P to exit
+		var shellCmd string
+		// Use double quotes and escape properly for tmux command inside function
+		cleanupCmd := fmt.Sprintf("tmux -L \"taw-%s\" set-option -g @taw_popup_open \"\" 2>/dev/null || true", sessionName)
+
+		switch shellName {
+		case "zsh":
+			// For zsh: create temp ZDOTDIR with .zshrc that binds Alt+P
+			shellCmd = fmt.Sprintf(
+				"TMPZD=$(mktemp -d) && "+
+					"cat > \"$TMPZD/.zshrc\" << 'RCEOF'\n"+
+					"[[ -f ~/.zshrc ]] && source ~/.zshrc\n"+
+					"_taw_close_popup() { %s; exit; }\n"+
+					"bindkey -s '\\ep' '\\C-u_taw_close_popup\\n'\n"+
+					"RCEOF\n"+
+					"ZDOTDIR=\"$TMPZD\" zsh; "+
+					"rm -rf \"$TMPZD\" 2>/dev/null; %s",
+				cleanupCmd, cleanupCmd)
+		default:
+			// For bash: use --rcfile with temp file
+			shellCmd = fmt.Sprintf(
+				"TMPRC=$(mktemp) && "+
+					"cat > \"$TMPRC\" << 'RCEOF'\n"+
+					"[ -f ~/.bashrc ] && source ~/.bashrc\n"+
+					"_taw_close_popup() { %s; exit; }\n"+
+					"bind '\"\\ep\": \"\\C-u_taw_close_popup\\n\"'\n"+
+					"RCEOF\n"+
+					"bash --rcfile \"$TMPRC\"; "+
+					"rm -f \"$TMPRC\" 2>/dev/null; %s",
+				cleanupCmd, cleanupCmd)
+		}
 
 		return tm.DisplayPopup(tmux.PopupOpts{
 			Width:     "80%",
-			Height:   "60%",
-			Title:     " Shell ",
+			Height:    "60%",
+			Title:     " Shell (⌥P to close) ",
 			Close:     true,
 			Directory: panePath,
 		}, shellCmd)

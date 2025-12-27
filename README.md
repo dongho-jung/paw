@@ -126,6 +126,7 @@ Agent가 사용할 수 있는 slash commands:
 - 브랜치가 main에 머지된 경우 감지
 - 브랜치가 외부에서 삭제된 경우 감지
 - worktree, 브랜치, 에이전트 디렉토리 자동 정리
+- 열려있는 window도 자동으로 닫힘
 - 정리된 태스크는 `✅ Cleaned up merged task: <task-name>` 메시지로 표시
 
 ### 손상된 Worktree 복구

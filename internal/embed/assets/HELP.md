@@ -18,7 +18,7 @@ Claude Code-based autonomous agent work environment
   ⌥ n         Toggle new window (task ↔ new window)
   ⌥ e         Complete task (commit → PR/merge → cleanup, follows ON_COMPLETE setting)
   ⌥ m         Batch merge completed tasks (merge + end all ✅ status tasks)
-  ⌥ p         Open/close popup shell (current worktree path)
+  ⌥ p         Open/close popup shell (toggle, current worktree path)
   ⌥ l         View live log (tail -f style, scrollable)
   ⌥ u         Add quick task to queue (auto-processed after completion)
 

@@ -138,6 +138,17 @@ func runMain(cmd *cobra.Command, args []string) error {
 
 // startNewSession creates a new tmux session
 func startNewSession(app *app.App, tm tmux.Client) error {
+	// Clean up merged tasks before starting new session
+	mgr := task.NewManager(app.AgentsDir, app.ProjectDir, app.TawDir, app.IsGitRepo, app.Config)
+	merged, err := mgr.FindMergedTasks()
+	if err == nil {
+		for _, t := range merged {
+			logging.Log("Auto-cleaning merged task: %s", t.Name)
+			mgr.CleanupTask(t)
+			fmt.Printf("✅ Cleaned up merged task: %s\n", t.Name)
+		}
+	}
+
 	// Get taw binary path for initial command
 	tawBin, err := os.Executable()
 	if err != nil {
@@ -202,7 +213,24 @@ func attachToSession(app *app.App, tm tmux.Client) error {
 	if err == nil {
 		for _, t := range merged {
 			logging.Log("Auto-cleaning merged task: %s", t.Name)
+			// Close window first if exists
+			if t.HasTabLock() {
+				if windowID, err := t.LoadWindowID(); err == nil && windowID != "" {
+					tm.KillWindow(windowID)
+				}
+			}
 			mgr.CleanupTask(t)
+			fmt.Printf("✅ Cleaned up merged task: %s\n", t.Name)
+		}
+	}
+
+	// Clean up orphaned windows (windows without agent directory)
+	orphanedWindows, err := mgr.FindOrphanedWindows()
+	if err == nil {
+		for _, windowID := range orphanedWindows {
+			logging.Log("Closing orphaned window: %s", windowID)
+			tm.KillWindow(windowID)
+			fmt.Printf("✅ Closed orphaned window: %s\n", windowID)
 		}
 	}
 
