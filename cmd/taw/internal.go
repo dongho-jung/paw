@@ -496,66 +496,100 @@ var endTaskCmd = &cobra.Command{
 
 				mergeTimer := logging.StartTimer("auto-merge")
 
-				// Use a temporary worktree for merge to avoid affecting project dir state
-				// This is idempotent and isolated from any uncommitted changes in project dir
-				mergeDir := filepath.Join(app.TawDir, "merge-"+targetTask.Name)
-
-				// Clean up any existing merge worktree (idempotent)
-				if _, err := os.Stat(mergeDir); err == nil {
-					logging.Log("Cleaning up existing merge worktree...")
-					os.RemoveAll(mergeDir)
-					gitClient.WorktreePrune(app.ProjectDir)
+				// Acquire merge lock to prevent concurrent merges
+				// This is necessary because we need to checkout main in project dir
+				lockFile := filepath.Join(app.TawDir, "merge.lock")
+				lockAcquired := false
+				for retries := 0; retries < 30; retries++ {
+					f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+					if err == nil {
+						f.WriteString(fmt.Sprintf("%s\n%d", targetTask.Name, os.Getpid()))
+						f.Close()
+						lockAcquired = true
+						break
+					}
+					logging.Log("Waiting for merge lock (attempt %d/30)...", retries+1)
+					time.Sleep(1 * time.Second)
 				}
 
-				// Fetch latest from origin
-				logging.Log("Fetching from origin...")
-				if err := gitClient.Fetch(app.ProjectDir, "origin"); err != nil {
-					logging.Warn("Failed to fetch: %v", err)
-				}
-
-				// Create temporary worktree for main branch
-				logging.Log("Creating merge worktree for %s...", mainBranch)
-				if err := gitClient.WorktreeAdd(app.ProjectDir, mergeDir, mainBranch, false); err != nil {
-					logging.Warn("Failed to create merge worktree: %v", err)
-					mergeTimer.StopWithResult(false, "worktree creation failed")
+				if !lockAcquired {
+					logging.Warn("Failed to acquire merge lock after 30 seconds")
+					mergeTimer.StopWithResult(false, "lock timeout")
 					mergeSuccess = false
 				} else {
-					// Pull latest in merge worktree
-					logging.Log("Pulling latest changes...")
-					if err := gitClient.Pull(mergeDir); err != nil {
-						logging.Warn("Failed to pull: %v", err)
+					// Ensure lock is released on exit
+					defer os.Remove(lockFile)
+
+					// Stash any uncommitted changes in project dir
+					hasLocalChanges := gitClient.HasChanges(app.ProjectDir)
+					if hasLocalChanges {
+						logging.Log("Stashing local changes...")
+						if err := gitClient.StashPush(app.ProjectDir, "taw-merge-temp"); err != nil {
+							logging.Warn("Failed to stash changes: %v", err)
+						}
 					}
 
-					// Merge task branch (--no-ff)
-					logging.Log("Merging branch %s into %s...", targetTask.Name, mainBranch)
-					mergeMsg := fmt.Sprintf("Merge branch '%s'", targetTask.Name)
-					if err := gitClient.Merge(mergeDir, targetTask.Name, true, mergeMsg); err != nil {
-						logging.Warn("Merge failed: %v - may need manual resolution", err)
-						// Abort merge on conflict
-						if abortErr := gitClient.MergeAbort(mergeDir); abortErr != nil {
-							logging.Warn("Failed to abort merge: %v", abortErr)
-						}
-						mergeTimer.StopWithResult(false, "merge conflict")
+					// Remember current branch to restore later
+					currentBranch, _ := gitClient.GetCurrentBranch(app.ProjectDir)
+
+					// Fetch latest from origin
+					logging.Log("Fetching from origin...")
+					if err := gitClient.Fetch(app.ProjectDir, "origin"); err != nil {
+						logging.Warn("Failed to fetch: %v", err)
+					}
+
+					// Checkout main
+					logging.Log("Checking out %s...", mainBranch)
+					if err := gitClient.Checkout(app.ProjectDir, mainBranch); err != nil {
+						logging.Warn("Failed to checkout %s: %v", mainBranch, err)
+						mergeTimer.StopWithResult(false, "checkout failed")
 						mergeSuccess = false
 					} else {
-						// Push merged main
-						logging.Log("Pushing merged main to origin...")
-						if err := gitClient.Push(mergeDir, "origin", mainBranch, false); err != nil {
-							logging.Warn("Failed to push merged main: %v", err)
-							mergeTimer.StopWithResult(false, "push failed")
+						// Pull latest
+						logging.Log("Pulling latest changes...")
+						if err := gitClient.Pull(app.ProjectDir); err != nil {
+							logging.Warn("Failed to pull: %v", err)
+						}
+
+						// Merge task branch (--no-ff)
+						logging.Log("Merging branch %s into %s...", targetTask.Name, mainBranch)
+						mergeMsg := fmt.Sprintf("Merge branch '%s'", targetTask.Name)
+						if err := gitClient.Merge(app.ProjectDir, targetTask.Name, true, mergeMsg); err != nil {
+							logging.Warn("Merge failed: %v - may need manual resolution", err)
+							// Abort merge on conflict
+							if abortErr := gitClient.MergeAbort(app.ProjectDir); abortErr != nil {
+								logging.Warn("Failed to abort merge: %v", abortErr)
+							}
+							mergeTimer.StopWithResult(false, "merge conflict")
 							mergeSuccess = false
 						} else {
-							mergeTimer.StopWithResult(true, fmt.Sprintf("merged %s into %s", targetTask.Name, mainBranch))
+							// Push merged main
+							logging.Log("Pushing merged main to origin...")
+							if err := gitClient.Push(app.ProjectDir, "origin", mainBranch, false); err != nil {
+								logging.Warn("Failed to push merged main: %v", err)
+								mergeTimer.StopWithResult(false, "push failed")
+								mergeSuccess = false
+							} else {
+								mergeTimer.StopWithResult(true, fmt.Sprintf("merged %s into %s", targetTask.Name, mainBranch))
+							}
+						}
+
+						// Restore original branch if different from main
+						if currentBranch != "" && currentBranch != mainBranch {
+							logging.Log("Restoring branch %s...", currentBranch)
+							if err := gitClient.Checkout(app.ProjectDir, currentBranch); err != nil {
+								logging.Warn("Failed to restore branch: %v", err)
+							}
 						}
 					}
 
-					// Clean up merge worktree
-					logging.Log("Cleaning up merge worktree...")
-					if err := gitClient.WorktreeRemove(app.ProjectDir, mergeDir, true); err != nil {
-						logging.Warn("Failed to remove merge worktree: %v", err)
-						os.RemoveAll(mergeDir)
+					// Restore stashed changes
+					if hasLocalChanges {
+						logging.Log("Restoring stashed changes...")
+						if err := gitClient.StashPop(app.ProjectDir); err != nil {
+							logging.Warn("Failed to restore stashed changes: %v", err)
+						}
 					}
-					gitClient.WorktreePrune(app.ProjectDir)
 				}
 
 				// If merge failed, rename window to warning and skip cleanup
