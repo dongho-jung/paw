@@ -37,14 +37,25 @@ $TAW_DIR/agents/$TASK_NAME/
 3. Identify build/test commands
 4. Log progress
 
-### Phase 2: Execute
+### Phase 2: Plan & Confirm (REQUIRED)
+**Before any code changes, you MUST get user approval:**
+1. Write a clear implementation plan:
+   - What files will be modified/created
+   - What approach you'll take
+   - Key implementation steps
+2. Present the plan to the user and ask: "이 계획대로 진행해도 될까요? (y/n)"
+3. **Wait for user confirmation before proceeding**
+4. If user says no or requests changes, revise the plan and ask again
+5. Only proceed to Phase 3 after explicit approval
+
+### Phase 3: Execute
 1. Make changes incrementally
 2. **After each logical change:**
    - Run tests if available → fix failures
    - Commit with clear message
    - Log progress
 
-### Phase 3: Complete
+### Phase 4: Complete
 1. Ensure all tests pass
 2. Commit all changes
 3. **Check `$ON_COMPLETE` and act accordingly** (see below)

@@ -371,7 +371,7 @@ exec "%s" internal end-task "%s" "%s"
 		envVars.WriteString(fmt.Sprintf("TAW_BIN='%s' ", tawBin))
 		envVars.WriteString(fmt.Sprintf("SESSION_NAME='%s'", sessionName))
 
-		claudeCmd := fmt.Sprintf("%s && claude --permission-mode plan --system-prompt \"$(cat '%s')\"",
+		claudeCmd := fmt.Sprintf("%s && claude --dangerously-skip-permissions --system-prompt \"$(cat '%s')\"",
 			envVars.String(), t.GetSystemPromptPath())
 		if err := tm.SendKeysLiteral(windowID+".0", claudeCmd); err != nil {
 			return fmt.Errorf("failed to send Claude command: %w", err)
