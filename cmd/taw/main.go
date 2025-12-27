@@ -354,6 +354,17 @@ func setupTmuxConfig(app *app.App, tm tmux.Client) error {
 	// Enable mouse mode
 	tm.SetOption("mouse", "on", true)
 
+	// Enable vi-style copy mode and clipboard integration
+	tm.SetOption("mode-keys", "vi", true)
+	tm.SetOption("set-clipboard", "on", true)
+
+	// Auto-copy to system clipboard when mouse selection ends
+	tm.Bind(tmux.BindOpts{
+		Key:     "MouseDragEnd1Pane",
+		Command: "copy-pipe-and-cancel 'pbcopy'",
+		Table:   "copy-mode-vi",
+	})
+
 	// Setup keybindings
 	bindings := []tmux.BindOpts{
 		{Key: "M-Tab", Command: "select-pane -t :.+", NoPrefix: true},
