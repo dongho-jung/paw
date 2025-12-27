@@ -397,8 +397,8 @@ ensure_main_window() {
         log "Creating ⭐️main window..."
         # Create at index 0
         tm new-window -t "$SESSION_NAME:0" -n "⭐️main" -c "$PROJECT_DIR"
-        # Run new-task in it
-        tm send-keys -t "$SESSION_NAME:⭐️main" "$TAW_HOME/_taw/bin/new-task" Enter
+        # Run new-task in it (loop so it restarts after each task)
+        tm send-keys -t "$SESSION_NAME:⭐️main" "while true; do '$TAW_HOME/_taw/bin/new-task' || true; done" Enter
     else
         # Ensure it's at index 0 (leftmost)
         local main_index
@@ -505,9 +505,9 @@ start_session() {
     setup_tmux_config
     log "Tmux configured"
 
-    # Run new-task in the main window
+    # Run new-task in the main window (loop so it restarts after each task)
     debug "Running new-task in ⭐️main window..."
-    tm send-keys -t "$SESSION_NAME:⭐️main" "$TAW_HOME/_taw/bin/new-task" Enter
+    tm send-keys -t "$SESSION_NAME:⭐️main" "while true; do '$TAW_HOME/_taw/bin/new-task' || true; done" Enter
 
     # Auto-cleanup merged tasks (before reopening, so merged tasks are cleaned up first)
     debug "Checking for merged tasks to cleanup..."
