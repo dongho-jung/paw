@@ -82,9 +82,10 @@ type PopupOpts struct {
 	Height      string
 	Title       string
 	Style       string
-	Close       bool   // -E flag: close on exit
+	Close       bool              // -E flag: close on exit
 	BorderStyle string
-	Directory   string // -d flag: working directory
+	Directory   string            // -d flag: working directory
+	Env         map[string]string // -e flag: environment variables
 }
 
 // BindOpts contains options for key binding.
@@ -350,6 +351,9 @@ func (c *tmuxClient) DisplayPopup(opts PopupOpts, command string) error {
 	}
 	if opts.Style != "" {
 		args = append(args, "-s", opts.Style)
+	}
+	for k, v := range opts.Env {
+		args = append(args, "-e", k+"="+v)
 	}
 	if command != "" {
 		args = append(args, command)

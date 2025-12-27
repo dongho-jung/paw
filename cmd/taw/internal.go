@@ -867,6 +867,19 @@ var popupShellCmd = &cobra.Command{
 				cleanupCmd, cleanupCmd)
 		}
 
+		// Build environment variables for popup
+		// Set TERM_PROGRAM based on LC_TERMINAL to fix bat color detection
+		env := make(map[string]string)
+		if lcTerminal := os.Getenv("LC_TERMINAL"); lcTerminal != "" {
+			// Map LC_TERMINAL to TERM_PROGRAM (e.g., "iTerm2" -> "iTerm.app")
+			switch lcTerminal {
+			case "iTerm2":
+				env["TERM_PROGRAM"] = "iTerm.app"
+			default:
+				env["TERM_PROGRAM"] = lcTerminal
+			}
+		}
+
 		// Ignore exit code from popup - commands like 'less' exit with non-zero
 		// and we don't want run-shell to display "...returned 1"
 		tm.DisplayPopup(tmux.PopupOpts{
@@ -876,6 +889,7 @@ var popupShellCmd = &cobra.Command{
 			Close:     true,
 			Directory: panePath,
 			Style:     "fg=terminal,bg=terminal",
+			Env:       env,
 		}, shellCmd)
 		return nil
 	},
