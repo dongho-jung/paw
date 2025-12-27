@@ -243,12 +243,42 @@ func attachToSession(app *app.App, tm tmux.Client) error {
 	merged, err := mgr.FindMergedTasks()
 	if err == nil && len(merged) > 0 {
 		logging.Log("Found %d merged tasks to clean up", len(merged))
+
+		// Build a map of task name -> window ID for quick lookup
+		taskWindowMap := make(map[string]string)
+		if windows, err := tm.ListWindows(); err == nil {
+			taskEmojis := []string{
+				constants.EmojiWorking,
+				constants.EmojiWaiting,
+				constants.EmojiDone,
+				constants.EmojiWarning,
+			}
+			for _, w := range windows {
+				for _, emoji := range taskEmojis {
+					if strings.HasPrefix(w.Name, emoji) {
+						taskName := strings.TrimPrefix(w.Name, emoji)
+						taskWindowMap[taskName] = w.ID
+						break
+					}
+				}
+			}
+		}
+
 		for _, t := range merged {
 			logging.Log("Auto-cleaning merged task: %s", t.Name)
-			// Close window first if exists
+			// Close window first if exists (by tab-lock or by matching window name)
+			windowKilled := false
 			if t.HasTabLock() {
 				if windowID, err := t.LoadWindowID(); err == nil && windowID != "" {
 					logging.Log("Killing window %s for merged task %s", windowID, t.Name)
+					tm.KillWindow(windowID)
+					windowKilled = true
+				}
+			}
+			// If no tab-lock or tab-lock didn't have window ID, try to find by window name
+			if !windowKilled {
+				if windowID, ok := taskWindowMap[t.Name]; ok {
+					logging.Log("Killing window %s (by name) for merged task %s", windowID, t.Name)
 					tm.KillWindow(windowID)
 				}
 			}

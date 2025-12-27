@@ -356,7 +356,7 @@ func (m *Manager) FindMergedTasks() ([]*Task, error) {
 	return merged, nil
 }
 
-// isTaskMerged checks if a task has been merged.
+// isTaskMerged checks if a task has been merged or externally cleaned up.
 func (m *Manager) isTaskMerged(task *Task, mainBranch string) bool {
 	// Check if PR is merged
 	if task.HasPR() {
@@ -372,6 +372,20 @@ func (m *Manager) isTaskMerged(task *Task, mainBranch string) bool {
 	// Check if branch is merged into main
 	if m.gitClient.BranchMerged(m.projectDir, task.Name, mainBranch) {
 		return true
+	}
+
+	// Check if task was externally cleaned up (branch and worktree both gone)
+	// This handles cases where someone manually merged and cleaned up the task
+	if m.config != nil && m.config.WorkMode == config.WorkModeWorktree {
+		branchExists := m.gitClient.BranchExists(m.projectDir, task.Name)
+		worktreeDir := task.GetWorktreeDir()
+		_, worktreeErr := os.Stat(worktreeDir)
+		worktreeExists := worktreeErr == nil
+
+		if !branchExists && !worktreeExists {
+			// Both branch and worktree are gone - task was cleaned up externally
+			return true
+		}
 	}
 
 	return false
