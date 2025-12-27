@@ -130,62 +130,68 @@ var newTaskCmd = &cobra.Command{
 			logging.SetGlobal(logger)
 		}
 
-		// Open editor for task content
-		content, err := openEditor(app.ProjectDir)
-		if err != nil {
-			return fmt.Errorf("failed to open editor: %w", err)
-		}
-
-		if strings.TrimSpace(content) == "" {
-			fmt.Println("Task content is empty, aborting.")
-			return nil
-		}
-
-		// Create task with spinner
 		mgr := task.NewManager(app.AgentsDir, app.ProjectDir, app.TawDir, app.IsGitRepo, app.Config)
 
-		var newTask *task.Task
-		spinner := tui.NewSpinner("태스크 이름 생성 중...")
-		p := tea.NewProgram(spinner)
-
-		// Run task creation in background
-		go func() {
-			t, err := mgr.CreateTask(content)
+		// Loop continuously for task creation
+		for {
+			// Open editor for task content
+			content, err := openEditor(app.ProjectDir)
 			if err != nil {
-				p.Send(tui.SpinnerDoneMsg{Err: err})
-				return
+				fmt.Printf("Failed to open editor: %v\n", err)
+				continue
 			}
-			newTask = t
-			p.Send(tui.SpinnerDoneMsg{Result: t.Name})
-		}()
 
-		finalModel, err := p.Run()
-		if err != nil {
-			return fmt.Errorf("spinner error: %w", err)
-		}
-
-		spinnerResult := finalModel.(*tui.Spinner)
-		if spinnerResult.GetError() != nil {
-			return fmt.Errorf("failed to create task: %w", spinnerResult.GetError())
-		}
-
-		logging.Log("Task created: %s", newTask.Name)
-
-		// Handle task in background
-		tawBin, _ := os.Executable()
-		handleCmd := exec.Command(tawBin, "internal", "handle-task", sessionName, newTask.AgentDir)
-		handleCmd.Start()
-
-		// Wait for window to be created
-		windowIDFile := filepath.Join(newTask.AgentDir, ".tab-lock", "window_id")
-		for i := 0; i < 60; i++ { // 30 seconds max (60 * 500ms)
-			if _, err := os.Stat(windowIDFile); err == nil {
-				break
+			if strings.TrimSpace(content) == "" {
+				fmt.Println("Task content is empty, try again.")
+				continue
 			}
-			time.Sleep(500 * time.Millisecond)
-		}
 
-		return nil
+			// Create task with spinner
+			var newTask *task.Task
+			spinner := tui.NewSpinner("태스크 이름 생성 중...")
+			p := tea.NewProgram(spinner)
+
+			// Run task creation in background
+			go func() {
+				t, err := mgr.CreateTask(content)
+				if err != nil {
+					p.Send(tui.SpinnerDoneMsg{Err: err})
+					return
+				}
+				newTask = t
+				p.Send(tui.SpinnerDoneMsg{Result: t.Name})
+			}()
+
+			finalModel, err := p.Run()
+			if err != nil {
+				fmt.Printf("Spinner error: %v\n", err)
+				continue
+			}
+
+			spinnerResult := finalModel.(*tui.Spinner)
+			if spinnerResult.GetError() != nil {
+				fmt.Printf("Failed to create task: %v\n", spinnerResult.GetError())
+				continue
+			}
+
+			logging.Log("Task created: %s", newTask.Name)
+
+			// Handle task in background
+			tawBin, _ := os.Executable()
+			handleCmd := exec.Command(tawBin, "internal", "handle-task", sessionName, newTask.AgentDir)
+			handleCmd.Start()
+
+			// Wait for window to be created
+			windowIDFile := filepath.Join(newTask.AgentDir, ".tab-lock", "window_id")
+			for i := 0; i < 60; i++ { // 30 seconds max (60 * 500ms)
+				if _, err := os.Stat(windowIDFile); err == nil {
+					break
+				}
+				time.Sleep(500 * time.Millisecond)
+			}
+
+			// Loop back to create another task
+		}
 	},
 }
 
