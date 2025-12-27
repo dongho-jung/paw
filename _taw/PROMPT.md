@@ -80,13 +80,14 @@ echo "ON_COMPLETE=$ON_COMPLETE"  # 먼저 확인
 1. 모든 변경사항 커밋
 2. `git push -u origin $TASK_NAME`
 3. Log: "작업 완료 - end-task 호출"
-4. **end-task 호출** (이게 merge, cleanup, window 닫기를 자동으로 처리):
-   ```bash
-   "$TAW_DIR/agents/$TASK_NAME/end-task"
-   ```
-   **NOTE**: 환경변수 대신 태스크별 end-task 스크립트를 사용합니다. 이 스크립트는 태스크 생성 시 자동으로 만들어집니다.
+4. **end-task 호출** - 태스크 시작 시 받은 **End-Task Script** 경로의 절대경로를 사용:
+   - user prompt에 **End-Task Script** 경로가 있습니다 (예: `/path/to/.taw/agents/task-name/end-task`)
+   - 이 절대 경로를 그대로 bash에서 실행하세요
+   - 예: `/Users/xxx/projects/yyy/.taw/agents/my-task/end-task`
 
-**CRITICAL**: `auto-merge`에서는 PR 생성 안 함! end-task가 자동으로 main에 merge하고 정리합니다.
+**CRITICAL**:
+- `auto-merge`에서는 PR 생성 안 함! end-task가 자동으로 main에 merge하고 정리합니다.
+- 반드시 절대 경로를 사용하세요. 환경변수(`$TAW_DIR` 등)는 bash에서 사용할 수 없습니다.
 
 #### `auto-pr` 모드
 ```

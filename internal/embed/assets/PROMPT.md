@@ -79,13 +79,14 @@ Commit → push → call end-task → (auto merge + cleanup + close window)
 1. Commit all changes
 2. `git push -u origin $TASK_NAME`
 3. Log: "Task complete - calling end-task"
-4. **Call end-task** (handles merge, cleanup, window close automatically):
-   ```bash
-   "$TAW_DIR/agents/$TASK_NAME/end-task"
-   ```
-   **NOTE**: Use the task-specific end-task script instead of environment variables. This script is auto-generated when the task is created.
+4. **Call end-task** - Use the **absolute path** from the **End-Task Script** in your user prompt:
+   - The user prompt contains the **End-Task Script** path (e.g., `/path/to/.taw/agents/task-name/end-task`)
+   - Execute this absolute path directly in bash
+   - Example: `/Users/xxx/projects/yyy/.taw/agents/my-task/end-task`
 
-**CRITICAL**: In `auto-merge`, don't create PR! end-task automatically merges to main and cleans up.
+**CRITICAL**:
+- In `auto-merge`, don't create PR! end-task automatically merges to main and cleans up.
+- You MUST use the absolute path. Environment variables (`$TAW_DIR` etc.) won't work in bash.
 
 #### `auto-pr` mode
 ```

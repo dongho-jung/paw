@@ -294,6 +294,9 @@ var handleTaskCmd = &cobra.Command{
 		projectPrompt, _ := os.ReadFile(app.GetPromptPath())
 		systemPrompt := claude.BuildSystemPrompt(string(globalPrompt), string(projectPrompt))
 
+		// Get taw binary path for end-task (needed for user prompt)
+		tawBin, _ := os.Executable()
+
 		// Build user prompt with context
 		var userPrompt strings.Builder
 		userPrompt.WriteString(fmt.Sprintf("# Task: %s\n\n", taskName))
@@ -301,6 +304,23 @@ var handleTaskCmd = &cobra.Command{
 			userPrompt.WriteString(fmt.Sprintf("**Worktree**: %s\n", workDir))
 		}
 		userPrompt.WriteString(fmt.Sprintf("**Project**: %s\n\n", app.ProjectDir))
+
+		// Add ON_COMPLETE setting and end-task path for auto-merge
+		userPrompt.WriteString(fmt.Sprintf("**ON_COMPLETE**: %s\n", app.Config.OnComplete))
+		endTaskScriptPath := filepath.Join(t.AgentDir, "end-task")
+		userPrompt.WriteString(fmt.Sprintf("**End-Task Script**: %s\n\n", endTaskScriptPath))
+
+		// Add critical instruction for auto-merge mode
+		if app.Config.OnComplete == config.OnCompleteAutoMerge {
+			userPrompt.WriteString("## ⚠️ AUTO-MERGE MODE\n")
+			userPrompt.WriteString("When you complete this task, you MUST:\n")
+			userPrompt.WriteString("1. Commit all changes\n")
+			userPrompt.WriteString("2. Push to origin\n")
+			userPrompt.WriteString(fmt.Sprintf("3. Run this exact command: `%s`\n", endTaskScriptPath))
+			userPrompt.WriteString("This will automatically merge to main and cleanup.\n\n")
+		}
+
+		userPrompt.WriteString("---\n\n")
 		userPrompt.WriteString(t.Content)
 
 		// Save prompts (errors are non-fatal but should be logged)
@@ -311,19 +331,17 @@ var handleTaskCmd = &cobra.Command{
 			logging.Warn("Failed to save user prompt: %v", err)
 		}
 
-		// Get taw binary path for end-task
-		tawBin, _ := os.Executable()
-
 		// Create task-specific end-task script
 		// This allows Claude to call end-task without needing environment variables
-		endTaskScript := filepath.Join(t.AgentDir, "end-task")
 		endTaskContent := fmt.Sprintf(`#!/bin/bash
 # Auto-generated end-task script for this task
 # Claude can call this directly without environment variables
 exec "%s" internal end-task "%s" "%s"
 `, tawBin, sessionName, windowID)
-		if err := os.WriteFile(endTaskScript, []byte(endTaskContent), 0755); err != nil {
+		if err := os.WriteFile(endTaskScriptPath, []byte(endTaskContent), 0755); err != nil {
 			logging.Warn("Failed to create end-task script: %v", err)
+		} else {
+			logging.Log("End-task script created: %s", endTaskScriptPath)
 		}
 
 		// Build environment variables and Claude command
