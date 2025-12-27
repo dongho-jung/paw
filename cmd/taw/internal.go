@@ -282,10 +282,11 @@ var handleTaskCmd = &cobra.Command{
 		}
 
 		// Split window for user pane (error is non-fatal)
-		if err := tm.SplitWindow(windowID, true, ""); err != nil {
+		// Pass workDir so user pane starts in the worktree (if git mode) or project dir
+		if err := tm.SplitWindow(windowID, true, workDir, ""); err != nil {
 			logging.Warn("Failed to split window: %v", err)
 		} else {
-			logging.Log("Window split for user pane")
+			logging.Log("Window split for user pane: startDir=%s", workDir)
 		}
 
 		// Build system prompt

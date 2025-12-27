@@ -31,7 +31,7 @@ type Client interface {
 	MoveWindow(source, target string) error
 
 	// Pane operations
-	SplitWindow(target string, horizontal bool, command string) error
+	SplitWindow(target string, horizontal bool, startDir string, command string) error
 	SelectPane(target string) error
 	SendKeys(target string, keys ...string) error
 	SendKeysLiteral(target, text string) error
@@ -283,13 +283,17 @@ func (c *tmuxClient) MoveWindow(source, target string) error {
 
 // Pane operations
 
-func (c *tmuxClient) SplitWindow(target string, horizontal bool, command string) error {
+func (c *tmuxClient) SplitWindow(target string, horizontal bool, startDir string, command string) error {
 	args := []string{"split-window", "-t", target}
 
 	if horizontal {
 		args = append(args, "-h")
 	} else {
 		args = append(args, "-v")
+	}
+
+	if startDir != "" {
+		args = append(args, "-c", startDir)
 	}
 
 	if command != "" {
