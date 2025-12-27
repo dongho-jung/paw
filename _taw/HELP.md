@@ -24,8 +24,7 @@ Claude Code 기반 자율 에이전트 작업 환경
 
 ### 세션
   ⌥ q         세션에서 나가기 (detach)
-  ⌥ h         이 도움말 열기/닫기 (toggle)
-  ⌥ /         이 도움말 열기/닫기 (toggle)
+  ⌥ h 또는 ⌥ /  이 도움말 열기/닫기 (toggle)
 
 ## Slash Commands (에이전트용)
 
@@ -37,13 +36,12 @@ Claude Code 기반 자율 에이전트 작업 환경
 ## 디렉토리 구조
 
   .taw/
+  ├── config                 프로젝트 설정 파일
   ├── PROMPT.md              프로젝트별 에이전트 지시사항
   ├── log                    통합 로그 파일
-  ├── new-task               태스크 생성 스크립트
   ├── .queue/                빠른 태스크 큐 (⌥u로 추가)
   └── agents/{task-name}/
       ├── task               태스크 내용
-      ├── attach             태스크 재연결 (./attach 실행)
       ├── origin/            프로젝트 루트 (symlink)
       └── worktree/          git worktree (자동 생성)
 
@@ -63,4 +61,4 @@ Claude Code 기반 자율 에이전트 작업 환경
   WINDOW_ID     tmux window ID (상태 갱신용)
 
 ---
-⌥h, ⌥/ 또는 q 키로 나가기
+⌥h 또는 q 키로 나가기

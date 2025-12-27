@@ -37,31 +37,30 @@ go install github.com/donghojung/taw@latest
 
 ```
 taw/                           # 이 레포
-├── install                    # taw 설치
-├── uninstall                  # taw 제거
-└── _taw/                      # 전역 설정
-    ├── PROMPT.md              # 전역 에이전트 프롬프트 (git 모드)
-    ├── PROMPT-nogit.md        # 전역 에이전트 프롬프트 (non-git 모드)
-    ├── HELP.md                # 도움말 (⌥h 또는 ⌥/ 로 열람)
-    ├── bin/                   # 실행 파일
-    │   ├── taw                # 메인 명령어 (세션 시작)
-    │   ├── setup              # 초기 설정 마법사
-    │   ├── new-task           # 태스크 생성
-    │   ├── handle-task        # 태스크 처리 (worktree 생성, agent 시작)
-    │   ├── end-task           # 태스크 완료 로직 (commit/PR/merge/cleanup)
-    │   ├── end-task-ui        # 태스크 완료 UI (⌥ e) - user pane에서 진행상황 표시
-    │   ├── attach             # 태스크 재연결
-    │   ├── cleanup            # 정리 스크립트 (end-task에서 사용)
-    │   ├── quick-task         # 빠른 태스크 큐 추가 (⌥ u)
-    │   ├── popup-shell        # 팝업 쉘 (⌥p로 열고, ⌥q로 닫기)
-    │   ├── process-queue      # 큐 처리 (태스크 완료 후 자동 실행)
-    │   ├── recover-task       # 손상된 태스크 복구/정리
-    │   └── _common.sh         # 공통 유틸리티 (상수, 함수, 설정)
-    └── claude/commands/       # slash commands
-        ├── commit.md          # /commit - 스마트 커밋
-        ├── test.md            # /test - 테스트 실행
-        ├── pr.md              # /pr - PR 생성
-        └── merge.md           # /merge - 브랜치 머지
+├── cmd/taw/                   # Go 메인 패키지
+├── internal/                  # Go 내부 패키지
+│   ├── app/                   # 애플리케이션 컨텍스트
+│   ├── claude/                # Claude API 클라이언트
+│   ├── config/                # 설정 관리
+│   ├── constants/             # 상수 정의
+│   ├── embed/                 # 임베디드 에셋 (프롬프트, 도움말)
+│   │   └── assets/            # 임베디드 파일들
+│   ├── git/                   # Git/Worktree 관리
+│   ├── github/                # GitHub API 클라이언트
+│   ├── logging/               # 로깅
+│   ├── task/                  # 태스크 관리
+│   ├── tmux/                  # Tmux 클라이언트
+│   └── tui/                   # 터미널 UI (로그 뷰어)
+├── _taw/                      # 레거시 파일 및 문서
+│   ├── HELP.md                # 도움말 (⌥h로 열람)
+│   ├── bin-legacy/            # Shell 버전 스크립트 (참고용)
+│   └── claude/commands/       # slash commands
+│       ├── commit.md          # /commit - 스마트 커밋
+│       ├── test.md            # /test - 테스트 실행
+│       ├── pr.md              # /pr - PR 생성
+│       └── merge.md           # /merge - 브랜치 머지
+├── Makefile                   # 빌드 스크립트
+└── go.mod                     # Go 모듈 파일
 
 {any-project}/                 # 사용자 프로젝트 (git 또는 일반 디렉토리)
 └── .taw/                      # taw가 생성하는 디렉토리
@@ -75,7 +74,6 @@ taw/                           # 이 레포
     │   └── 001.task           # 대기 중인 태스크 (순서대로 처리)
     └── agents/{task-name}/    # 태스크별 작업 공간
         ├── task               # 태스크 내용
-        ├── attach             # 태스크 재연결 스크립트
         ├── origin             # -> 프로젝트 루트 (symlink)
         ├── worktree/          # git worktree (git 모드에서만 자동 생성)
         ├── .tab-lock/         # 탭 생성 락 (atomic mkdir로 race condition 방지)
@@ -99,12 +97,10 @@ taw  # .taw 디렉토리 생성 및 tmux 세션 시작 → 자동으로 new-task
 
 ### 태스크 생성
 
-추가 태스크 생성이 필요하면 tmux 세션 내에서:
-```bash
-.taw/new-task  # $EDITOR에서 태스크 작성 → 자동으로 agent 시작
-```
-
-vi/vim/nvim 사용 시 자동으로 insert 모드로 시작합니다.
+추가 태스크 생성이 필요하면 tmux 세션 내에서 `⌥ n`을 누릅니다:
+- 에디터가 열리고 태스크 내용을 작성합니다
+- 저장하고 종료하면 자동으로 agent가 시작됩니다
+- vi/vim/nvim 사용 시 자동으로 insert 모드로 시작합니다
 
 ### Slash Commands
 
@@ -169,18 +165,27 @@ Agent가 사용할 수 있는 slash commands:
 처음 `taw`를 실행하면 설정 마법사가 나타납니다:
 
 ```
-=== TAW Initial Setup ===
-
-Work Mode
-How should taw create working directories for tasks?
-
-  → 1) worktree - Create git worktree per task (isolated, recommended)
-    2) main     - Work directly on current branch (simpler)
+🚀 TAW Setup Wizard
+Work Mode:
+  1. worktree (Recommended) - Each task gets its own git worktree
+  2. main - All tasks work on current branch
 
 Select [1-2, default: 1]:
+
+On Complete Action:
+  1. confirm (Recommended) - Ask before each action
+  2. auto-commit - Automatically commit changes
+  3. auto-merge - Auto commit + merge + cleanup
+  4. auto-pr - Auto commit + create pull request
+
+Select [1-4, default: 1]:
+
+✅ Configuration saved!
+   Work mode: worktree
+   On complete: confirm
 ```
 
-설정은 `.taw/config` 파일에 YAML 형식으로 저장됩니다.
+설정은 `.taw/config` 파일에 저장됩니다.
 
 ### 설정 재실행
 
@@ -190,22 +195,20 @@ taw setup  # 설정 마법사 다시 실행
 
 ### 설정 파일 (.taw/config)
 
-```yaml
+```
 # TAW Configuration
-# Edit this file directly to change settings
+# Generated by taw setup
 
-# Work Mode (git repositories only)
-# Options: worktree | main
-#   worktree - Create a git worktree per task (recommended)
-#   main     - Work directly on current branch
+# Work mode: worktree or main
+# - worktree: Each task gets its own git worktree (recommended)
+# - main: All tasks work on the current branch
 work_mode: worktree
 
-# On Complete Behavior
-# Options: confirm | auto-commit | auto-merge | auto-pr
-#   confirm     - Ask before each action (commit, merge, PR)
-#   auto-commit - Automatically commit changes (manual merge/PR)
-#   auto-merge  - Task completes -> auto commit + merge + cleanup + close window (no ⌥e needed)
-#   auto-pr     - Auto commit + create Pull Request (for teams)
+# On complete action: confirm, auto-commit, auto-merge, or auto-pr
+# - confirm: Ask before each action (recommended)
+# - auto-commit: Automatically commit changes
+# - auto-merge: Auto commit + merge + cleanup + close window
+# - auto-pr: Auto commit + create pull request
 on_complete: confirm
 ```
 
@@ -245,8 +248,8 @@ brew install tmux gh
 | 팝업 쉘 | `⌥ p` (현재 worktree에서 쉘 열기/닫기) |
 | 실시간 로그 | `⌥ l` (로그 뷰어 토글, vim-like 네비게이션 지원) |
 | 빠른 태스크 큐 추가 | `⌥ u` (현재 태스크 완료 후 자동 처리) |
-| Session 나가기 | `⌥ q` (detach) |
 | 도움말 | `⌥ h` 또는 `⌥ /` |
+| Session 나가기 | `⌥ q` (detach) |
 
 ## 빠른 태스크 큐
 
@@ -277,7 +280,7 @@ brew install tmux gh
 | `PgUp` / `PgDn` | 페이지 단위 스크롤 |
 | `s` | Tail 모드 토글 (새 로그 자동 추적) |
 | `w` | Word Wrap 토글 |
-| `⌥ l` | 로그 뷰어 닫기 (토글) |
+| `q` / `Esc` / `⌥ l` | 로그 뷰어 닫기 |
 
 ### 상태 표시
 

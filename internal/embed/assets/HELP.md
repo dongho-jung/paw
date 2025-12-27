@@ -24,8 +24,7 @@ Claude Code-based autonomous agent work environment
 
 ### Session
   ⌥ q         Exit session (detach)
-  ⌥ h         Open/close this help (toggle)
-  ⌥ /         Open/close this help (toggle)
+  ⌥ h or ⌥ /  Open/close this help (toggle)
 
 ## Slash Commands (for agents)
 
@@ -37,13 +36,12 @@ Claude Code-based autonomous agent work environment
 ## Directory Structure
 
   .taw/
+  ├── config                 Project configuration file
   ├── PROMPT.md              Project-specific agent instructions
   ├── log                    Unified log file
-  ├── new-task               Task creation script
   ├── .queue/                Quick task queue (add with ⌥u)
   └── agents/{task-name}/
       ├── task               Task content
-      ├── attach             Task reattach (run ./attach)
       ├── origin/            Project root (symlink)
       └── worktree/          git worktree (auto-created)
 
@@ -63,4 +61,4 @@ Claude Code-based autonomous agent work environment
   WINDOW_ID     tmux window ID (for status updates)
 
 ---
-Press ⌥h, ⌥/ or q to exit
+Press ⌥h or q to exit
