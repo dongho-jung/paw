@@ -75,13 +75,14 @@ else
     tm set-option -g @taw_log_open "1"
 
     # Use custom log-viewer with full features:
-    # - j/k or arrows: scroll up/down
+    # - ↑/↓ (or j/k): scroll up/down
+    # - PgUp/PgDn: page up/down
     # - g/G: go to top/bottom
     # - /: search, n/N: next/prev match
     # - f: highlight word
     # - F: filter lines
     # - s: toggle tail mode
     # - q, Esc, Alt+L: quit
-    tm display-popup -E -w 90% -h 80% -T " Log Viewer (j/k:scroll g/G:top/btm /:search f:highlight F:filter s:tail q:quit) " \
+    tm display-popup -E -w 90% -h 80% -T " Log Viewer (↑↓:scroll  /:search  f:highlight  F:filter  q:quit) " \
         "'$TAW_HOME/_taw/bin/log-viewer' '$LOG_FILE' '$SESSION_NAME'"
 fi

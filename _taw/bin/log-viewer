@@ -1,10 +1,11 @@
 #!/bin/bash
 
-# TAW Log Viewer - Interactive log file viewer with vim-like navigation
+# TAW Log Viewer - Interactive log file viewer
 #
 # Features:
-#   - Arrow up/down or j/k: Scroll up/down
-#   - g/G: Go to top/bottom
+#   - ↑/↓ (or j/k): Scroll up/down
+#   - PgUp/PgDn: Page up/down
+#   - Home/g, End/G: Go to top/bottom
 #   - /: Search (enter pattern)
 #   - n/N: Next/previous search result
 #   - f: Highlight a word (toggle)
@@ -200,7 +201,7 @@ draw_status() {
     # Help line (bottom)
     move $TERM_LINES 1
     printf '\033[2m'  # Dim
-    local help="j/k:scroll  g/G:top/btm  /:search  n/N:next/prev  f:highlight  F:filter  s:tail  q:quit"
+    local help="↑↓:scroll  PgUp/Dn:page  g/G:top/btm  /:search  n/N:next/prev  f:hl  F:filter  s:tail  q:quit"
     printf "%-${TERM_COLS}s" "$help"
     printf '\033[0m'
 }
@@ -238,17 +239,24 @@ redraw() {
 prompt_input() {
     local prompt_text="$1"
 
-    move $TERM_LINES 1
-    printf '\033[K'
-    printf '\033[7m%s\033[0m' "$prompt_text"
+    # Clear any pending input
+    while IFS= read -r -n1 -t 0.1 _ 2>/dev/null; do :; done
 
-    # Temporarily enable echo for input
-    stty -raw echo 2>/dev/null || true
+    # Move to bottom line and show prompt
+    move $TERM_LINES 1
+    printf '\033[K'  # Clear line
+    printf '\033[7m%s\033[0m' "$prompt_text"  # Inverse video prompt
+
+    # Switch to cooked mode for line editing
+    stty sane 2>/dev/null || stty cooked 2>/dev/null || stty -raw 2>/dev/null || true
+    stty echo 2>/dev/null || true
     tput cnorm 2>/dev/null || true  # Show cursor
 
     local input=""
-    read -r input 2>/dev/null || true
+    # Read user input (allow empty for clearing)
+    IFS= read -r input </dev/tty 2>/dev/null || true
 
+    # Restore raw mode
     tput civis 2>/dev/null || true  # Hide cursor
     stty raw -echo min 0 time 5 2>/dev/null || true
 
@@ -335,19 +343,50 @@ main() {
         fi
 
         # Handle escape sequences
+        # Note: Escape sequences (arrow keys, etc.) send multiple bytes rapidly.
+        # We use a short stty timeout to detect if more bytes are coming.
         if [ "$key" = $'\033' ]; then
-            local seq1="" seq2=""
-            IFS= read -r -n1 -t 0.01 seq1 2>/dev/null || true
+            local seq1="" seq2="" seq3=""
+
+            # Temporarily set very short timeout for escape sequence detection
+            # (time 1 = 0.1 seconds, which is enough for escape sequences)
+            stty raw -echo min 0 time 1 2>/dev/null || true
+
+            IFS= read -r -n1 seq1 2>/dev/null || true
 
             if [ "$seq1" = "[" ]; then
-                IFS= read -r -n1 -t 0.01 seq2 2>/dev/null || true
+                IFS= read -r -n1 seq2 2>/dev/null || true
                 case "$seq2" in
                     A) key="UP" ;;
                     B) key="DOWN" ;;
+                    C) key="RIGHT" ;;
+                    D) key="LEFT" ;;
                     H) key="HOME" ;;
                     F) key="END" ;;
-                    5) IFS= read -r -n1 -t 0.01 _ 2>/dev/null; key="PGUP" ;;
-                    6) IFS= read -r -n1 -t 0.01 _ 2>/dev/null; key="PGDN" ;;
+                    1|5|6)
+                        # Extended sequences: 1~ = Home, 5~ = PgUp, 6~ = PgDn
+                        IFS= read -r -n1 seq3 2>/dev/null || true
+                        if [ "$seq3" = "~" ]; then
+                            case "$seq2" in
+                                1) key="HOME" ;;
+                                5) key="PGUP" ;;
+                                6) key="PGDN" ;;
+                            esac
+                        fi
+                        ;;
+                    4)
+                        # 4~ = End
+                        IFS= read -r -n1 seq3 2>/dev/null || true
+                        [ "$seq3" = "~" ] && key="END"
+                        ;;
+                    *) key="ESC" ;;
+                esac
+            elif [ "$seq1" = "O" ]; then
+                # SS3 sequences (some terminals use these for Home/End)
+                IFS= read -r -n1 seq2 2>/dev/null || true
+                case "$seq2" in
+                    H) key="HOME" ;;
+                    F) key="END" ;;
                     *) key="ESC" ;;
                 esac
             elif [ "$seq1" = "l" ] || [ "$seq1" = "L" ]; then
@@ -358,6 +397,9 @@ main() {
             else
                 key="ESC"
             fi
+
+            # Restore normal timeout
+            stty raw -echo min 0 time 5 2>/dev/null || true
         fi
 
         case "$key" in
