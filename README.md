@@ -36,22 +36,18 @@ taw/                           # 이 레포
 │   ├── claude/                # Claude API 클라이언트
 │   ├── config/                # 설정 관리
 │   ├── constants/             # 상수 정의
-│   ├── embed/                 # 임베디드 에셋 (프롬프트, 도움말)
-│   │   └── assets/            # 임베디드 파일들
+│   ├── embed/                 # 임베디드 에셋
+│   │   └── assets/            # HELP.md (도움말)
 │   ├── git/                   # Git/Worktree 관리
 │   ├── github/                # GitHub API 클라이언트
 │   ├── logging/               # 로깅
 │   ├── task/                  # 태스크 관리
 │   ├── tmux/                  # Tmux 클라이언트
 │   └── tui/                   # 터미널 UI (로그 뷰어)
-├── _taw/                      # 리소스 파일
-│   ├── bin/                   # Shell 스크립트 (fallback용)
-│   ├── HELP.md                # 도움말 (⌥/로 열람)
-│   └── claude/commands/       # slash commands
-│       ├── commit.md          # /commit - 스마트 커밋
-│       ├── test.md            # /test - 테스트 실행
-│       ├── pr.md              # /pr - PR 생성
-│       └── merge.md           # /merge - 브랜치 머지
+├── _taw/                      # 리소스 파일 (프로젝트에 symlink로 연결됨)
+│   ├── PROMPT.md              # 시스템 프롬프트 (git mode)
+│   ├── PROMPT-nogit.md        # 시스템 프롬프트 (non-git mode)
+│   └── claude/commands/       # slash commands (/commit, /test, /pr, /merge)
 ├── Makefile                   # 빌드 스크립트
 └── go.mod                     # Go 모듈 파일
 
@@ -222,9 +218,9 @@ on_complete: confirm
 
 ### 기타 설정
 
-- `_taw/PROMPT.md`: 전역 에이전트 프롬프트
+- `_taw/PROMPT.md`: 시스템 프롬프트 (프로젝트 `.taw/.global-prompt`로 symlink됨)
 - `.taw/PROMPT.md`: 프로젝트별 프롬프트 (각 프로젝트 내)
-- `_taw/claude/commands/`: slash commands
+- `_taw/claude/commands/`: slash commands (프로젝트 `.taw/.claude`로 symlink됨)
 - `EDITOR` 환경변수: 태스크 작성 에디터 (기본: vim)
 
 ## 의존성
