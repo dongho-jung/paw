@@ -103,10 +103,12 @@ esac
 # - 80% width, 60% height
 # - Uses user's default shell config (no custom prompt)
 # - -E flag makes popup close when shell exits
+# - -s flag sets style to use default colors (adapts to light/dark themes)
 # When popup exits (naturally or via Alt+P), clean up the state
 tmux -L "taw-$SESSION_NAME" display-popup \
     -E \
     -w 80% -h 60% \
     -d "$PANE_PATH" \
     -T " Shell " \
+    -s 'fg=default,bg=default' \
     "$SHELL_CMD; tmux -L 'taw-$SESSION_NAME' set-option -g @taw_popup_open '' 2>/dev/null || true"

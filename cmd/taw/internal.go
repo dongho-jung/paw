@@ -729,6 +729,7 @@ var quickTaskCmd = &cobra.Command{
 			Height: "3",
 			Title:  "Quick Task",
 			Close:  true,
+			Style:  "fg=default,bg=default",
 		}, fmt.Sprintf("bash -c '%s'", popupCmd))
 	},
 }
@@ -860,6 +861,7 @@ var popupShellCmd = &cobra.Command{
 			Title:     " Shell (⌥P to close) ",
 			Close:     true,
 			Directory: panePath,
+			Style:     "fg=default,bg=default",
 		}, shellCmd)
 	},
 }
@@ -905,6 +907,7 @@ var toggleLogCmd = &cobra.Command{
 			Height: "80%",
 			Title:  " Log Viewer (↑↓:scroll  g/G:top/end  s:tail  w:wrap  q:quit) ",
 			Close:  true,
+			Style:  "fg=default,bg=default",
 		}, logCmd)
 	},
 }
@@ -971,6 +974,7 @@ var toggleHelpCmd = &cobra.Command{
 			Height: "80%",
 			Title:  " Help (⌥/ or q to close) ",
 			Close:  true,
+			Style:  "fg=default,bg=default",
 		}, popupCmd)
 	},
 }
