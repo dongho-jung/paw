@@ -231,7 +231,7 @@ func setupTmuxConfig(app *app.App, tm tmux.Client) error {
 	tm.SetOption("status", "on", true)
 	tm.SetOption("status-position", "bottom", true)
 	tm.SetOption("status-left", "", true)
-	tm.SetOption("status-right", " ⌥n:new ⌥e:end ⌥m:merge ⌥p:shell ⌥l:log ⌥u:queue ⌥h:help ⌥q:quit ", true)
+	tm.SetOption("status-right", " ⌥n:new ⌥e:end ⌥m:merge ⌥p:shell ⌥l:log ⌥u:queue ⌥/:help ⌥q:quit ", true)
 	tm.SetOption("status-right-length", "100", true)
 
 	// Enable mouse mode
@@ -249,7 +249,6 @@ func setupTmuxConfig(app *app.App, tm tmux.Client) error {
 		{Key: "M-u", Command: fmt.Sprintf("run-shell '%s internal quick-task %s'", tawBin, app.SessionName), NoPrefix: true},
 		{Key: "M-l", Command: fmt.Sprintf("run-shell '%s internal toggle-log %s'", tawBin, app.SessionName), NoPrefix: true},
 		{Key: "M-/", Command: fmt.Sprintf("run-shell '%s internal toggle-help %s'", tawBin, app.SessionName), NoPrefix: true},
-		{Key: "M-h", Command: fmt.Sprintf("run-shell '%s internal toggle-help %s'", tawBin, app.SessionName), NoPrefix: true},
 		{Key: "M-q", Command: "detach", NoPrefix: true},
 	}
 

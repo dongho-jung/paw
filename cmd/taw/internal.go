@@ -766,10 +766,10 @@ var toggleHelpCmd = &cobra.Command{
 		}
 		tmpFile.Close()
 
-		// Build command with lesskey bindings for Alt+H and Alt+/ to quit
+		// Build command with lesskey binding for Alt+/ to quit
 		// Creates a temp keyfile, uses LESSKEYIN to load it, then cleans up
 		popupCmd := fmt.Sprintf(
-			"KEYFILE=$(mktemp) && printf '#command\\n\\\\eh quit\\n\\\\e/ quit\\n' > \"$KEYFILE\" && "+
+			"KEYFILE=$(mktemp) && printf '#command\\n\\\\e/ quit\\n' > \"$KEYFILE\" && "+
 				"LESSKEYIN=\"$KEYFILE\" less '%s'; "+
 				"rm -f '%s' \"$KEYFILE\" 2>/dev/null || true; "+
 				"tmux -L 'taw-%s' set-option -g @taw_help_open '' 2>/dev/null || true",
@@ -778,7 +778,7 @@ var toggleHelpCmd = &cobra.Command{
 		return tm.DisplayPopup(tmux.PopupOpts{
 			Width:  "80%",
 			Height: "80%",
-			Title:  " Help (⌥h or q to close) ",
+			Title:  " Help (⌥/ or q to close) ",
 			Close:  true,
 		}, popupCmd)
 	},

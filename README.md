@@ -24,15 +24,6 @@ make install
 go install github.com/donghojung/taw@latest
 ```
 
-### Shell 버전 (Legacy)
-
-```bash
-./install    # ~/.local/bin/taw 설치
-./uninstall  # ~/.local/bin/taw 제거
-```
-
-**참고**: Shell 버전 스크립트는 `_taw/bin-legacy/`에 보관되어 있습니다.
-
 ## 디렉토리 구조
 
 ```
@@ -51,9 +42,9 @@ taw/                           # 이 레포
 │   ├── task/                  # 태스크 관리
 │   ├── tmux/                  # Tmux 클라이언트
 │   └── tui/                   # 터미널 UI (로그 뷰어)
-├── _taw/                      # 레거시 파일 및 문서
-│   ├── HELP.md                # 도움말 (⌥h로 열람)
-│   ├── bin-legacy/            # Shell 버전 스크립트 (참고용)
+├── _taw/                      # 리소스 파일
+│   ├── bin/                   # Shell 스크립트 (fallback용)
+│   ├── HELP.md                # 도움말 (⌥/로 열람)
 │   └── claude/commands/       # slash commands
 │       ├── commit.md          # /commit - 스마트 커밋
 │       ├── test.md            # /test - 테스트 실행
@@ -248,7 +239,7 @@ brew install tmux gh
 | 팝업 쉘 | `⌥ p` (현재 worktree에서 쉘 열기/닫기) |
 | 실시간 로그 | `⌥ l` (로그 뷰어 토글, vim-like 네비게이션 지원) |
 | 빠른 태스크 큐 추가 | `⌥ u` (현재 태스크 완료 후 자동 처리) |
-| 도움말 | `⌥ h` 또는 `⌥ /` |
+| 도움말 | `⌥ /` |
 | Session 나가기 | `⌥ q` (detach) |
 
 ## 빠른 태스크 큐

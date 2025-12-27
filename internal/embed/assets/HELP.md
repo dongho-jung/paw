@@ -24,7 +24,7 @@ Claude Code-based autonomous agent work environment
 
 ### Session
   ⌥ q         Exit session (detach)
-  ⌥ h or ⌥ /  Open/close this help (toggle)
+  ⌥ /         Open/close this help (toggle)
 
 ## Slash Commands (for agents)
 
@@ -61,4 +61,4 @@ Claude Code-based autonomous agent work environment
   WINDOW_ID     tmux window ID (for status updates)
 
 ---
-Press ⌥h or q to exit
+Press ⌥/ or q to exit
