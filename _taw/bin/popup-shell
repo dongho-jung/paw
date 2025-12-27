@@ -47,27 +47,42 @@ TMP_RCFILE=$(mktemp)
 
 case "$SHELL_NAME" in
     zsh)
-        cat > "$TMP_RCFILE" << 'RCFILE'
+        # Use unquoted heredoc to allow variable expansion for SESSION_NAME
+        cat > "$TMP_RCFILE" << RCFILE
 # Source user's zshrc for full environment
 [[ -f ~/.zshrc ]] && source ~/.zshrc
 
-# Bind Alt+P to exit (toggle close from inside popup)
-bindkey -s '\ep' '\C-u exit\n'
+# Function to properly close popup and clear state
+_taw_close_popup() {
+    tmux -L 'taw-$SESSION_NAME' set-option -g @taw_popup_open '' 2>/dev/null || true
+    exit
+}
+
+# Bind Alt+P to close popup (toggle close from inside popup)
+bindkey -s '\ep' '\C-u_taw_close_popup\n'
 RCFILE
         ;;
     *)
         # Default to bash behavior
-        cat > "$TMP_RCFILE" << 'RCFILE'
+        # Use unquoted heredoc to allow variable expansion for SESSION_NAME
+        cat > "$TMP_RCFILE" << RCFILE
 # Load user's bashrc if exists
 [ -f ~/.bashrc ] && source ~/.bashrc
 
-# Bind Alt+P to exit (toggle close from inside popup)
-bind '"\ep": "\C-u exit\n"'
+# Function to properly close popup and clear state
+_taw_close_popup() {
+    tmux -L 'taw-$SESSION_NAME' set-option -g @taw_popup_open '' 2>/dev/null || true
+    exit
+}
+
+# Bind Alt+P to close popup (toggle close from inside popup)
+bind '"\ep": "\C-u_taw_close_popup\n"'
 RCFILE
         ;;
 esac
 
-# Mark popup as open
+# Mark popup as open (clear first to ensure clean state)
+tmux -L "taw-$SESSION_NAME" set-option -g @taw_popup_open ""
 tmux -L "taw-$SESSION_NAME" set-option -g @taw_popup_open "1"
 
 # Build shell command based on shell type
