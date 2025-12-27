@@ -804,22 +804,20 @@ var mergeCompletedCmd = &cobra.Command{
 
 var popupShellCmd = &cobra.Command{
 	Use:   "popup-shell [session]",
-	Short: "Toggle popup shell",
+	Short: "Toggle shell pane at bottom 40%",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sessionName := args[0]
 		tm := tmux.New(sessionName)
 
-		// Check if popup is open
-		isOpen, _ := tm.GetOption("@taw_popup_open")
-		if isOpen == "1" {
-			// Close popup using display-popup -C
-			tm.SetOption("@taw_popup_open", "", true)
-			tm.Run("display-popup", "-C")
+		// Check if shell pane exists
+		paneID, _ := tm.GetOption("@taw_shell_pane_id")
+		if paneID != "" && tm.HasPane(paneID) {
+			// Shell pane exists, kill it and clear option
+			tm.KillPane(paneID)
+			tm.SetOption("@taw_shell_pane_id", "", true)
 			return nil
 		}
-
-		tm.SetOption("@taw_popup_open", "1", true)
 
 		// Get current pane's working directory (worktree path)
 		panePath, err := tm.Display("#{pane_current_path}")
@@ -838,59 +836,47 @@ var popupShellCmd = &cobra.Command{
 		}
 		shellName := filepath.Base(shell)
 
-		// Build shell command with Alt+P binding to close popup
+		// Build shell command with Alt+P binding to close pane
 		// We create a temporary rcfile that binds Alt+P to exit
 		var shellCmd string
-		// Use double quotes and escape properly for tmux command inside function
-		cleanupCmd := fmt.Sprintf("tmux -L \"taw-%s\" set-option -g @taw_popup_open \"\" 2>/dev/null || true", sessionName)
+
+		// Command to kill the shell pane and clear the option
+		// Note: We'll get the pane_id after creation and update the cleanup command
+		cleanupCmd := fmt.Sprintf("tmux -L \"taw-%s\" set-option -g @taw_shell_pane_id \"\" 2>/dev/null; exit", sessionName)
 
 		switch shellName {
 		case "zsh":
 			// For zsh: create temp ZDOTDIR with .zshrc that binds Alt+P
-			// Use printf to avoid newline issues with tmux display-popup and preserve escape sequences
-			// Use || true to suppress non-zero exit codes from commands like 'less'
 			shellCmd = fmt.Sprintf(
 				"TMPZD=$(mktemp -d) && "+
-					"printf '%%s\\n' '[[ -f ~/.zshrc ]] && source ~/.zshrc' '_taw_close_popup() { %s; exit; }' \"bindkey -s '\\\\ep' '\\\\C-u_taw_close_popup\\\\n'\" > \"$TMPZD/.zshrc\" && "+
-					"ZDOTDIR=\"$TMPZD\" zsh || true; "+
-					"rm -rf \"$TMPZD\" 2>/dev/null; %s",
-				cleanupCmd, cleanupCmd)
+					"printf '%%s\\n' '[[ -f ~/.zshrc ]] && source ~/.zshrc' '_taw_close_shell() { %s; }' \"bindkey -s '\\\\ep' '\\\\C-u_taw_close_shell\\\\n'\" > \"$TMPZD/.zshrc\" && "+
+					"ZDOTDIR=\"$TMPZD\" zsh; "+
+					"rm -rf \"$TMPZD\" 2>/dev/null",
+				cleanupCmd)
 		default:
 			// For bash: use --rcfile with temp file
-			// Use printf to avoid newline issues with tmux display-popup and preserve escape sequences
-			// Use || true to suppress non-zero exit codes from commands like 'less'
 			shellCmd = fmt.Sprintf(
 				"TMPRC=$(mktemp) && "+
-					"printf '%%s\\n' '[ -f ~/.bashrc ] && source ~/.bashrc' '_taw_close_popup() { %s; exit; }' \"bind '\\\"\\\\ep\\\": \\\"\\\\C-u_taw_close_popup\\\\n\\\"'\" > \"$TMPRC\" && "+
-					"bash --rcfile \"$TMPRC\" || true; "+
-					"rm -f \"$TMPRC\" 2>/dev/null; %s",
-				cleanupCmd, cleanupCmd)
+					"printf '%%s\\n' '[ -f ~/.bashrc ] && source ~/.bashrc' '_taw_close_shell() { %s; }' \"bind '\\\"\\\\ep\\\": \\\"\\\\C-u_taw_close_shell\\\\n\\\"'\" > \"$TMPRC\" && "+
+					"bash --rcfile \"$TMPRC\"; "+
+					"rm -f \"$TMPRC\" 2>/dev/null",
+				cleanupCmd)
 		}
 
-		// Build environment variables for popup
-		// Set TERM_PROGRAM based on LC_TERMINAL to fix bat color detection
-		env := make(map[string]string)
-		if lcTerminal := os.Getenv("LC_TERMINAL"); lcTerminal != "" {
-			// Map LC_TERMINAL to TERM_PROGRAM (e.g., "iTerm2" -> "iTerm.app")
-			switch lcTerminal {
-			case "iTerm2":
-				env["TERM_PROGRAM"] = "iTerm.app"
-			default:
-				env["TERM_PROGRAM"] = lcTerminal
-			}
+		// Create shell pane at bottom 40%
+		newPaneID, err := tm.SplitWindowPane(tmux.SplitOpts{
+			Horizontal: false, // vertical split (top/bottom)
+			Size:       "40%",
+			StartDir:   panePath,
+			Command:    shellCmd,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create shell pane: %w", err)
 		}
 
-		// Ignore exit code from popup - commands like 'less' exit with non-zero
-		// and we don't want run-shell to display "...returned 1"
-		tm.DisplayPopup(tmux.PopupOpts{
-			Width:     "80%",
-			Height:    "60%",
-			Title:     " Shell (⌥P to close) ",
-			Close:     true,
-			Directory: panePath,
-			Style:     "fg=terminal,bg=terminal",
-			Env:       env,
-		}, shellCmd)
+		// Store pane ID for toggle
+		tm.SetOption("@taw_shell_pane_id", newPaneID, true)
+
 		return nil
 	},
 }

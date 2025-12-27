@@ -32,7 +32,10 @@ type Client interface {
 
 	// Pane operations
 	SplitWindow(target string, horizontal bool, startDir string, command string) error
+	SplitWindowPane(opts SplitOpts) (string, error)
 	SelectPane(target string) error
+	KillPane(target string) error
+	HasPane(target string) bool
 	SendKeys(target string, keys ...string) error
 	SendKeysLiteral(target, text string) error
 	CapturePane(target string, lines int) (string, error)
@@ -90,10 +93,20 @@ type PopupOpts struct {
 
 // BindOpts contains options for key binding.
 type BindOpts struct {
-	Key     string
-	Command string
+	Key      string
+	Command  string
 	NoPrefix bool // -n flag
-	Table   string
+	Table    string
+}
+
+// SplitOpts contains options for split-window with pane return.
+type SplitOpts struct {
+	Target     string // Target window or pane
+	Horizontal bool   // -h for horizontal split, default is vertical (-v)
+	Size       string // -l flag: percentage (e.g., "40%") or lines
+	StartDir   string // -c flag: working directory
+	Command    string // Command to run in the new pane
+	Before     bool   // -b flag: create pane before target
 }
 
 // Window represents a tmux window.
@@ -304,8 +317,50 @@ func (c *tmuxClient) SplitWindow(target string, horizontal bool, startDir string
 	return c.Run(args...)
 }
 
+func (c *tmuxClient) SplitWindowPane(opts SplitOpts) (string, error) {
+	args := []string{"split-window", "-P", "-F", "#{pane_id}"}
+
+	if opts.Target != "" {
+		args = append(args, "-t", opts.Target)
+	}
+
+	if opts.Horizontal {
+		args = append(args, "-h")
+	} else {
+		args = append(args, "-v")
+	}
+
+	if opts.Size != "" {
+		args = append(args, "-l", opts.Size)
+	}
+
+	if opts.StartDir != "" {
+		args = append(args, "-c", opts.StartDir)
+	}
+
+	if opts.Before {
+		args = append(args, "-b")
+	}
+
+	if opts.Command != "" {
+		args = append(args, opts.Command)
+	}
+
+	return c.RunWithOutput(args...)
+}
+
 func (c *tmuxClient) SelectPane(target string) error {
 	return c.Run("select-pane", "-t", target)
+}
+
+func (c *tmuxClient) KillPane(target string) error {
+	return c.Run("kill-pane", "-t", target)
+}
+
+func (c *tmuxClient) HasPane(target string) bool {
+	// Check if pane exists by trying to get its info
+	_, err := c.RunWithOutput("display-message", "-t", target, "-p", "#{pane_id}")
+	return err == nil
 }
 
 func (c *tmuxClient) SendKeys(target string, keys ...string) error {

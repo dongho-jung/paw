@@ -238,7 +238,7 @@ brew install tmux gh
 | new window 토글 | `⌥ n` (task ↔ new window) |
 | 태스크 완료 | `⌥ e` (user pane에서 진행상황 표시, commit → PR/merge → cleanup) |
 | 완료 태스크 일괄 머지 | `⌥ m` (✅ 상태 태스크 모두 merge + end) |
-| 팝업 쉘 | `⌥ p` (현재 worktree에서 쉘 열기/닫기) |
+| 쉘 pane 토글 | `⌥ p` (하단 40%, 현재 worktree에서 쉘 열기/닫기) |
 | 실시간 로그 | `⌥ l` (로그 뷰어 토글, vim-like 네비게이션 지원) |
 | 빠른 태스크 큐 추가 | `⌥ u` (현재 태스크 완료 후 자동 처리) |
 | 도움말 | `⌥ /` |
