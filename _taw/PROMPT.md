@@ -32,24 +32,30 @@ $TAW_DIR/agents/$TASK_NAME/
 
 ## ⚠️ Plan Mode (CRITICAL - 반드시 먼저 실행)
 
-Claude Code가 Plan Mode로 시작됩니다. **코드 작성 전에 반드시 Plan을 세우고 AskUserQuestion으로 승인받으세요.**
+Claude Code가 Plan Mode로 시작됩니다. **코드 작성 전에 반드시 Plan을 세우세요.**
 
 ### Plan Mode 진행 순서
 
 1. **프로젝트 분석**: 코드베이스, 빌드/테스트 명령어 파악
 2. **Plan 작성**: 작업 단계와 검증 방법 정리
-3. **⚠️ AskUserQuestion으로 확인받기** (아래 형식 필수)
-4. **승인 후 ExitPlanMode로 실행 모드 전환**
+3. **(선택) 구현 선택지가 있으면 AskUserQuestion으로 질문**
+4. **ExitPlanMode로 실행 모드 전환**
 
-### AskUserQuestion 사용 (REQUIRED)
+### AskUserQuestion 사용 (선택사항)
 
-Plan 작성 후, **반드시 AskUserQuestion tool을 사용**하여 핵심 확인 사항만 간결하게 질문하세요.
+**💡 핵심 원칙: 구현 선택지가 있을 때만 물어보기**
 
-**💡 핵심 원칙: 유저가 결정해야 할 것만 물어보기**
+Plan을 세우면서 유저가 선택해야 할 구현 방식이 있다면 AskUserQuestion으로 질문하세요.
+선택지가 없다면 질문 없이 바로 ExitPlanMode로 진행해도 됩니다.
 
-Plan 내용은 질문 텍스트에 요약해서 보여주고, **옵션으로는 유저가 선택해야 할 핵심 사항만** 제시하세요.
+**언제 질문할까?**
+- ✅ 구현 방식에 여러 선택지가 있을 때 (예: "A 방식 vs B 방식")
+- ✅ 라이브러리/도구 선택이 필요할 때
+- ✅ 아키텍처 결정이 필요할 때
+- ❌ 단순 승인만 필요할 때 → 질문 없이 진행
+- ❌ "커밋 할까요?", "진행할까요?" 같은 당연한 질문 → 불필요
 
-**권장 형식 (단일 질문):**
+**예시 - 선택지가 있는 경우:**
 
 ```
 AskUserQuestion:
@@ -57,31 +63,42 @@ AskUserQuestion:
     - question: |
         ## 📋 작업 계획
 
-        1. 첫 번째 단계 설명
-        2. 두 번째 단계 설명
-        3. ...
+        1. API 클라이언트 구현
+        2. 캐시 레이어 추가
+        3. 테스트 작성
 
-        **검증 방법**: `go build ./...` && `go test ./...`
-
-        위 계획으로 진행할까요?
+        **검증**: `go test ./...`
       header: "Plan"
       multiSelect: false
       options:
-        - label: "승인 ✅"
-          description: "자동 검증 가능 → 완료 시 auto-merge"
-        - label: "승인 (수동 확인)"
-          description: "자동 검증 불가 → 완료 시 사용자 확인 필요"
+        - label: "진행"
+          description: "이 계획대로 작업합니다"
         - label: "수정 필요"
-          description: "계획 수정이 필요합니다"
+          description: "계획을 수정해주세요"
+
+    - question: "캐시 방식은 어떤 걸로 할까요?"
+      header: "Cache"
+      multiSelect: false
+      options:
+        - label: "Redis (Recommended)"
+          description: "분산 환경에 적합, 별도 서버 필요"
+        - label: "In-memory"
+          description: "간단하지만 앱 재시작 시 초기화"
+        - label: "파일 기반"
+          description: "영속성 있음, 분산 환경 부적합"
 ```
 
-**옵션 의미:**
-- **승인 ✅**: Plan대로 진행 + 테스트/빌드로 자동 검증 가능 → `auto-merge` 허용
-- **승인 (수동 확인)**: Plan대로 진행하되, UI/설정 등 눈으로 확인 필요 → `💬` 상태로 전환
-- **수정 필요**: Plan 수정 후 다시 질문
+**예시 - 선택지가 없는 경우 (질문 불필요):**
+
+작업이 명확하고 선택지가 없다면, 질문 없이 바로 ExitPlanMode를 호출하세요.
+```
+# 계획만 설명하고 바로 진행
+"1. 버그 수정 2. 테스트 추가. 검증: go test. 진행합니다."
+→ ExitPlanMode 호출
+```
 
 **⚠️ 불필요한 질문 피하기:**
-- 승인/수정만 물어보는 단순 질문 ❌
+- 승인/수정만 물어보는 단순 질문 (선택지 없으면 바로 진행) ❌
 - 같은 내용을 여러 질문으로 나누기 ❌
 - 당연한 것 물어보기 (예: "커밋 할까요?") ❌
 
@@ -110,7 +127,8 @@ AskUserQuestion:
 4. **Write Plan** including:
    - 작업 단계
    - **성공 검증 방법** (자동 검증 가능 여부 명시)
-5. Get user approval via ExitPlanMode
+5. (선택) 구현 선택지가 있으면 AskUserQuestion으로 질문
+6. ExitPlanMode로 실행 모드 전환
 
 ### Phase 2: Execute
 1. Make changes incrementally
