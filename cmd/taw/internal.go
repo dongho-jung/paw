@@ -561,10 +561,10 @@ var endTaskCmd = &cobra.Command{
 							logging.Warn("Failed to pull: %v", err)
 						}
 
-						// Merge task branch (--no-ff)
-						logging.Log("Merging branch %s into %s...", targetTask.Name, mainBranch)
-						mergeMsg := fmt.Sprintf("Merge branch '%s'", targetTask.Name)
-						if err := gitClient.Merge(app.ProjectDir, targetTask.Name, true, mergeMsg); err != nil {
+						// Merge task branch (squash)
+						logging.Log("Squash merging branch %s into %s...", targetTask.Name, mainBranch)
+						mergeMsg := fmt.Sprintf("feat: %s", targetTask.Name)
+						if err := gitClient.MergeSquash(app.ProjectDir, targetTask.Name, mergeMsg); err != nil {
 							logging.Warn("Merge failed: %v - may need manual resolution", err)
 							// Abort merge on conflict
 							if abortErr := gitClient.MergeAbort(app.ProjectDir); abortErr != nil {
@@ -580,7 +580,7 @@ var endTaskCmd = &cobra.Command{
 								mergeTimer.StopWithResult(false, "push failed")
 								mergeSuccess = false
 							} else {
-								mergeTimer.StopWithResult(true, fmt.Sprintf("merged %s into %s", targetTask.Name, mainBranch))
+								mergeTimer.StopWithResult(true, fmt.Sprintf("squash merged %s into %s", targetTask.Name, mainBranch))
 							}
 						}
 

@@ -135,6 +135,7 @@ on_complete: confirm
 
 - `_taw/PROMPT.md`: System prompt (symlinked to `.taw/.global-prompt` in projects)
 - `.taw/PROMPT.md`: Project-specific prompt (per project)
+- `.taw/memory`: Project memory (YAML, update in place for reusable info)
 - `_taw/claude/commands/`: Slash commands (symlinked to `.taw/.claude` in projects)
 - `EDITOR` environment variable: Editor for writing tasks (default: vim)
 </details>

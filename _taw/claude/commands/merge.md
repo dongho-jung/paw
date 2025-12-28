@@ -53,10 +53,10 @@ Ask user to confirm before proceeding.
 Using environment variables from Step 1:
 
 ```bash
-git -C "$PROJECT_DIR" merge "$TASK_NAME" --no-ff -m "Merge branch '$TASK_NAME'"
+git -C "$PROJECT_DIR" merge --squash "$TASK_NAME" && git -C "$PROJECT_DIR" commit -m "feat: $TASK_NAME"
 ```
 
-Use `--no-ff` to preserve branch history.
+Use `--squash` to combine all commits from the branch into a single clean commit.
 
 ## Step 5: Handle Conflicts (if any)
 

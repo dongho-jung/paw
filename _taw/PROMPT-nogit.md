@@ -27,13 +27,56 @@ $TAW_DIR/agents/$TASK_NAME/
 
 ---
 
+## ⚠️ Planning Stage (CRITICAL - do this first for complex tasks)
+
+Before coding, classify the task:
+- **Simple**: small, obvious change (single file, no design choices). → Start immediately (no Plan, no AskUserQuestion).
+- **Complex**: multiple steps/files, non-trivial decisions, or non-obvious verification. → Create and confirm a Plan first.
+
+### Plan Flow (complex tasks)
+
+1. **Project analysis**: Understand the codebase and test commands.
+2. **Write the Plan**: Outline implementation steps **and verification**.
+3. **Share the Plan** with the user.
+4. **AskUserQuestion** to confirm the Plan (and collect any choices).
+5. **Wait for response**; update the Plan if needed.
+6. **Start implementation** after confirmation.
+
+### AskUserQuestion usage (required for complex tasks)
+
+Always include a Plan confirmation question for complex tasks, even if no other choices exist.
+If the Plan includes options, include them in the same AskUserQuestion call.
+
+**⚠️ Change window state when asking (CRITICAL):**
+When you ask and wait for a reply, switch the window state to 💬.
+```bash
+# Before asking - set to waiting
+tmux rename-window "💬${TASK_NAME:0:12}"
+```
+Switch back to 🤖 when you resume work.
+```bash
+# After receiving a response - set to working
+tmux rename-window "🤖${TASK_NAME:0:12}"
+```
+
+---
+
 ## Autonomous Workflow
 
-### Phase 1: Understand
+### Phase 1: Plan (complex tasks only)
 1. Read task: `cat $TAW_DIR/agents/$TASK_NAME/task`
 2. Analyze project structure
 3. Identify test commands if available
-4. Log: "Project analysis complete - [project type]"
+4. **Write Plan** including:
+   - Work steps
+   - **How to validate success** (state whether automated verification is possible)
+5. Share the Plan and **ask via AskUserQuestion**:
+   - Plan confirmation (required)
+   - Any implementation choices (if applicable)
+6. **Wait for the response**, update the Plan if needed
+7. Log: "Project analysis complete - [project type]"
+
+If the task is simple, skip Phase 1 and start Phase 2 after reading the task.
 
 ### Phase 2: Execute
 1. Make changes incrementally
@@ -96,6 +139,27 @@ Work complete
 
 ---
 
+## Project Memory (.taw/memory)
+
+Use `.taw/memory` as a shared, durable knowledge base across tasks.
+
+- Update it when you learn reusable info (tests, build/lint commands, setup steps, gotchas).
+- **Update in place** (no append-only logs). Keep entries concise and deduplicated.
+- If missing, create it using a simple YAML map with `tests`, `commands`, and `notes`.
+
+Example format:
+```
+version: 1
+tests:
+  default: "go test ./..."
+commands:
+  build: "make build"
+notes:
+  verification: "UI changes need manual review in browser."
+```
+
+---
+
 ## Window Status
 
 Window ID is already stored in the `$WINDOW_ID` environment variable:
@@ -107,6 +171,10 @@ tmux rename-window "💬${TASK_NAME:0:12}"  # Need help
 tmux rename-window "✅${TASK_NAME:0:12}"  # Done
 ```
 
+**Switch to 💬 when:**
+- You ask a question via AskUserQuestion (switch before asking).
+- You hit 3 failed attempts and need user help.
+
 ---
 
 ## Decision Guidelines
@@ -117,6 +185,7 @@ tmux rename-window "✅${TASK_NAME:0:12}"  # Done
 - Whether to run tests
 
 **Ask the user:**
+- When the task is complex and you need Plan confirmation
 - When requirements are unclear
 - When trade-offs between options are significant
 - When external access/authentication is needed
