@@ -43,45 +43,47 @@ Claude Code가 Plan Mode로 시작됩니다. **코드 작성 전에 반드시 Pl
 
 ### AskUserQuestion 사용 (REQUIRED)
 
-Plan 작성 후, **반드시 AskUserQuestion tool을 사용**하여 다음 3가지를 구조화된 질문으로 확인받으세요.
+Plan 작성 후, **반드시 AskUserQuestion tool을 사용**하여 핵심 확인 사항만 간결하게 질문하세요.
 
-**다중 질문 형식 (필수):**
+**💡 핵심 원칙: 유저가 결정해야 할 것만 물어보기**
+
+Plan 내용은 질문 텍스트에 요약해서 보여주고, **옵션으로는 유저가 선택해야 할 핵심 사항만** 제시하세요.
+
+**권장 형식 (단일 질문):**
 
 ```
 AskUserQuestion:
   questions:
-    - question: "다음 작업 계획으로 진행해도 될까요?\n\n1. 첫 번째 단계 설명\n2. 두 번째 단계 설명\n3. ..."
-      header: "작업 계획"
-      multiSelect: false
-      options:
-        - label: "승인"
-          description: "작업 계획이 적절합니다"
-        - label: "수정 필요"
-          description: "작업 계획에 수정이 필요합니다"
+    - question: |
+        ## 📋 작업 계획
 
-    - question: "다음 검증 방법으로 확인할까요?\n\n- 빌드: `go build ./...`\n- 테스트: `go test ./...`"
-      header: "검증 방법"
-      multiSelect: false
-      options:
-        - label: "승인"
-          description: "검증 방법이 적절합니다"
-        - label: "수정 필요"
-          description: "검증 방법에 수정이 필요합니다"
+        1. 첫 번째 단계 설명
+        2. 두 번째 단계 설명
+        3. ...
 
-    - question: "이 작업은 자동 검증이 가능한가요?"
-      header: "자동 검증"
+        **검증 방법**: `go build ./...` && `go test ./...`
+
+        위 계획으로 진행할까요?
+      header: "Plan"
       multiSelect: false
       options:
-        - label: "✅ 가능"
-          description: "테스트/빌드로 성공 여부 자동 확인 가능"
-        - label: "❌ 불가"
-          description: "시각적 확인, 수동 테스트 등 필요"
+        - label: "승인 ✅"
+          description: "자동 검증 가능 → 완료 시 auto-merge"
+        - label: "승인 (수동 확인)"
+          description: "자동 검증 불가 → 완료 시 사용자 확인 필요"
+        - label: "수정 필요"
+          description: "계획 수정이 필요합니다"
 ```
 
-**각 질문에서 확인할 내용:**
-1. **작업 계획**: 구체적인 단계별 설명 (question 안에 계획 포함)
-2. **검증 방법**: 어떤 명령어로 검증할지 (question 안에 명령어 포함)
-3. **자동 검증 가능 여부**: 가능/불가 선택 (옵션으로 선택)
+**옵션 의미:**
+- **승인 ✅**: Plan대로 진행 + 테스트/빌드로 자동 검증 가능 → `auto-merge` 허용
+- **승인 (수동 확인)**: Plan대로 진행하되, UI/설정 등 눈으로 확인 필요 → `💬` 상태로 전환
+- **수정 필요**: Plan 수정 후 다시 질문
+
+**⚠️ 불필요한 질문 피하기:**
+- 승인/수정만 물어보는 단순 질문 ❌
+- 같은 내용을 여러 질문으로 나누기 ❌
+- 당연한 것 물어보기 (예: "커밋 할까요?") ❌
 
 ### 검증 가능 여부 판단 기준
 
