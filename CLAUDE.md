@@ -30,6 +30,7 @@ taw/                           # This repository
 │   ├── git/                   # Git/worktree management
 │   ├── github/                # GitHub API client
 │   ├── logging/               # Logging (L0-L5 levels)
+│   ├── notify/                # Desktop notifications
 │   ├── task/                  # Task management
 │   ├── tmux/                  # Tmux client
 │   └── tui/                   # Terminal UI (log viewer)

@@ -19,7 +19,7 @@ Claude Code-based autonomous agent work environment
   ⌥ e         Complete task (commit → PR/merge → cleanup, follows ON_COMPLETE setting)
   ⌥ m         Batch merge completed tasks (merge + end all ✅ status tasks)
   ⌥ p         Toggle shell pane (bottom 40%, current worktree path)
-  ⌥ l         View live log (tail -f style, scrollable)
+  ⌥ l         Toggle log viewer (see Log Viewer section below)
   ⌥ u         Add quick task to queue (auto-processed after completion)
 
 ### Session
@@ -48,10 +48,23 @@ Claude Code-based autonomous agent work environment
 
 ## Window Status Icons
 
+  ⭐️  New task input window
   🤖  Agent working
   💬  Waiting for user input
   ✅  Task completed
-  ⚠️  Corrupted (needs recovery or cleanup)
+  ⚠️  Warning (merge failed, needs manual resolution)
+
+## Log Viewer
+
+  ↑/↓         Scroll vertically
+  ←/→         Scroll horizontally (when word wrap is off)
+  g           Jump to top
+  G           Jump to bottom
+  PgUp/PgDn   Page scroll
+  s           Toggle tail mode (follow new logs)
+  w           Toggle word wrap
+  l           Cycle log level filter (L0+ → L1+ → ... → L5 only)
+  q/Esc/⌥l    Close the log viewer
 
 ## Environment Variables (for agents)
 

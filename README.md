@@ -59,9 +59,11 @@ Tasks merged externally (PR merge, direct branch merge, etc.) are cleaned up aut
 
 ### Window states
 
+- ⭐️ New task input window
 - 🤖 Working
 - 💬 Waiting (user input required)
 - ✅ Done
+- ⚠️ Warning (merge failed, needs manual resolution)
 
 ## Configuration
 
@@ -192,6 +194,7 @@ Press `⌥ l` to open the live log viewer.
 | `PgUp` / `PgDn` | Page scroll |
 | `s` | Toggle tail mode (follow new logs) |
 | `w` | Toggle word wrap |
+| `l` | Cycle log level filter (L0+ → L1+ → ... → L5 only) |
 | `q` / `Esc` / `⌥ l` | Close the log viewer |
 </details>
 
