@@ -74,6 +74,10 @@ func (a *App) Initialize() error {
 		}
 	}
 
+	if err := ensureMemoryFile(filepath.Join(a.TawDir, constants.MemoryFileName)); err != nil {
+		return fmt.Errorf("failed to create memory file: %w", err)
+	}
+
 	return nil
 }
 

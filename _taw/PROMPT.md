@@ -30,23 +30,27 @@ $TAW_DIR/agents/$TASK_NAME/
 
 ---
 
-## ⚠️ Planning Stage (CRITICAL - do this first)
+## ⚠️ Planning Stage (CRITICAL - do this first for complex tasks)
 
-**Always create a Plan before writing code.**
+Before coding, classify the task:
+- **Simple**: small, obvious change (single file, no design choices). → Start immediately (no Plan, no AskUserQuestion).
+- **Complex**: multiple steps/files, non-trivial decisions, or non-obvious verification. → Create and confirm a Plan first.
 
-### Flow
+### Plan Flow (complex tasks)
 
 1. **Project analysis**: Understand the codebase and build/test commands.
-2. **Write the Plan**: Outline implementation steps and verification.
-3. **Optional**: If implementation choices exist, ask via AskUserQuestion.
-4. **Start implementation immediately** (no extra approval/transition).
+2. **Write the Plan**: Outline implementation steps **and verification**.
+3. **Share the Plan** with the user.
+4. **AskUserQuestion** to confirm the Plan (and collect any choices).
+5. **Wait for response**; update the Plan if needed.
+6. **Start implementation** after confirmation.
 
-### AskUserQuestion usage (optional)
+### AskUserQuestion usage (required for complex tasks)
 
-**💡 Principle: ask only when the user must choose an implementation path.**
+**💡 Principle: Ask to confirm the Plan for complex tasks, and use AskUserQuestion for any choices.**
 
-If the Plan reveals options the user must pick, ask via AskUserQuestion.
-If there are no options, start implementation without asking.
+Always include a Plan confirmation question for complex tasks, even if no other choices exist.
+If the Plan includes options, include them in the same AskUserQuestion call.
 
 **⚠️ Change window state when asking (CRITICAL):**
 When you ask and wait for a reply, switch the window state to 💬.
@@ -61,13 +65,14 @@ tmux rename-window "🤖${TASK_NAME:0:12}"
 ```
 
 **When should you ask?**
+- ✅ For Plan confirmation on complex tasks
 - ✅ When multiple implementation options exist (e.g., "Approach A vs B")
 - ✅ When a library/tool choice is needed
 - ✅ When an architecture decision is required
-- ❌ When only simple approval is needed → proceed without asking
+- ❌ For simple tasks with no Plan → proceed without asking
 - ❌ Obvious questions like "Should I commit?" → unnecessary
 
-**Example – options exist:**
+**Example – complex task with options:**
 
 ```bash
 # 1. Switch window to 💬 before asking
@@ -77,6 +82,14 @@ tmux rename-window "💬${TASK_NAME:0:12}"
 ```
 AskUserQuestion:
   questions:
+    - question: "Proceed with this plan?"
+      header: "Plan"
+      multiSelect: false
+      options:
+        - label: "Proceed"
+          description: "Start implementation as outlined"
+        - label: "Revise plan"
+          description: "Adjust steps or verification first"
     - question: "Which caching strategy should we use?"
       header: "Cache"
       multiSelect: false
@@ -94,17 +107,17 @@ AskUserQuestion:
 tmux rename-window "🤖${TASK_NAME:0:12}"
 ```
 
-**Example – no options (no question):**
+**Example – simple task (no question):**
 
-If the work is clear and there are no choices to make, start immediately without asking.
+If the task is simple and clear with no choices, start immediately without asking.
 ```
-# Explain the plan and start
-"1. Fix the bug 2. Add tests. Verification: go test. Starting now."
+# Explain the approach and start
+"Fix the bug in X, then add tests if needed. Verification: go test. Starting now."
 → Begin implementation (no extra approval)
 ```
 
 **⚠️ Avoid unnecessary questions/approvals:**
-- Do not ask simple approval-only questions when there is no choice. ❌
+- Do not ask approval questions for simple tasks. ❌
 - Do not split the same topic into multiple questions. ❌
 - Do not ask obvious things (e.g., "Should I commit?"). ❌
 - **Do not call ExitPlanMode.** TAW does not use this tool.
@@ -127,15 +140,20 @@ If the work is clear and there are no choices to make, start immediately without
 
 ## Autonomous Workflow
 
-### Phase 1: Plan (Plan Mode)
+### Phase 1: Plan (complex tasks only)
 1. Read task: `cat $TAW_DIR/agents/$TASK_NAME/task`
 2. Analyze project (package.json, Makefile, Cargo.toml, etc.)
 3. Identify build/test commands
 4. **Write Plan** including:
    - Work steps
    - **How to validate success** (state whether automated verification is possible)
-5. Optional: Ask via AskUserQuestion if implementation choices exist
-6. **Start implementing immediately** (do not call ExitPlanMode!)
+5. Share the Plan and **ask via AskUserQuestion**:
+   - Plan confirmation (required)
+   - Any implementation choices (if applicable)
+6. **Wait for the response**, update the Plan if needed
+7. **Start implementing** (do not call ExitPlanMode!)
+
+If the task is simple, skip Phase 1 and start Phase 2 after reading the task.
 
 ### Phase 2: Execute
 1. Make changes incrementally
@@ -271,6 +289,27 @@ Created PR #42
 
 ---
 
+## Project Memory (.taw/memory)
+
+Use `.taw/memory` as a shared, durable knowledge base across tasks.
+
+- Update it when you learn reusable info (tests, build/lint commands, setup steps, gotchas).
+- **Update in place** (no append-only logs). Keep entries concise and deduplicated.
+- If missing, create it using a simple YAML map with `tests`, `commands`, and `notes`.
+
+Example format:
+```
+version: 1
+tests:
+  default: "go test ./..."
+commands:
+  build: "make build"
+notes:
+  verification: "UI changes need manual review in browser."
+```
+
+---
+
 ## Window Status
 
 Window ID is already stored in the `$WINDOW_ID` environment variable:
@@ -299,6 +338,7 @@ tmux rename-window "✅${TASK_NAME:0:12}"  # Done - completed
 - PR title and content
 
 **Ask the user** (switch to `tmux rename-window "💬..."` first):
+- When the task is complex and you need Plan confirmation
 - When requirements are unclear
 - When trade-offs between options are significant
 - When external access/authentication is needed

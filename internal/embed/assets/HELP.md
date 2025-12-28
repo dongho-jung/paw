@@ -38,6 +38,7 @@ Claude Code-based autonomous agent work environment
   .taw/
   ├── config                 Project configuration file
   ├── PROMPT.md              Project-specific agent instructions
+  ├── memory                 Shared project memory (YAML)
   ├── log                    Unified log file
   ├── .queue/                Quick task queue (add with ⌥u)
   └── agents/{task-name}/

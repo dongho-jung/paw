@@ -56,6 +56,7 @@ type Client interface {
 
 	// Merge
 	Merge(dir, branch string, noFF bool, message string) error
+	MergeSquash(dir, branch, message string) error
 	MergeAbort(dir string) error
 	HasConflicts(dir string) (bool, []string, error)
 	CheckoutOurs(dir, path string) error
@@ -361,6 +362,13 @@ func (c *gitClient) Merge(dir, branch string, noFF bool, message string) error {
 	}
 	args = append(args, branch)
 	return c.run(dir, args...)
+}
+
+func (c *gitClient) MergeSquash(dir, branch, message string) error {
+	if err := c.run(dir, "merge", "--squash", branch); err != nil {
+		return err
+	}
+	return c.Commit(dir, message)
 }
 
 func (c *gitClient) MergeAbort(dir string) error {

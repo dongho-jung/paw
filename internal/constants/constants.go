@@ -54,6 +54,7 @@ const (
 	HistoryDirName   = "history"
 	ConfigFileName   = "config"
 	LogFileName      = "log"
+	MemoryFileName   = "memory"
 	PromptFileName   = "PROMPT.md"
 	TaskFileName     = "task"
 	TabLockDirName   = ".tab-lock"
