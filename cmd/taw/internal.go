@@ -618,10 +618,19 @@ var endTaskCmd = &cobra.Command{
 			if err != nil {
 				logging.Warn("Failed to capture pane content: %v", err)
 			} else {
+				// Build history content: task content + separator + pane capture
+				var historyContent strings.Builder
+				taskContent, _ := targetTask.LoadContent()
+				if taskContent != "" {
+					historyContent.WriteString(taskContent)
+					historyContent.WriteString("\n---------\n")
+				}
+				historyContent.WriteString(paneContent)
+
 				// Generate filename: YYMMDD_HHMMSS_taskname
 				timestamp := time.Now().Format("060102_150405")
 				historyFile := filepath.Join(historyDir, fmt.Sprintf("%s_%s", timestamp, targetTask.Name))
-				if err := os.WriteFile(historyFile, []byte(paneContent), 0644); err != nil {
+				if err := os.WriteFile(historyFile, []byte(historyContent.String()), 0644); err != nil {
 					logging.Warn("Failed to write history file: %v", err)
 				} else {
 					logging.Log("Agent history saved: %s", historyFile)
