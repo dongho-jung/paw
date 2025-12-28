@@ -192,21 +192,10 @@ func (m *Manager) FindIncompleteTasks(sessionName string) ([]*Task, error) {
 	// Build map of active window IDs and task names from window names
 	activeWindowIDs := make(map[string]bool)
 	activeTaskNames := make(map[string]bool)
-	taskEmojis := []string{
-		constants.EmojiWorking,
-		constants.EmojiWaiting,
-		constants.EmojiDone,
-		constants.EmojiWarning,
-	}
 	for _, w := range windows {
 		activeWindowIDs[w.ID] = true
-		// Extract task name from window name (e.g., "⚙️task-name" -> "task-name")
-		for _, emoji := range taskEmojis {
-			if strings.HasPrefix(w.Name, emoji) {
-				taskName := strings.TrimPrefix(w.Name, emoji)
-				activeTaskNames[taskName] = true
-				break
-			}
+		if taskName, ok := constants.ExtractTaskName(w.Name); ok {
+			activeTaskNames[taskName] = true
 		}
 	}
 
@@ -399,22 +388,23 @@ func (m *Manager) CleanupTask(task *Task) error {
 		// Remove worktree
 		if _, err := os.Stat(worktreeDir); err == nil {
 			if err := m.gitClient.WorktreeRemove(m.projectDir, worktreeDir, true); err != nil {
+				logging.Debug("WorktreeRemove failed, trying force remove: %v", err)
 				// Try force remove if normal remove fails
 				if removeErr := os.RemoveAll(worktreeDir); removeErr != nil {
-					// Log but continue - cleanup should not fail entirely
+					logging.Warn("Force remove worktree failed: %v", removeErr)
 				}
 			}
 		}
 
 		// Prune worktrees (error is non-fatal)
 		if err := m.gitClient.WorktreePrune(m.projectDir); err != nil {
-			// Log but continue
+			logging.Debug("WorktreePrune failed: %v", err)
 		}
 
 		// Delete branch (error is non-fatal)
 		if m.gitClient.BranchExists(m.projectDir, task.Name) {
 			if err := m.gitClient.BranchDelete(m.projectDir, task.Name, true); err != nil {
-				// Log but continue
+				logging.Debug("BranchDelete failed: %v", err)
 			}
 		}
 	}
@@ -488,25 +478,8 @@ func (m *Manager) FindOrphanedWindows() ([]string, error) {
 	}
 
 	var orphaned []string
-	taskEmojis := []string{
-		constants.EmojiWorking,
-		constants.EmojiWaiting,
-		constants.EmojiDone,
-		constants.EmojiWarning,
-	}
-
 	for _, w := range windows {
-		// Check if it's a task window (starts with task emoji)
-		isTaskWindow := false
-		taskName := ""
-		for _, emoji := range taskEmojis {
-			if strings.HasPrefix(w.Name, emoji) {
-				isTaskWindow = true
-				taskName = strings.TrimPrefix(w.Name, emoji)
-				break
-			}
-		}
-
+		taskName, isTaskWindow := constants.ExtractTaskName(w.Name)
 		if !isTaskWindow {
 			continue
 		}

@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/donghojung/taw/internal/constants"
 )
@@ -132,12 +131,6 @@ func New(sessionName string) Client {
 	}
 }
 
-// NewWithSocket creates a new tmux client with a custom socket.
-func NewWithSocket(socket string) Client {
-	return &tmuxClient{
-		socket: socket,
-	}
-}
 
 func (c *tmuxClient) cmd(args ...string) *exec.Cmd {
 	allArgs := append([]string{"-L", c.socket}, args...)
@@ -484,22 +477,3 @@ func (c *tmuxClient) Display(format string) (string, error) {
 	return c.RunWithOutput("display-message", "-p", format)
 }
 
-// WaitForWindow waits for a window to be created with the given ID file.
-func WaitForWindow(ctx context.Context, checkFn func() (string, bool)) (string, error) {
-	timeout := time.After(constants.WindowCreationTimeout)
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-timeout:
-			return "", fmt.Errorf("timeout waiting for window creation")
-		case <-ticker.C:
-			if id, ok := checkFn(); ok {
-				return id, nil
-			}
-		}
-	}
-}

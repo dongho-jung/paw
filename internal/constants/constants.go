@@ -1,7 +1,10 @@
 // Package constants defines shared constants used throughout the TAW application.
 package constants
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Window status emojis
 const (
@@ -11,6 +14,25 @@ const (
 	EmojiWarning = "⚠️"
 	EmojiNew     = "⭐️"
 )
+
+// TaskEmojis contains all emojis used for task windows.
+var TaskEmojis = []string{
+	EmojiWorking,
+	EmojiWaiting,
+	EmojiDone,
+	EmojiWarning,
+}
+
+// ExtractTaskName extracts the task name from a window name by removing the emoji prefix.
+// Returns the task name and true if a task emoji was found, or empty string and false otherwise.
+func ExtractTaskName(windowName string) (string, bool) {
+	for _, emoji := range TaskEmojis {
+		if strings.HasPrefix(windowName, emoji) {
+			return strings.TrimPrefix(windowName, emoji), true
+		}
+	}
+	return "", false
+}
 
 // Display limits
 const (

@@ -247,19 +247,9 @@ func attachToSession(app *app.App, tm tmux.Client) error {
 		// Build a map of task name -> window ID for quick lookup
 		taskWindowMap := make(map[string]string)
 		if windows, err := tm.ListWindows(); err == nil {
-			taskEmojis := []string{
-				constants.EmojiWorking,
-				constants.EmojiWaiting,
-				constants.EmojiDone,
-				constants.EmojiWarning,
-			}
 			for _, w := range windows {
-				for _, emoji := range taskEmojis {
-					if strings.HasPrefix(w.Name, emoji) {
-						taskName := strings.TrimPrefix(w.Name, emoji)
-						taskWindowMap[taskName] = w.ID
-						break
-					}
+				if taskName, ok := constants.ExtractTaskName(w.Name); ok {
+					taskWindowMap[taskName] = w.ID
 				}
 			}
 		}

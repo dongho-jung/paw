@@ -38,8 +38,6 @@ func init() {
 	internalCmd.AddCommand(watchWaitCmd)
 	internalCmd.AddCommand(endTaskCmd)
 	internalCmd.AddCommand(endTaskUICmd)
-	internalCmd.AddCommand(attachCmd)
-	internalCmd.AddCommand(cleanupCmd)
 	internalCmd.AddCommand(processQueueCmd)
 	internalCmd.AddCommand(quickTaskCmd)
 	internalCmd.AddCommand(mergeCompletedCmd)
@@ -168,7 +166,11 @@ var newTaskCmd = &cobra.Command{
 			// Handle task in background
 			tawBin, _ := os.Executable()
 			handleCmd := exec.Command(tawBin, "internal", "handle-task", sessionName, newTask.AgentDir)
-			handleCmd.Start()
+			if err := handleCmd.Start(); err != nil {
+				logging.Warn("Failed to start handle-task: %v", err)
+				fmt.Printf("Failed to start task handler: %v\n", err)
+				continue
+			}
 
 			// Wait for window to be created
 			windowIDFile := filepath.Join(newTask.AgentDir, ".tab-lock", "window_id")
@@ -529,8 +531,15 @@ var endTaskCmd = &cobra.Command{
 				for retries := 0; retries < 30; retries++ {
 					f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 					if err == nil {
-						f.WriteString(fmt.Sprintf("%s\n%d", targetTask.Name, os.Getpid()))
-						f.Close()
+						_, writeErr := f.WriteString(fmt.Sprintf("%s\n%d", targetTask.Name, os.Getpid()))
+						closeErr := f.Close()
+						if writeErr != nil || closeErr != nil {
+							// Failed to write lock info, remove and retry
+							os.Remove(lockFile)
+							logging.Warn("Failed to write lock file: write=%v, close=%v", writeErr, closeErr)
+							time.Sleep(100 * time.Millisecond)
+							continue
+						}
 						lockAcquired = true
 						break
 					}
@@ -691,30 +700,6 @@ var endTaskUICmd = &cobra.Command{
 		// For now, just call end-task
 		// TODO: Implement proper TUI with progress display
 		return endTaskCmd.RunE(cmd, args)
-	},
-}
-
-var attachCmd = &cobra.Command{
-	Use:   "attach [agent-dir]",
-	Short: "Attach to an existing task",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		agentDir := args[0]
-		// TODO: Implement attach logic
-		fmt.Printf("Attaching to task in %s\n", agentDir)
-		return nil
-	},
-}
-
-var cleanupCmd = &cobra.Command{
-	Use:   "cleanup [task-name]",
-	Short: "Cleanup a specific task",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		taskName := args[0]
-		// TODO: Implement cleanup logic
-		fmt.Printf("Cleaning up task %s\n", taskName)
-		return nil
 	},
 }
 
