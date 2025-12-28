@@ -107,6 +107,7 @@ work_mode: %s
 # - auto-merge: Auto commit + merge + cleanup + close window
 # - auto-pr: Auto commit + create pull request
 on_complete: %s
+
 `, c.WorkMode, c.OnComplete)
 
 	return os.WriteFile(configPath, []byte(content), 0644)

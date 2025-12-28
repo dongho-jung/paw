@@ -116,6 +116,7 @@ work_mode: worktree
 # - auto-merge: Auto commit + merge + cleanup + close window
 # - auto-pr: Auto commit + create pull request
 on_complete: confirm
+
 ```
 </details>
 
