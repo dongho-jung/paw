@@ -67,11 +67,11 @@ Respond with ONLY the task name, nothing else.`, content)
 		constants.ClaudeNameGenTimeout3,
 	}
 
-	logging.Debug("GenerateTaskName: starting with %d timeout attempts", len(timeouts))
+	logging.Trace("GenerateTaskName: starting with %d timeout attempts", len(timeouts))
 
 	var lastErr error
 	for i, timeout := range timeouts {
-		logging.Debug("GenerateTaskName: attempt %d with timeout=%v", i+1, timeout)
+		logging.Debug("GenerateTaskName: attempt %d/%d with timeout=%v", i+1, len(timeouts), timeout)
 		name, err := c.runClaude(prompt, timeout)
 		if err != nil {
 			logging.Debug("GenerateTaskName: attempt %d failed: %v", i+1, err)
@@ -79,11 +79,11 @@ Respond with ONLY the task name, nothing else.`, content)
 			continue
 		}
 
-		logging.Debug("GenerateTaskName: raw response=%q", name)
+		logging.Trace("GenerateTaskName: raw response=%q", name)
 
 		// Validate the name
 		sanitized := sanitizeTaskName(name)
-		logging.Debug("GenerateTaskName: sanitized=%q", sanitized)
+		logging.Trace("GenerateTaskName: sanitized=%q", sanitized)
 
 		if TaskNamePattern.MatchString(sanitized) {
 			logging.Debug("GenerateTaskName: valid name generated: %s", sanitized)
@@ -95,7 +95,7 @@ Respond with ONLY the task name, nothing else.`, content)
 	}
 
 	// Return error - let caller decide fallback
-	logging.Debug("GenerateTaskName: all attempts failed, returning error: %v", lastErr)
+	logging.Debug("GenerateTaskName: all attempts failed: %v", lastErr)
 	return "", lastErr
 }
 
@@ -103,7 +103,7 @@ func (c *claudeClient) runClaude(prompt string, timeout time.Duration) (string, 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	logging.Debug("runClaude: executing claude -p --model haiku with timeout=%v", timeout)
+	logging.Trace("runClaude: executing claude -p --model haiku with timeout=%v", timeout)
 
 	cmd := exec.CommandContext(ctx, "claude", "-p", "--model", "haiku")
 	cmd.Stdin = strings.NewReader(prompt)
@@ -114,12 +114,12 @@ func (c *claudeClient) runClaude(prompt string, timeout time.Duration) (string, 
 
 	if err := cmd.Run(); err != nil {
 		errMsg := stderr.String()
-		logging.Debug("runClaude: command failed: err=%v, stderr=%q", err, errMsg)
+		logging.Trace("runClaude: command failed: err=%v, stderr=%q", err, errMsg)
 		return "", fmt.Errorf("claude command failed: %w: %s", err, errMsg)
 	}
 
 	result := strings.TrimSpace(stdout.String())
-	logging.Debug("runClaude: success, output=%q", result)
+	logging.Trace("runClaude: success, output=%q", result)
 	return result, nil
 }
 

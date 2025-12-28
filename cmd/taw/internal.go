@@ -393,7 +393,7 @@ exec "%s" internal end-task "%s" "%s"
 
 		// Send trust response if needed (error is non-fatal)
 		if err := claudeClient.SendTrustResponse(tm, windowID+".0"); err != nil {
-			logging.Debug("Failed to send trust response: %v", err)
+			logging.Trace("Failed to send trust response: %v", err)
 		} else {
 			logging.Log("Trust response sent")
 		}
@@ -403,10 +403,10 @@ exec "%s" internal end-task "%s" "%s"
 
 		// Clear scrollback history and screen before sending task instruction
 		if err := tm.ClearHistory(windowID + ".0"); err != nil {
-			logging.Debug("Failed to clear history: %v", err)
+			logging.Trace("Failed to clear history: %v", err)
 		}
 		if err := tm.SendKeys(windowID+".0", "C-l"); err != nil {
-			logging.Debug("Failed to clear screen: %v", err)
+			logging.Trace("Failed to clear screen: %v", err)
 		}
 
 		// Send task instruction - tell Claude to read from file
@@ -685,7 +685,7 @@ var endTaskCmd = &cobra.Command{
 		// Process queue
 		tawBin, _ := os.Executable()
 		if err := exec.Command(tawBin, "internal", "process-queue", sessionName).Start(); err != nil {
-			logging.Debug("Failed to start process-queue: %v", err)
+			logging.Trace("Failed to start process-queue: %v", err)
 		}
 
 		return nil

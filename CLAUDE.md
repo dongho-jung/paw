@@ -29,7 +29,7 @@ taw/                           # This repository
 │   │   └── assets/            # HELP.md (help text)
 │   ├── git/                   # Git/worktree management
 │   ├── github/                # GitHub API client
-│   ├── logging/               # Logging
+│   ├── logging/               # Logging (L0-L5 levels)
 │   ├── task/                  # Task management
 │   ├── tmux/                  # Tmux client
 │   └── tui/                   # Terminal UI (log viewer)
@@ -61,6 +61,24 @@ taw/                           # This repository
         │   └── window_id      # Tmux window ID (used in cleanup)
         └── .pr                # PR number (when created)
 ```
+
+## Logging levels
+
+TAW uses a 6-level logging system (L0-L5):
+
+| Level | Name  | Description                                      | Output          |
+|-------|-------|--------------------------------------------------|-----------------|
+| L0    | Trace | Internal state tracking, loop iterations, dumps  | File only (debug mode) |
+| L1    | Debug | Retry attempts, state changes, conditional paths | Stderr + file (debug mode) |
+| L2    | Info  | Normal operation flow, task lifecycle events     | File only       |
+| L3    | Warn  | Non-fatal issues requiring attention             | Stderr + file   |
+| L4    | Error | Errors that affect functionality                 | Stderr + file   |
+| L5    | Fatal | Critical errors requiring immediate attention    | Stderr + file   |
+
+- Enable debug mode: `TAW_DEBUG=1 taw`
+- Log file location: `.taw/log`
+- View logs: Press `⌥ l` to open the log viewer
+- Filter levels in log viewer: Press `l` to cycle through L0+ → L1+ → ... → L5 only
 
 ## Working rules
 

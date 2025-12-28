@@ -19,7 +19,7 @@ type LogViewer struct {
 	horizontalPos int
 	tailMode      bool
 	wordWrap      bool
-	minLevel      int // 1-4: minimum level to display (1=all, 2=L2+, 3=L3+, 4=L4 only)
+	minLevel      int // 0-5: minimum level to display (0=all, 1=L1+, ..., 5=L5 only)
 	width         int
 	height        int
 	lastModTime   time.Time
@@ -40,7 +40,7 @@ func NewLogViewer(logFile string) *LogViewer {
 	return &LogViewer{
 		logFile:  logFile,
 		tailMode: true,
-		minLevel: 1, // Show all levels by default
+		minLevel: 0, // Show all levels by default (L0+)
 	}
 }
 
@@ -134,10 +134,10 @@ func (m *LogViewer) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "l":
-		// Cycle through log levels: 1 -> 2 -> 3 -> 4 -> 1
+		// Cycle through log levels: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 0
 		m.minLevel++
-		if m.minLevel > 4 {
-			m.minLevel = 1
+		if m.minLevel > 5 {
+			m.minLevel = 0
 		}
 		m.scrollPos = 0
 		if m.tailMode {
@@ -176,33 +176,33 @@ func (m *LogViewer) scrollDown(n int) {
 	}
 }
 
-// getLogLevel extracts the log level (1-4) from a log line.
-// Returns 0 if no level is found (line will always be shown).
+// getLogLevel extracts the log level (0-5) from a log line.
+// Returns -1 if no level is found (line will always be shown).
 func getLogLevel(line string) int {
-	// Look for [L1], [L2], [L3], [L4] pattern
+	// Look for [L0], [L1], [L2], [L3], [L4], [L5] pattern
 	// Format: [timestamp] [LN] [context] [caller] message
 	for i := 0; i < len(line)-3; i++ {
 		if line[i] == '[' && line[i+1] == 'L' && line[i+3] == ']' {
 			level := line[i+2]
-			if level >= '1' && level <= '4' {
+			if level >= '0' && level <= '5' {
 				return int(level - '0')
 			}
 		}
 	}
-	return 0
+	return -1
 }
 
 // getFilteredLines returns lines filtered by minimum log level.
 func (m *LogViewer) getFilteredLines() []string {
-	if m.minLevel <= 1 {
+	if m.minLevel <= 0 {
 		return m.lines
 	}
 
 	var filtered []string
 	for _, line := range m.lines {
 		level := getLogLevel(line)
-		// Show line if level is 0 (no level found) or >= minLevel
-		if level == 0 || level >= m.minLevel {
+		// Show line if level is -1 (no level found) or >= minLevel
+		if level == -1 || level >= m.minLevel {
 			filtered = append(filtered, line)
 		}
 	}
@@ -300,7 +300,7 @@ func (m *LogViewer) View() string {
 	if m.wordWrap {
 		status += " [WRAP]"
 	}
-	if m.minLevel > 1 {
+	if m.minLevel > 0 {
 		status += fmt.Sprintf(" [L%d+]", m.minLevel)
 	}
 	if status == "" {

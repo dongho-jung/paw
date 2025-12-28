@@ -388,7 +388,7 @@ func (m *Manager) CleanupTask(task *Task) error {
 		// Remove worktree
 		if _, err := os.Stat(worktreeDir); err == nil {
 			if err := m.gitClient.WorktreeRemove(m.projectDir, worktreeDir, true); err != nil {
-				logging.Debug("WorktreeRemove failed, trying force remove: %v", err)
+				logging.Trace("WorktreeRemove failed, trying force remove: %v", err)
 				// Try force remove if normal remove fails
 				if removeErr := os.RemoveAll(worktreeDir); removeErr != nil {
 					logging.Warn("Force remove worktree failed: %v", removeErr)
@@ -398,13 +398,13 @@ func (m *Manager) CleanupTask(task *Task) error {
 
 		// Prune worktrees (error is non-fatal)
 		if err := m.gitClient.WorktreePrune(m.projectDir); err != nil {
-			logging.Debug("WorktreePrune failed: %v", err)
+			logging.Trace("WorktreePrune failed: %v", err)
 		}
 
 		// Delete branch (error is non-fatal)
 		if m.gitClient.BranchExists(m.projectDir, task.Name) {
 			if err := m.gitClient.BranchDelete(m.projectDir, task.Name, true); err != nil {
-				logging.Debug("BranchDelete failed: %v", err)
+				logging.Trace("BranchDelete failed: %v", err)
 			}
 		}
 	}

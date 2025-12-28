@@ -72,7 +72,7 @@ var watchWaitCmd = &cobra.Command{
 
 		for {
 			if !tm.HasPane(paneID) {
-				logging.Debug("Pane %s no longer exists, stopping wait watcher", paneID)
+				logging.Log("Pane %s no longer exists, stopping wait watcher", paneID)
 				return nil
 			}
 
@@ -92,7 +92,7 @@ var watchWaitCmd = &cobra.Command{
 
 			content, err := tm.CapturePane(paneID, waitCaptureLines)
 			if err != nil {
-				logging.Debug("Failed to capture pane: %v", err)
+				logging.Trace("Failed to capture pane: %v", err)
 				time.Sleep(waitPollInterval)
 				continue
 			}
@@ -114,7 +114,7 @@ var watchWaitCmd = &cobra.Command{
 				}
 				if waitDetected && !isFinal {
 					if err := ensureWaitingWindow(tm, windowID, taskName); err != nil {
-						logging.Debug("Failed to rename window: %v", err)
+						logging.Trace("Failed to rename window: %v", err)
 					}
 					if !notified {
 						logging.Log("Wait detected: %s", reason)
@@ -130,10 +130,10 @@ var watchWaitCmd = &cobra.Command{
 								choice, err := promptUserChoice(tm, prompt)
 								promptActive = false
 								if err != nil {
-									logging.Debug("Prompt choice failed: %v", err)
+									logging.Trace("Prompt choice failed: %v", err)
 								} else if choice != "" {
 									if err := sendAgentResponse(tm, paneID, choice); err != nil {
-										logging.Debug("Failed to send prompt response: %v", err)
+										logging.Trace("Failed to send prompt response: %v", err)
 									} else {
 										logging.Log("Sent prompt response: %s", choice)
 									}
@@ -158,11 +158,11 @@ var watchWaitCmd = &cobra.Command{
 						break
 					}
 					if err != nil {
-						logging.Debug("Wait dialog exited: %v", err)
+						logging.Trace("Wait dialog exited: %v", err)
 						if currentWait && endedKind == dialogKindAppleScript {
 							fallbackDialog, fallbackErr := startWaitDialog(waitMessage, dialogKindJXA)
 							if fallbackErr != nil {
-								logging.Debug("Wait dialog fallback failed: %v", fallbackErr)
+								logging.Trace("Wait dialog fallback failed: %v", fallbackErr)
 							} else if fallbackDialog != nil {
 								waitDialog = fallbackDialog
 							}
@@ -177,7 +177,7 @@ var watchWaitCmd = &cobra.Command{
 				if waitDialog == nil {
 					dialog, err := startWaitDialog(waitMessage, dialogKindAppleScript)
 					if err != nil {
-						logging.Debug("Wait dialog failed: %v", err)
+						logging.Trace("Wait dialog failed: %v", err)
 					} else if dialog != nil {
 						waitDialog = dialog
 					}
@@ -313,7 +313,7 @@ func notifyWaiting(taskName, reason string) {
 	title := "TAW: Waiting for input"
 	message := fmt.Sprintf("Task %s needs your response.", taskName)
 	if err := notify.Send(title, message); err != nil {
-		logging.Debug("Failed to send notification: %v", err)
+		logging.Trace("Failed to send notification: %v", err)
 	}
 }
 
@@ -504,7 +504,7 @@ func promptUserChoice(tm tmux.Client, prompt askPrompt) (string, error) {
 	}
 
 	if err := tm.DisplayPopup(opts, scriptPath); err != nil {
-		logging.Debug("Popup prompt failed, falling back to dialog: %v", err)
+		logging.Trace("Popup prompt failed, falling back to dialog: %v", err)
 		return promptUserChoiceDialog(prompt)
 	}
 
@@ -576,7 +576,7 @@ func promptUserChoiceDialog(prompt askPrompt) (string, error) {
 	script := buildAppleScript(prompt.Question, prompt.Options)
 	output, err := runAppleScript(script, true)
 	if err != nil {
-		logging.Debug("Dialog failed: %v", err)
+		logging.Trace("Dialog failed: %v", err)
 		return "", nil
 	}
 	return strings.TrimSpace(output), nil

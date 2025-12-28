@@ -1,4 +1,12 @@
 // Package logging provides unified logging functionality for TAW.
+//
+// Log Levels (0-5):
+//   - L0 (Trace):   Most detailed internal state tracking, loop iterations, variable dumps
+//   - L1 (Debug):   Debugging info, retry attempts, state changes (only when TAW_DEBUG=1)
+//   - L2 (Info):    Normal operation flow, task lifecycle events
+//   - L3 (Warn):    Non-fatal issues requiring attention
+//   - L4 (Error):   Errors that may affect functionality
+//   - L5 (Fatal):   Critical errors that require immediate attention
 package logging
 
 import (
@@ -10,22 +18,71 @@ import (
 	"time"
 )
 
+// Level represents a log level.
+type Level int
+
+const (
+	LevelTrace Level = iota // L0: Most detailed tracing
+	LevelDebug              // L1: Debug information
+	LevelInfo               // L2: Normal operation info
+	LevelWarn               // L3: Warnings
+	LevelError              // L4: Errors
+	LevelFatal              // L5: Fatal errors
+)
+
+// String returns the level string for log output.
+func (l Level) String() string {
+	return fmt.Sprintf("L%d", l)
+}
+
+// Name returns the human-readable level name.
+func (l Level) Name() string {
+	switch l {
+	case LevelTrace:
+		return "TRACE"
+	case LevelDebug:
+		return "DEBUG"
+	case LevelInfo:
+		return "INFO"
+	case LevelWarn:
+		return "WARN"
+	case LevelError:
+		return "ERROR"
+	case LevelFatal:
+		return "FATAL"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 // Logger provides logging capabilities for TAW.
 type Logger interface {
-	// Debug outputs debug information (only when TAW_DEBUG=1)
+	// Trace outputs the most detailed tracing information (L0)
+	// Use for: loop iterations, variable dumps, internal state tracking
+	Trace(format string, args ...interface{})
+
+	// Debug outputs debug information (L1, only when TAW_DEBUG=1)
+	// Use for: retry attempts, state changes, conditional logic paths
 	Debug(format string, args ...interface{})
 
-	// Log writes to the unified log file with timestamp
+	// Log writes informational message to log file (L2)
+	// Use for: normal operation flow, task lifecycle events
 	Log(format string, args ...interface{})
 
-	// Info writes informational message to log file
+	// Info is an alias for Log (L2)
 	Info(format string, args ...interface{})
 
-	// Warn outputs warning to stderr and log file
+	// Warn outputs warning to stderr and log file (L3)
+	// Use for: non-fatal issues, recoverable errors
 	Warn(format string, args ...interface{})
 
-	// Error outputs error to stderr and log file
+	// Error outputs error to stderr and log file (L4)
+	// Use for: errors that affect functionality
 	Error(format string, args ...interface{})
+
+	// Fatal outputs fatal error to stderr and log file (L5)
+	// Use for: critical errors requiring immediate attention
+	Fatal(format string, args ...interface{})
 
 	// SetScript sets the current script name for context
 	SetScript(script string)
@@ -51,7 +108,7 @@ type Timer struct {
 func (t *Timer) Stop() time.Duration {
 	elapsed := time.Since(t.start)
 	if t.logger != nil {
-		t.logger.logWithLevel("L2", "%s completed in %v", t.operation, elapsed)
+		t.logger.logWithLevel(LevelInfo, "%s completed in %v", t.operation, elapsed)
 	}
 	return elapsed
 }
@@ -61,10 +118,10 @@ func (t *Timer) StopWithResult(success bool, detail string) time.Duration {
 	elapsed := time.Since(t.start)
 	if t.logger != nil {
 		status := "completed"
-		level := "L2"
+		level := LevelInfo
 		if !success {
 			status = "failed"
-			level = "L3"
+			level = LevelWarn
 		}
 		if detail != "" {
 			t.logger.logWithLevel(level, "%s %s in %v: %s", t.operation, status, elapsed, detail)
@@ -146,7 +203,7 @@ func getCaller(skip int) string {
 }
 
 // logWithLevel writes a log entry with the specified level
-func (l *fileLogger) logWithLevel(level string, format string, args ...interface{}) {
+func (l *fileLogger) logWithLevel(level Level, format string, args ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -160,9 +217,28 @@ func (l *fileLogger) logWithLevel(level string, format string, args ...interface
 	caller := getCaller(3) // Skip logWithLevel, the public method, and the caller
 
 	// Format: [timestamp] [level] [context] [caller] message
-	line := fmt.Sprintf("[%s] [%s] [%s] [%s] %s\n", timestamp, level, context, caller, msg)
+	line := fmt.Sprintf("[%s] [%s] [%s] [%s] %s\n", timestamp, level.String(), context, caller, msg)
 	if _, err := l.file.WriteString(line); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write to log file: %v\n", err)
+	}
+}
+
+func (l *fileLogger) Trace(format string, args ...interface{}) {
+	// Trace is only logged when debug mode is enabled
+	if !l.debug {
+		return
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.file != nil {
+		msg := fmt.Sprintf(format, args...)
+		timestamp := time.Now().Format("06-01-02 15:04:05.0")
+		context := l.getContext()
+		caller := getCaller(2)
+		line := fmt.Sprintf("[%s] [L0] [%s] [%s] %s\n", timestamp, context, caller, msg)
+		l.file.WriteString(line)
 	}
 }
 
@@ -187,11 +263,11 @@ func (l *fileLogger) Debug(format string, args ...interface{}) {
 }
 
 func (l *fileLogger) Log(format string, args ...interface{}) {
-	l.logWithLevel("L2", format, args...)
+	l.logWithLevel(LevelInfo, format, args...)
 }
 
 func (l *fileLogger) Info(format string, args ...interface{}) {
-	l.logWithLevel("L2", format, args...)
+	l.logWithLevel(LevelInfo, format, args...)
 }
 
 func (l *fileLogger) Warn(format string, args ...interface{}) {
@@ -226,10 +302,26 @@ func (l *fileLogger) Error(format string, args ...interface{}) {
 	}
 }
 
+func (l *fileLogger) Fatal(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	fmt.Fprintf(os.Stderr, "FATAL: %s\n", msg)
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.file != nil {
+		timestamp := time.Now().Format("06-01-02 15:04:05.0")
+		context := l.getContext()
+		caller := getCaller(2)
+		line := fmt.Sprintf("[%s] [L5] [%s] [%s] %s\n", timestamp, context, caller, msg)
+		l.file.WriteString(line)
+	}
+}
+
 func (l *fileLogger) StartTimer(operation string) *Timer {
 	// Log start only if file is available
 	if l.file != nil {
-		l.logWithLevel("L2", "%s started", operation)
+		l.logWithLevel(LevelInfo, "%s started", operation)
 	}
 	return &Timer{
 		operation: operation,
@@ -261,6 +353,11 @@ func Global() Logger {
 	return globalLogger
 }
 
+// Trace logs trace information using the global logger.
+func Trace(format string, args ...interface{}) {
+	globalLogger.Trace(format, args...)
+}
+
 // Debug logs debug information using the global logger.
 func Debug(format string, args ...interface{}) {
 	globalLogger.Debug(format, args...)
@@ -284,6 +381,11 @@ func Warn(format string, args ...interface{}) {
 // Error logs an error using the global logger.
 func Error(format string, args ...interface{}) {
 	globalLogger.Error(format, args...)
+}
+
+// Fatal logs a fatal error using the global logger.
+func Fatal(format string, args ...interface{}) {
+	globalLogger.Fatal(format, args...)
 }
 
 // StartTimer starts a timer for measuring operation duration using the global logger.
