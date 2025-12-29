@@ -390,7 +390,7 @@ func (c *claudeClient) VerifyPaneAlive(tm tmux.Client, target string, timeout ti
 
 		content, err := tm.CapturePane(target, 5)
 		if err != nil {
-			logging.Trace("VerifyPaneAlive: capture failed (attempt %d/%d): %v", target, i+1, maxAttempts, err)
+			logging.Trace("VerifyPaneAlive: pane %s capture failed (attempt %d/%d): %v", target, i+1, maxAttempts, err)
 			time.Sleep(pollInterval)
 			continue
 		}
