@@ -4,9 +4,9 @@ package tui
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textarea"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/bubbles/v2/textarea"
+	tea "github.com/charmbracelet/bubbletea/v2"
+	"github.com/charmbracelet/lipgloss/v2"
 )
 
 // TaskInput provides an inline text input for task content.
@@ -31,19 +31,26 @@ func NewTaskInput() *TaskInput {
 	ta.Focus()
 	ta.CharLimit = 0 // No limit
 	ta.ShowLineNumbers = false
+	ta.Prompt = "" // Clear prompt to avoid extra characters on the left
 	ta.SetWidth(80)
 	ta.SetHeight(10)
 
-	// Custom styling
-	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
-	ta.FocusedStyle.Base = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+	// Enable real cursor for proper IME support (Korean input)
+	ta.VirtualCursor = false
+
+	// Custom styling using v2 API - assign directly to Styles field
+	ta.Styles = textarea.DefaultStyles(true) // dark mode
+	ta.Styles.Focused.Base = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("39")).
 		Padding(0, 1)
-	ta.BlurredStyle.Base = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+	ta.Styles.Blurred.Base = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240")).
 		Padding(0, 1)
+	ta.Styles.Focused.CursorLine = lipgloss.NewStyle()
+	ta.Styles.Focused.Prompt = lipgloss.NewStyle()
+	ta.Styles.Blurred.Prompt = lipgloss.NewStyle()
 
 	return &TaskInput{
 		textarea: ta,
@@ -93,6 +100,38 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// If empty, don't submit - just continue
 			return m, nil
 		}
+
+	case tea.MouseClickMsg:
+		// Handle mouse click to position cursor in textarea
+		// MouseClickMsg embeds Mouse directly, access fields directly
+		if msg.Button == tea.MouseLeft {
+			m.textarea.Focus()
+
+			// Calculate textarea position from screen coordinates
+			// Screen layout (based on user testing Y offset = +4):
+			// Y=0: "New Task" title
+			// Y=1: empty (MarginBottom)
+			// Y=2: empty (\n)
+			// Y=3: ╭── border top
+			// Y=4+: textarea content lines
+			textareaStartY := 4 // First content line
+			textareaStartX := 1 // Border only
+
+			targetRow := msg.Y - textareaStartY
+			targetCol := msg.X - textareaStartX
+
+			// Only reposition if click is within textarea content area
+			if targetRow >= 0 && targetCol >= 0 {
+				// Move to start, then navigate to target position
+				m.textarea.CursorStart()
+				for i := 0; i < targetRow; i++ {
+					m.textarea.CursorDown()
+				}
+				if targetCol > 0 {
+					m.textarea.SetCursorColumn(targetCol)
+				}
+			}
+		}
 	}
 
 	m.textarea, cmd = m.textarea.Update(msg)
@@ -102,7 +141,7 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the task input.
-func (m *TaskInput) View() string {
+func (m *TaskInput) View() tea.View {
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("39")).
@@ -120,7 +159,24 @@ func (m *TaskInput) View() string {
 	sb.WriteString("\n")
 	sb.WriteString(helpStyle.Render("Alt+Enter: Submit  |  Esc: Cancel"))
 
-	return sb.String()
+	v := tea.NewView(sb.String())
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+
+	// Set real cursor from textarea for proper IME support
+	if cursor := m.textarea.Cursor(); cursor != nil {
+		// Offset cursor position (based on user testing):
+		// Y=0: "New Task" title
+		// Y=1: empty (MarginBottom)
+		// Y=2: empty (\n)
+		// Y=3: ╭── border top
+		// Y=4+: textarea content (cursor Y=0 maps to screen Y=4)
+		cursor.Position.Y += 4
+		cursor.Position.X += 1 // Border only
+		v.Cursor = cursor
+	}
+
+	return v
 }
 
 // Result returns the task input result.
@@ -134,7 +190,7 @@ func (m *TaskInput) Result() TaskInputResult {
 // RunTaskInput runs the task input and returns the result.
 func RunTaskInput() (*TaskInputResult, error) {
 	m := NewTaskInput()
-	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	p := tea.NewProgram(m)
 
 	finalModel, err := p.Run()
 	if err != nil {
