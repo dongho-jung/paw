@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/v2/textarea"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
+	"github.com/mattn/go-runewidth"
 )
 
 // TaskInput provides an inline text input for task content.
@@ -115,21 +116,45 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Y=3: ╭── border top
 			// Y=4+: textarea content lines
 			textareaStartY := 4 // First content line
-			textareaStartX := 1 // Border only
+			textareaStartX := 2 // Border + padding offset
 
 			targetRow := msg.Y - textareaStartY
 			targetCol := msg.X - textareaStartX
 
 			// Only reposition if click is within textarea content area
-			if targetRow >= 0 && targetCol >= 0 {
-				// Move to start, then navigate to target position
-				m.textarea.CursorStart()
-				for i := 0; i < targetRow; i++ {
-					m.textarea.CursorDown()
+			if targetRow >= 0 {
+				if targetCol < 0 {
+					targetCol = 0
 				}
-				if targetCol > 0 {
-					m.textarea.SetCursorColumn(targetCol)
+
+				if cursor := m.textarea.Cursor(); cursor != nil {
+					currentRow := cursor.Position.Y
+
+					switch {
+					case targetRow > currentRow:
+						steps := targetRow - currentRow
+						for i := 0; i < steps; i++ {
+							prev := m.textarea.Cursor()
+							m.textarea.CursorDown()
+							next := m.textarea.Cursor()
+							if next == nil || (prev != nil && next.Position.Y == prev.Position.Y) {
+								break
+							}
+						}
+					case targetRow < currentRow:
+						steps := currentRow - targetRow
+						for i := 0; i < steps; i++ {
+							prev := m.textarea.Cursor()
+							m.textarea.CursorUp()
+							next := m.textarea.Cursor()
+							if next == nil || (prev != nil && next.Position.Y == prev.Position.Y) {
+								break
+							}
+						}
+					}
 				}
+
+				m.moveCursorToVisualColumn(targetCol)
 			}
 		}
 	}
@@ -172,11 +197,49 @@ func (m *TaskInput) View() tea.View {
 		// Y=3: ╭── border top
 		// Y=4+: textarea content (cursor Y=0 maps to screen Y=4)
 		cursor.Position.Y += 4
-		cursor.Position.X += 1 // Border only
+		cursor.Position.X += 1 // Border only; padding already included in textarea cursor
 		v.Cursor = cursor
 	}
 
 	return v
+}
+
+func (m *TaskInput) moveCursorToVisualColumn(targetCol int) {
+	lines := strings.Split(m.textarea.Value(), "\n")
+	row := m.textarea.Line()
+	if row < 0 || row >= len(lines) {
+		return
+	}
+
+	lineInfo := m.textarea.LineInfo()
+	runes := []rune(lines[row])
+
+	start := min(lineInfo.StartColumn, len(runes))
+	col := start
+	width := 0
+
+	if targetCol < 0 {
+		targetCol = 0
+	}
+	if lineInfo.CharWidth > 0 {
+		targetCol = min(targetCol, lineInfo.CharWidth)
+	}
+
+	for idx := start; idx < len(runes); idx++ {
+		rw := runewidth.RuneWidth(runes[idx])
+		if rw <= 0 {
+			rw = 1
+		}
+
+		if width+rw > targetCol {
+			break
+		}
+
+		width += rw
+		col = idx + 1
+	}
+
+	m.textarea.SetCursorColumn(col)
 }
 
 // Result returns the task input result.
