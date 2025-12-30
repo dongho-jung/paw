@@ -172,8 +172,6 @@ brew install tmux gh
 | Help | `⌥ /` |
 | Leave session | `⌥ q` (detach) |
 
-> **Note**: All shortcuts work regardless of the keyboard input language (English/Korean).
-
 ## Quick task queue
 
 Quickly capture ideas or follow-up work while you are busy.
