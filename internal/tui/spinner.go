@@ -171,7 +171,7 @@ func (s *SimpleSpinner) Start() {
 				return
 			case <-ticker.C:
 				frame := spinnerFrames[s.frame%len(spinnerFrames)]
-				fmt.Printf("\r%s %s", frame, s.message)
+				fmt.Printf("\r  %s %s", frame, s.message)
 				s.frame++
 			}
 		}
@@ -183,12 +183,12 @@ func (s *SimpleSpinner) Stop(success bool, result string) {
 	close(s.done)
 
 	if success {
-		fmt.Printf("\r✓ %s", s.message)
+		fmt.Printf("\r  ✓ %s", s.message)
 		if result != "" {
 			fmt.Printf(": %s", result)
 		}
 	} else {
-		fmt.Printf("\r✗ %s", s.message)
+		fmt.Printf("\r  ✗ %s", s.message)
 		if result != "" {
 			fmt.Printf(": %s", result)
 		}

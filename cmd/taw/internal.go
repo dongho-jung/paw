@@ -608,6 +608,9 @@ var endTaskCmd = &cobra.Command{
 		}
 
 		logging.Log("=== End task: %s ===", targetTask.Name)
+
+		// Print task header for user feedback
+		fmt.Printf("\n  Ending task: %s\n\n", targetTask.Name)
 		logging.Debug("Configuration: ON_COMPLETE=%s, WorkMode=%s", app.Config.OnComplete, app.Config.WorkMode)
 
 		tm := tmux.New(sessionName)
@@ -621,6 +624,9 @@ var endTaskCmd = &cobra.Command{
 			logging.Trace("Git status: hasChanges=%v", hasChanges)
 
 			if hasChanges {
+				spinner := tui.NewSimpleSpinner("Committing changes")
+				spinner.Start()
+
 				commitTimer := logging.StartTimer("git commit")
 				if err := gitClient.AddAll(workDir); err != nil {
 					logging.Warn("Failed to add changes: %v", err)
@@ -630,23 +636,34 @@ var endTaskCmd = &cobra.Command{
 				message := fmt.Sprintf("chore: auto-commit on task end\n\n%s", diffStat)
 				if err := gitClient.Commit(workDir, message); err != nil {
 					commitTimer.StopWithResult(false, err.Error())
+					spinner.Stop(false, err.Error())
 				} else {
 					commitTimer.StopWithResult(true, "")
+					spinner.Stop(true, "")
 				}
+			} else {
+				fmt.Println("  ○ No changes to commit")
 			}
 
 			// Push changes
+			pushSpinner := tui.NewSimpleSpinner("Pushing to remote")
+			pushSpinner.Start()
+
 			pushTimer := logging.StartTimer("git push")
 			if err := gitClient.Push(workDir, "origin", targetTask.Name, true); err != nil {
 				pushTimer.StopWithResult(false, err.Error())
+				pushSpinner.Stop(false, err.Error())
 			} else {
 				pushTimer.StopWithResult(true, fmt.Sprintf("branch=%s", targetTask.Name))
+				pushSpinner.Stop(true, targetTask.Name)
 			}
 
 			// Handle auto-merge mode
 			mergeSuccess := true // Track merge result to decide cleanup
 			if app.Config != nil && app.Config.OnComplete == config.OnCompleteAutoMerge {
 				logging.Log("auto-merge: starting merge process")
+				fmt.Println()
+				fmt.Println("  Auto-merge mode:")
 
 				// Get main branch name
 				mainBranch := gitClient.GetMainBranch(app.ProjectDir)
@@ -656,6 +673,9 @@ var endTaskCmd = &cobra.Command{
 
 				// Acquire merge lock to prevent concurrent merges
 				// This is necessary because we need to checkout main in project dir
+				lockSpinner := tui.NewSimpleSpinner("Acquiring merge lock")
+				lockSpinner.Start()
+
 				lockFile := filepath.Join(app.TawDir, "merge.lock")
 				lockAcquired := false
 				for retries := 0; retries < 30; retries++ {
@@ -680,8 +700,10 @@ var endTaskCmd = &cobra.Command{
 				if !lockAcquired {
 					logging.Warn("Failed to acquire merge lock after 30 seconds")
 					mergeTimer.StopWithResult(false, "lock timeout")
+					lockSpinner.Stop(false, "timeout after 30s")
 					mergeSuccess = false
 				} else {
+					lockSpinner.Stop(true, "")
 					// Ensure lock is released on exit
 					defer os.Remove(lockFile)
 
@@ -698,25 +720,42 @@ var endTaskCmd = &cobra.Command{
 					currentBranch, _ := gitClient.GetCurrentBranch(app.ProjectDir)
 
 					// Fetch latest from origin
+					fetchSpinner := tui.NewSimpleSpinner("Fetching from origin")
+					fetchSpinner.Start()
 					logging.Debug("Fetching from origin...")
 					if err := gitClient.Fetch(app.ProjectDir, "origin"); err != nil {
 						logging.Warn("Failed to fetch: %v", err)
+						fetchSpinner.Stop(false, err.Error())
+					} else {
+						fetchSpinner.Stop(true, "")
 					}
 
 					// Checkout main
+					checkoutSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Checking out %s", mainBranch))
+					checkoutSpinner.Start()
 					logging.Debug("Checking out %s...", mainBranch)
 					if err := gitClient.Checkout(app.ProjectDir, mainBranch); err != nil {
 						logging.Warn("Failed to checkout %s: %v", mainBranch, err)
 						mergeTimer.StopWithResult(false, "checkout failed")
+						checkoutSpinner.Stop(false, err.Error())
 						mergeSuccess = false
 					} else {
+						checkoutSpinner.Stop(true, "")
+
 						// Pull latest
+						pullSpinner := tui.NewSimpleSpinner("Pulling latest changes")
+						pullSpinner.Start()
 						logging.Debug("Pulling latest changes...")
 						if err := gitClient.Pull(app.ProjectDir); err != nil {
 							logging.Warn("Failed to pull: %v", err)
+							pullSpinner.Stop(false, err.Error())
+						} else {
+							pullSpinner.Stop(true, "")
 						}
 
 						// Merge task branch (squash)
+						mergeSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Merging %s into %s", targetTask.Name, mainBranch))
+						mergeSpinner.Start()
 						logging.Debug("Squash merging branch %s into %s...", targetTask.Name, mainBranch)
 						mergeMsg := fmt.Sprintf("feat: %s", targetTask.Name)
 						if err := gitClient.MergeSquash(app.ProjectDir, targetTask.Name, mergeMsg); err != nil {
@@ -726,16 +765,23 @@ var endTaskCmd = &cobra.Command{
 								logging.Warn("Failed to abort merge: %v", abortErr)
 							}
 							mergeTimer.StopWithResult(false, "merge conflict")
+							mergeSpinner.Stop(false, "conflict")
 							mergeSuccess = false
 						} else {
+							mergeSpinner.Stop(true, "")
+
 							// Push merged main
+							pushMainSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Pushing %s to origin", mainBranch))
+							pushMainSpinner.Start()
 							logging.Debug("Pushing merged main to origin...")
 							if err := gitClient.Push(app.ProjectDir, "origin", mainBranch, false); err != nil {
 								logging.Warn("Failed to push merged main: %v", err)
 								mergeTimer.StopWithResult(false, "push failed")
+								pushMainSpinner.Stop(false, err.Error())
 								mergeSuccess = false
 							} else {
 								mergeTimer.StopWithResult(true, fmt.Sprintf("squash merged %s into %s", targetTask.Name, mainBranch))
+								pushMainSpinner.Stop(true, "")
 							}
 						}
 
@@ -760,6 +806,8 @@ var endTaskCmd = &cobra.Command{
 				// If merge failed, rename window to warning and skip cleanup
 				if !mergeSuccess {
 					logging.Warn("Merge failed - keeping task for manual resolution")
+					fmt.Println()
+					fmt.Println("  ✗ Merge failed - manual resolution needed")
 					warningWindowName := constants.EmojiWarning + targetTask.Name
 					if err := tm.RenameWindow(windowID, warningWindowName); err != nil {
 						logging.Warn("Failed to rename window: %v", err)
@@ -773,6 +821,7 @@ var endTaskCmd = &cobra.Command{
 				}
 			}
 		}
+		fmt.Println()
 
 		// Capture agent pane history before cleanup
 		historyDir := app.GetHistoryDir()
@@ -804,13 +853,18 @@ var endTaskCmd = &cobra.Command{
 				logging.Warn("Failed to capture pane content: %v", captureErr)
 			} else if paneContent != "" {
 				// Generate summary using Claude
+				summarySpinner := tui.NewSimpleSpinner("Generating summary")
+				summarySpinner.Start()
+
 				claudeClient := claude.New()
 				summary, err := claudeClient.GenerateSummary(paneContent)
 				if err != nil {
 					logging.Warn("Failed to generate summary: %v", err)
+					summarySpinner.Stop(false, "skipped")
 					summary = "" // Continue without summary
 				} else {
 					logging.Debug("Generated summary: %d chars", len(summary))
+					summarySpinner.Stop(true, "")
 				}
 
 				// Build history content: task + summary + pane capture
@@ -844,17 +898,25 @@ var endTaskCmd = &cobra.Command{
 		}
 
 		// Cleanup task (only reached if merge succeeded or not in auto-merge mode)
+		cleanupSpinner := tui.NewSimpleSpinner("Cleaning up")
+		cleanupSpinner.Start()
+
 		cleanupTimer := logging.StartTimer("task cleanup")
 		if err := mgr.CleanupTask(targetTask); err != nil {
 			cleanupTimer.StopWithResult(false, err.Error())
+			cleanupSpinner.Stop(false, err.Error())
 		} else {
 			cleanupTimer.StopWithResult(true, "")
+			cleanupSpinner.Stop(true, "")
 		}
 
 		// Kill window
 		if err := tm.KillWindow(windowID); err != nil {
 			logging.Warn("Failed to kill window: %v", err)
 		}
+
+		fmt.Println()
+		fmt.Println("  ✓ Done!")
 
 		// Process queue
 		tawBin, _ := os.Executable()
