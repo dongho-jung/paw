@@ -82,10 +82,10 @@ Select [1-2, default: 1]:
 On Complete Action:
   1. confirm (Recommended) - Ask before each action
   2. auto-commit - Automatically commit changes
-  3. auto-merge - Auto commit + merge + cleanup
-  4. auto-pr - Auto commit + create pull request
+  3. auto-merge - Auto commit + merge + cleanup      (worktree mode only)
+  4. auto-pr - Auto commit + create pull request     (worktree mode only)
 
-Select [1-4, default: 1]:
+Select [1-2 or 1-4, default: 1]:
 
 ✅ Configuration saved!
    Work mode: worktree
@@ -137,8 +137,8 @@ on_complete: confirm
 |             | `main` | Work directly on the current branch (simple) |
 | `on_complete` | `confirm` | Ask before each action (safe) |
 |               | `auto-commit` | Auto commit (merge/PR are manual) |
-|               | `auto-merge` | **Auto** commit + merge + clean up + close window at task completion (no ⌥e) |
-|               | `auto-pr` | Auto commit + create PR (team-friendly) |
+|               | `auto-merge` | **Auto** commit + merge + clean up + close window (worktree mode only) |
+|               | `auto-pr` | Auto commit + create PR (worktree mode only) |
 | `worktree_hook` | (command) | Shell command(s) to run after worktree creation (e.g., `npm install`) |
 
 <details>

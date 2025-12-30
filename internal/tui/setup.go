@@ -135,8 +135,14 @@ func (m *SetupWizard) View() tea.View {
 		}{
 			{"confirm (Recommended)", "Ask before each action"},
 			{"auto-commit", "Automatically commit changes"},
-			{"auto-merge", "Auto commit + merge + cleanup"},
-			{"auto-pr", "Auto commit + create pull request"},
+		}
+
+		// In worktree mode, add merge and PR options
+		if m.workMode == config.WorkModeWorktree {
+			options = append(options,
+				struct{ name, desc string }{"auto-merge", "Auto commit + merge + cleanup"},
+				struct{ name, desc string }{"auto-pr", "Auto commit + create pull request"},
+			)
 		}
 
 		for i, opt := range options {
@@ -163,7 +169,10 @@ func (m *SetupWizard) maxCursor() int {
 	case 0:
 		return 1 // worktree, main
 	case 1:
-		return 3 // confirm, auto-commit, auto-merge, auto-pr
+		if m.workMode == config.WorkModeWorktree {
+			return 3 // confirm, auto-commit, auto-merge, auto-pr
+		}
+		return 1 // confirm, auto-commit (main mode)
 	}
 	return 0
 }
