@@ -25,7 +25,7 @@ The first launch automatically opens the task editor.
 
 ### Create a task
 
-To add another task inside the tmux session, press `⌃⇧N`:
+To add another task inside the tmux session, press `⌃R` and select `new-task`:
 - The editor opens so you can write the task content.
 - Save and exit to automatically launch the agent.
 - vi/vim/nvim start in insert mode automatically.
@@ -42,8 +42,8 @@ Slash commands available to the agent:
 | `/merge` | Merges the worktree branch into the current project branch |
 
 **Task completion**:
-- `auto-merge` mode: Automatically commit → merge → clean up → close the window when the task ends (no ⌃⇧E needed)
-- Other modes: Press `⌃⇧E` to commit → PR/merge → clean up according to ON_COMPLETE
+- `auto-merge` mode: Automatically commit → merge → clean up → close the window when the task ends
+- Other modes: Press `⌃R` → `end-task` to commit → PR/merge → clean up according to ON_COMPLETE
 
 <details>
 <summary>Automatically reopen incomplete tasks</summary>
@@ -161,24 +161,29 @@ brew install tmux gh
 
 | Action | Shortcut |
 |--------|----------|
-| Cycle panes | `⌃⇧Tab` |
-| Move window | `⌃⇧←/→` |
-| Toggle new window | `⌃⇧N` (task ↔ new window) |
-| Complete task | `⌃⇧E` (log progress in user pane, commit → PR/merge → cleanup) |
-| Merge all done tasks | `⌃⇧M` (merge + end all ✅ tasks) |
-| Toggle shell pane | `⌃⇧P` (bottom 40%, open/close shell in current worktree) |
-| Live log viewer | `⌃⇧L` (toggle log viewer, vim-like navigation) |
-| Add quick task to queue | `⌃⇧U` (auto-run after current task completes) |
-| Help | `⌃⇧/` |
-| Leave session | `⌃⇧Q` (detach) |
+| Command palette | `⌃R` (fzf-based fuzzy search) |
+| Cycle panes | `⌥Tab` |
+| Move window | `⌥←/→` |
+| Exit session | `⌃C` or `⌃D` twice |
+
+All commands are accessible via the command palette (`⌃R`):
+- `new-task` — Create a new task
+- `end-task` — Complete current task (commit → PR/merge → cleanup)
+- `show-tasks` — View all tasks (active + completed)
+- `show-log` — Live log viewer
+- `show-shell` — Open shell pane (bottom 40%)
+- `show-help` — Show help
+- `add-queue` — Add quick task to queue
+- `merge-all` — Merge all done tasks
+- `detach` — Leave session
 
 ## Quick task queue
 
 Quickly capture ideas or follow-up work while you are busy.
 
-1. Press `⌃⇧U` to open the popup.
+1. Press `⌃R` and select `add-queue`.
 2. Enter the task description and hit Enter.
-3. When the current task finishes (`⌃⇧E`), queued tasks start automatically.
+3. When the current task finishes (`end-task`), queued tasks start automatically.
 
 Queue layout:
 ```bash
@@ -188,7 +193,7 @@ Queue layout:
 
 ## Log viewer
 
-Press `⌃⇧L` to open the live log viewer.
+Press `⌃R` and select `show-log` to open the live log viewer.
 
 <details>
 <summary>Controls</summary>
@@ -203,7 +208,7 @@ Press `⌃⇧L` to open the live log viewer.
 | `s` | Toggle tail mode (follow new logs) |
 | `w` | Toggle word wrap |
 | `l` | Cycle log level filter (L0+ → L1+ → ... → L5 only) |
-| `q` / `Esc` / `⌃⇧L` | Close the log viewer |
+| `q` / `Esc` | Close the log viewer |
 </details>
 
 ## Task history
