@@ -26,7 +26,11 @@ taw/                           # This repository
 │   ├── config/                # Configuration management
 │   ├── constants/             # Constants
 │   ├── embed/                 # Embedded assets
-│   │   └── assets/            # HELP.md (help text)
+│   │   └── assets/            # Embedded files (compiled into binary)
+│   │       ├── HELP.md        # Help text
+│   │       ├── PROMPT.md      # System prompt (git mode)
+│   │       ├── PROMPT-nogit.md # System prompt (non-git mode)
+│   │       └── claude/        # Claude settings and slash commands
 │   ├── git/                   # Git/worktree management
 │   ├── github/                # GitHub API client
 │   ├── logging/               # Logging (L0-L5 levels)
@@ -34,10 +38,6 @@ taw/                           # This repository
 │   ├── task/                  # Task management
 │   ├── tmux/                  # Tmux client
 │   └── tui/                   # Terminal UI (log viewer)
-├── _taw/                      # Resource files (symlinked into projects)
-│   ├── PROMPT.md              # System prompt (git mode)
-│   ├── PROMPT-nogit.md        # System prompt (non-git mode)
-│   └── claude/commands/       # Slash commands (/commit, /test, /pr, /merge)
 ├── Makefile                   # Build script
 └── go.mod                     # Go module file
 
@@ -45,10 +45,11 @@ taw/                           # This repository
 └── .taw/                      # Created by taw
     ├── config                 # Project config (YAML, created during setup)
     ├── log                    # Consolidated logs (all scripts write here)
-    ├── PROMPT.md              # Project prompt
-    ├── .global-prompt         # -> Global prompt (symlink, varies by git mode)
+    ├── PROMPT.md              # Project prompt (user-customizable)
     ├── .is-git-repo           # Git mode marker (exists only in git repos)
-    ├── .claude                # -> _taw/claude (symlink)
+    ├── .claude/               # Claude settings and slash commands (copied from embed)
+    │   ├── settings.local.json
+    │   └── commands/          # Slash commands (/commit, /test, /pr, /merge)
     ├── .queue/                # Quick task queue (add with ⌥ u)
     │   └── 001.task           # Pending tasks (processed in order)
     ├── history/               # Task history directory

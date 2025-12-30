@@ -13,6 +13,7 @@ import (
 	"github.com/donghojung/taw/internal/app"
 	"github.com/donghojung/taw/internal/config"
 	"github.com/donghojung/taw/internal/constants"
+	"github.com/donghojung/taw/internal/embed"
 	"github.com/donghojung/taw/internal/git"
 	"github.com/donghojung/taw/internal/logging"
 	"github.com/donghojung/taw/internal/task"
@@ -199,14 +200,10 @@ func startNewSession(app *app.App, tm tmux.Client) error {
 		os.WriteFile(markerPath, []byte{}, 0644)
 	}
 
-	// Setup global prompt symlink
-	if err := setupPromptSymlink(app); err != nil {
-		logging.Warn("Failed to setup prompt symlink: %v", err)
-	}
-
-	// Setup .claude symlink
-	if err := setupClaudeSymlink(app); err != nil {
-		logging.Warn("Failed to setup claude symlink: %v", err)
+	// Write embedded claude files to .taw/.claude/
+	claudeDir := filepath.Join(app.TawDir, constants.ClaudeLink)
+	if err := embed.WriteClaudeFiles(claudeDir); err != nil {
+		logging.Warn("Failed to write claude files: %v", err)
 	}
 
 	// Update .gitignore
@@ -401,34 +398,6 @@ func setupTmuxConfig(app *app.App, tm tmux.Client) error {
 	return nil
 }
 
-// setupPromptSymlink creates the global prompt symlink
-func setupPromptSymlink(app *app.App) error {
-	linkPath := app.GetGlobalPromptPath()
-
-	// Remove existing symlink
-	os.Remove(linkPath)
-
-	// Determine target based on git mode
-	var target string
-	if app.IsGitRepo {
-		target = filepath.Join(app.TawHome, "_taw", "PROMPT.md")
-	} else {
-		target = filepath.Join(app.TawHome, "_taw", "PROMPT-nogit.md")
-	}
-
-	return os.Symlink(target, linkPath)
-}
-
-// setupClaudeSymlink creates the .claude symlink
-func setupClaudeSymlink(app *app.App) error {
-	linkPath := filepath.Join(app.TawDir, constants.ClaudeLink)
-
-	// Remove existing symlink
-	os.Remove(linkPath)
-
-	target := filepath.Join(app.TawHome, "_taw", "claude")
-	return os.Symlink(target, linkPath)
-}
 
 // updateGitignore adds .taw gitignore rules if not already present
 // Rules: .taw/ (ignore all), !.taw/config (keep config), !.taw/memory (keep memory)

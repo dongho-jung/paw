@@ -208,7 +208,7 @@ func (t *Task) GetWindowName() string {
 }
 
 // SetupSymlinks creates the origin symlink.
-func (t *Task) SetupSymlinks(tawHome, projectDir string) error {
+func (t *Task) SetupSymlinks(projectDir string) error {
 	// Create origin symlink to project root
 	originPath := t.GetOriginPath()
 	if err := os.Remove(originPath); err != nil && !os.IsNotExist(err) {

@@ -339,8 +339,7 @@ var handleTaskCmd = &cobra.Command{
 		}
 
 		// Setup symlinks (error is non-fatal)
-		tawHome, _ := getTawHome()
-		if err := t.SetupSymlinks(tawHome, app.ProjectDir); err != nil {
+		if err := t.SetupSymlinks(app.ProjectDir); err != nil {
 			logging.Warn("Failed to setup symlinks: %v", err)
 		}
 
@@ -377,9 +376,9 @@ var handleTaskCmd = &cobra.Command{
 		}
 
 		// Build system prompt
-		globalPrompt, _ := os.ReadFile(app.GetGlobalPromptPath())
+		globalPrompt, _ := embed.GetPrompt(app.IsGitRepo)
 		projectPrompt, _ := os.ReadFile(app.GetPromptPath())
-		systemPrompt := claude.BuildSystemPrompt(string(globalPrompt), string(projectPrompt))
+		systemPrompt := claude.BuildSystemPrompt(globalPrompt, string(projectPrompt))
 
 		// Get taw binary path for end-task (needed for user prompt)
 		tawBin, _ := os.Executable()
