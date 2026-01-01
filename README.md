@@ -180,6 +180,7 @@ brew install tmux gh
 |--------|----------|
 | Toggle tasks | `⌃T` |
 | Toggle logs | `⌃L` |
+| Toggle git status | `⌃G` |
 | Toggle bottom (shell) | `⌃B` |
 | Toggle help | `⌃/` |
 

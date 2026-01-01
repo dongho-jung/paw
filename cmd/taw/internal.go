@@ -48,6 +48,7 @@ func init() {
 	internalCmd.AddCommand(toggleLogCmd)
 	internalCmd.AddCommand(logViewerCmd)
 	internalCmd.AddCommand(toggleHelpCmd)
+	internalCmd.AddCommand(toggleGitStatusCmd)
 	internalCmd.AddCommand(recoverTaskCmd)
 	internalCmd.AddCommand(loadingScreenCmd)
 	internalCmd.AddCommand(toggleTaskListCmd)
@@ -1353,6 +1354,48 @@ var toggleHelpCmd = &cobra.Command{
 			Title:  " Help (q to close) ",
 			Close:  true,
 			Style:  "fg=terminal,bg=terminal",
+		}, popupCmd)
+		return nil
+	},
+}
+
+var toggleGitStatusCmd = &cobra.Command{
+	Use:   "toggle-git-status [session]",
+	Short: "Show git status popup",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sessionName := args[0]
+		tm := tmux.New(sessionName)
+
+		app, err := getAppFromSession(sessionName)
+		if err != nil {
+			return err
+		}
+
+		// Check if this is a git repo
+		if !app.IsGitRepo {
+			tm.DisplayMessage("Not a git repository", 2000)
+			return nil
+		}
+
+		// Get current pane's working directory (for worktree context)
+		panePath, err := tm.Display("#{pane_current_path}")
+		if err != nil || panePath == "" {
+			panePath = app.ProjectDir
+		}
+		panePath = strings.TrimSpace(panePath)
+
+		// Build command to show git status with color
+		// Uses less -R to preserve colors, closes with q
+		popupCmd := fmt.Sprintf("cd '%s' && git status; echo; echo 'Press q to close'; read -n 1", panePath)
+
+		tm.DisplayPopup(tmux.PopupOpts{
+			Width:     "80%",
+			Height:    "60%",
+			Title:     " Git Status (q to close) ",
+			Close:     true,
+			Style:     "fg=terminal,bg=terminal",
+			Directory: panePath,
 		}, popupCmd)
 		return nil
 	},

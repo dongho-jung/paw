@@ -14,6 +14,7 @@ import (
 //   - Ctrl+Q: Quit taw
 //   - Ctrl+T: Toggle tasks
 //   - Ctrl+L: Toggle logs
+//   - Ctrl+G: Toggle git status
 //   - Ctrl+B: Toggle bottom (shell)
 //   - Ctrl+/: Toggle help
 //   - Alt+Left/Right: Move window
@@ -26,6 +27,7 @@ func buildKeybindings(tawBin, sessionName string) []tmux.BindOpts {
 	cmdQuit := "detach-client"
 	cmdToggleTasks := fmt.Sprintf("run-shell '%s internal toggle-task-list %s'", tawBin, sessionName)
 	cmdToggleLogs := fmt.Sprintf("run-shell '%s internal toggle-log %s'", tawBin, sessionName)
+	cmdToggleGitStatus := fmt.Sprintf("run-shell '%s internal toggle-git-status %s'", tawBin, sessionName)
 	cmdToggleBottom := fmt.Sprintf("run-shell '%s internal popup-shell %s'", tawBin, sessionName)
 	cmdToggleHelp := fmt.Sprintf("run-shell '%s internal toggle-help %s'", tawBin, sessionName)
 
@@ -44,6 +46,7 @@ func buildKeybindings(tawBin, sessionName string) []tmux.BindOpts {
 		// Toggle commands (Ctrl-based)
 		{Key: "C-t", Command: cmdToggleTasks, NoPrefix: true},
 		{Key: "C-l", Command: cmdToggleLogs, NoPrefix: true},
+		{Key: "C-g", Command: cmdToggleGitStatus, NoPrefix: true},
 		{Key: "C-b", Command: cmdToggleBottom, NoPrefix: true},
 		{Key: "C-_", Command: cmdToggleHelp, NoPrefix: true}, // Ctrl+/ sends C-_
 	}

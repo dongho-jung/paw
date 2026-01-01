@@ -23,6 +23,7 @@ Claude Code-based autonomous agent work environment
 ### Toggle Panels
   ⌃T          Toggle tasks (show task list)
   ⌃L          Toggle logs (show log viewer)
+  ⌃G          Toggle git status
   ⌃B          Toggle bottom (shell pane)
   ⌃/          Toggle help
 
