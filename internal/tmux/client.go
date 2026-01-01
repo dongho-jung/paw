@@ -289,7 +289,7 @@ func (c *tmuxClient) ListWindows() ([]Window, error) {
 		}
 
 		var index int
-		fmt.Sscanf(parts[1], "%d", &index)
+		_, _ = fmt.Sscanf(parts[1], "%d", &index)
 
 		windows = append(windows, Window{
 			ID:     parts[0],

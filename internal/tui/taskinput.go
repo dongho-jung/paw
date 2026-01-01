@@ -128,7 +128,7 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				if cursor := m.textarea.Cursor(); cursor != nil {
-					currentRow := cursor.Position.Y
+					currentRow := cursor.Y
 
 					switch {
 					case targetRow > currentRow:
@@ -137,7 +137,7 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							prev := m.textarea.Cursor()
 							m.textarea.CursorDown()
 							next := m.textarea.Cursor()
-							if next == nil || (prev != nil && next.Position.Y == prev.Position.Y) {
+							if next == nil || (prev != nil && next.Y == prev.Y) {
 								break
 							}
 						}
@@ -147,7 +147,7 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							prev := m.textarea.Cursor()
 							m.textarea.CursorUp()
 							next := m.textarea.Cursor()
-							if next == nil || (prev != nil && next.Position.Y == prev.Position.Y) {
+							if next == nil || (prev != nil && next.Y == prev.Y) {
 								break
 							}
 						}
@@ -196,8 +196,8 @@ func (m *TaskInput) View() tea.View {
 		// Y=2: empty (\n)
 		// Y=3: ╭── border top
 		// Y=4+: textarea content (cursor Y=0 maps to screen Y=4)
-		cursor.Position.Y += 4
-		cursor.Position.X += 1 // Border only; padding already included in textarea cursor
+		cursor.Y += 4
+		cursor.X += 1 // Border only; padding already included in textarea cursor
 		v.Cursor = cursor
 	}
 

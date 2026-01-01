@@ -80,7 +80,7 @@ func (m *Manager) CreateTask(content string) (*Task, error) {
 
 	// Save task content
 	if err := task.SaveContent(content); err != nil {
-		task.Remove()
+		_ = task.Remove()
 		logging.Error("Failed to save task content: %v", err)
 		return nil, fmt.Errorf("failed to save task content: %w", err)
 	}
@@ -126,15 +126,11 @@ func (m *Manager) GetTask(name string) (*Task, error) {
 
 	// Load window ID if exists (error is non-fatal)
 	if task.HasTabLock() {
-		if _, err := task.LoadWindowID(); err != nil {
-			// Window ID file might be corrupted or missing - continue anyway
-		}
+		_, _ = task.LoadWindowID()
 	}
 
 	// Load PR number if exists (error is non-fatal)
-	if _, err := task.LoadPRNumber(); err != nil {
-		// PR file might be corrupted - continue anyway
-	}
+	_, _ = task.LoadPRNumber()
 
 	// Set worktree directory (with nil check for config)
 	if m.isGitRepo && m.config != nil && m.config.WorkMode == config.WorkModeWorktree {
@@ -449,24 +445,18 @@ func (m *Manager) SetupWorktree(task *Task) error {
 
 	// Apply stash to worktree if there were changes (error is non-fatal)
 	if stashHash != "" {
-		if err := m.gitClient.StashApply(worktreeDir, stashHash); err != nil {
-			// Stash apply can fail if there are conflicts - continue anyway
-		}
+		_ = m.gitClient.StashApply(worktreeDir, stashHash)
 	}
 
 	// Copy untracked files to worktree (error is non-fatal)
 	if len(untrackedFiles) > 0 {
-		if err := git.CopyUntrackedFiles(untrackedFiles, m.projectDir, worktreeDir); err != nil {
-			// Continue even if copying fails
-		}
+		_ = git.CopyUntrackedFiles(untrackedFiles, m.projectDir, worktreeDir)
 	}
 
 	// Create .claude symlink in worktree (error is non-fatal)
 	claudeLink := filepath.Join(worktreeDir, constants.ClaudeLink)
 	claudeTarget := filepath.Join(m.tawDir, constants.ClaudeLink)
-	if err := os.Symlink(claudeTarget, claudeLink); err != nil {
-		// Symlink might already exist or fail for other reasons - continue anyway
-	}
+	_ = os.Symlink(claudeTarget, claudeLink)
 
 	// Execute worktree hook if configured (error is non-fatal)
 	if m.config.WorktreeHook != "" {

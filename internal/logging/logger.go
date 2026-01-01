@@ -243,7 +243,7 @@ func (l *fileLogger) Trace(format string, args ...interface{}) {
 		context := l.getContext()
 		caller := getCaller(2)
 		line := fmt.Sprintf("[%s] [L0] [%s] [%s] %s\n", timestamp, context, caller, msg)
-		l.file.WriteString(line)
+		_, _ = l.file.WriteString(line)
 	}
 }
 
@@ -263,7 +263,7 @@ func (l *fileLogger) Debug(format string, args ...interface{}) {
 		timestamp := time.Now().Format("06-01-02 15:04:05.0")
 		context := l.getContext()
 		line := fmt.Sprintf("[%s] [L1] [%s] [%s] %s\n", timestamp, context, caller, msg)
-		l.file.WriteString(line)
+		_, _ = l.file.WriteString(line)
 	}
 }
 
@@ -287,7 +287,7 @@ func (l *fileLogger) Warn(format string, args ...interface{}) {
 		context := l.getContext()
 		caller := getCaller(2)
 		line := fmt.Sprintf("[%s] [L3] [%s] [%s] %s\n", timestamp, context, caller, msg)
-		l.file.WriteString(line)
+		_, _ = l.file.WriteString(line)
 	}
 }
 
@@ -303,7 +303,7 @@ func (l *fileLogger) Error(format string, args ...interface{}) {
 		context := l.getContext()
 		caller := getCaller(2)
 		line := fmt.Sprintf("[%s] [L4] [%s] [%s] %s\n", timestamp, context, caller, msg)
-		l.file.WriteString(line)
+		_, _ = l.file.WriteString(line)
 	}
 }
 
@@ -319,7 +319,7 @@ func (l *fileLogger) Fatal(format string, args ...interface{}) {
 		context := l.getContext()
 		caller := getCaller(2)
 		line := fmt.Sprintf("[%s] [L5] [%s] [%s] %s\n", timestamp, context, caller, msg)
-		l.file.WriteString(line)
+		_, _ = l.file.WriteString(line)
 	}
 }
 

@@ -72,7 +72,7 @@ func (r *RecoveryManager) recoverNotInGit(task *Task) error {
 	}
 
 	// Prune worktrees
-	r.gitClient.WorktreePrune(r.projectDir)
+	_ = r.gitClient.WorktreePrune(r.projectDir)
 
 	// Recreate worktree
 	createBranch := !r.gitClient.BranchExists(r.projectDir, task.Name)
@@ -97,12 +97,12 @@ func (r *RecoveryManager) recoverInvalidGit(task *Task) error {
 	}
 
 	// Prune worktrees
-	r.gitClient.WorktreePrune(r.projectDir)
+	_ = r.gitClient.WorktreePrune(r.projectDir)
 
 	// Recreate worktree
 	if err := r.gitClient.WorktreeAdd(r.projectDir, worktreeDir, task.Name, !branchExists); err != nil {
 		// Restore backup on failure
-		os.Rename(backupDir, worktreeDir)
+		_ = os.Rename(backupDir, worktreeDir)
 		return fmt.Errorf("failed to recreate worktree: %w", err)
 	}
 
@@ -112,7 +112,7 @@ func (r *RecoveryManager) recoverInvalidGit(task *Task) error {
 	}
 
 	// Remove backup
-	os.RemoveAll(backupDir)
+	_ = os.RemoveAll(backupDir)
 
 	return nil
 }
@@ -252,7 +252,7 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer srcFile.Close()
+	defer func() { _ = srcFile.Close() }()
 
 	info, err := srcFile.Stat()
 	if err != nil {
@@ -263,7 +263,7 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer dstFile.Close()
+	defer func() { _ = dstFile.Close() }()
 
 	_, err = io.Copy(dstFile, srcFile)
 	return err

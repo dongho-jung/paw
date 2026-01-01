@@ -35,7 +35,7 @@ var ctrlCCmd = &cobra.Command{
 		// Setup logging
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("ctrl-c")
 			logging.SetGlobal(logger)
 		}
@@ -66,7 +66,7 @@ var ctrlCCmd = &cobra.Command{
 			pendingTime, err := parseUnixTime(pendingTimeStr)
 			if err == nil && now-pendingTime <= constants.DoublePressIntervalSec {
 				// Double-press detected, cancel the task
-				tm.SetOption("@taw_cancel_pending", "", true) // Clear pending state
+				_ = tm.SetOption("@taw_cancel_pending", "", true) // Clear pending state
 
 				// Get current window ID
 				windowID, err := tm.Display("#{window_id}")
@@ -86,14 +86,14 @@ var ctrlCCmd = &cobra.Command{
 		// (sending Ctrl+C would cause Claude to exit immediately)
 
 		// Store current timestamp
-		tm.SetOption("@taw_cancel_pending", fmt.Sprintf("%d", now), true)
+		_ = tm.SetOption("@taw_cancel_pending", fmt.Sprintf("%d", now), true)
 
 		// Play sound to indicate pending cancel state
 		logging.Trace("ctrlCCmd: playing SoundCancelPending (first press, waiting for second)")
 		notify.PlaySound(notify.SoundCancelPending)
 
 		// Show message to user
-		tm.DisplayMessage("⌃C again to cancel task", 2000)
+		_ = tm.DisplayMessage("⌃C again to cancel task", 2000)
 
 		return nil
 	},
@@ -124,7 +124,7 @@ var renameWindowCmd = &cobra.Command{
 		if logPath != "" {
 			logger, _ := logging.New(logPath, debug)
 			if logger != nil {
-				defer logger.Close()
+				defer func() { _ = logger.Close() }()
 				logger.SetScript("rename-window")
 				if taskName := os.Getenv("TASK_NAME"); taskName != "" {
 					logger.SetTask(taskName)
@@ -253,74 +253,3 @@ func getShell() string {
 	return shell
 }
 
-// CommandContext holds common context for internal commands.
-type CommandContext struct {
-	App     *app.App
-	Logger  logging.Logger
-	Tm      tmux.Client
-	cleanup func()
-}
-
-// setupCommandContext initializes the common context for a command.
-// Returns a cleanup function that should be deferred.
-func setupCommandContext(sessionName, scriptName string) (*CommandContext, error) {
-	application, err := getAppFromSession(sessionName)
-	if err != nil {
-		return nil, err
-	}
-
-	logger, _ := logging.New(application.GetLogPath(), application.Debug)
-	var cleanup func()
-	if logger != nil {
-		logger.SetScript(scriptName)
-		logging.SetGlobal(logger)
-		cleanup = func() { logger.Close() }
-	} else {
-		cleanup = func() {}
-	}
-
-	return &CommandContext{
-		App:     application,
-		Logger:  logger,
-		Tm:      tmux.New(sessionName),
-		cleanup: cleanup,
-	}, nil
-}
-
-// SetTask sets the task name in the logger.
-func (c *CommandContext) SetTask(taskName string) {
-	if c.Logger != nil {
-		c.Logger.SetTask(taskName)
-	}
-}
-
-// Close cleans up resources.
-func (c *CommandContext) Close() {
-	if c.cleanup != nil {
-		c.cleanup()
-	}
-}
-
-// findTaskByWindowID finds a task by its window ID.
-func findTaskByWindowID(mgr *task.Manager, windowID string) (*task.Task, error) {
-	tasks, err := mgr.ListTasks()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list tasks: %w", err)
-	}
-
-	for _, t := range tasks {
-		if id, _ := t.LoadWindowID(); id == windowID {
-			return t, nil
-		}
-	}
-
-	return nil, fmt.Errorf("task not found for window %s", windowID)
-}
-
-// isTaskWindow checks if a window name indicates a task window.
-func isTaskWindow(windowName string) bool {
-	return strings.HasPrefix(windowName, constants.EmojiWorking) ||
-		strings.HasPrefix(windowName, constants.EmojiWaiting) ||
-		strings.HasPrefix(windowName, constants.EmojiDone) ||
-		strings.HasPrefix(windowName, constants.EmojiWarning)
-}

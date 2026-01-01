@@ -76,7 +76,7 @@ func TestNewWithFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	logger.SetScript("test-script")
 	logger.SetTask("test-task")
@@ -112,7 +112,7 @@ func TestLoggerDebugMode(t *testing.T) {
 
 	logger.Debug("debug message")
 	logger.Trace("trace message")
-	logger.Close()
+	_ = logger.Close()
 
 	data, err := os.ReadFile(logPath)
 	if err != nil {
@@ -136,7 +136,7 @@ func TestLoggerDebugMode(t *testing.T) {
 
 	logger2.Debug("debug message on")
 	logger2.Trace("trace message on")
-	logger2.Close()
+	_ = logger2.Close()
 
 	data2, err := os.ReadFile(logPath2)
 	if err != nil {
@@ -164,7 +164,7 @@ func TestLoggerWarnError(t *testing.T) {
 	logger.Warn("warning message")
 	logger.Error("error message")
 	logger.Fatal("fatal message")
-	logger.Close()
+	_ = logger.Close()
 
 	data, err := os.ReadFile(logPath)
 	if err != nil {
@@ -191,7 +191,7 @@ func TestTimer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	timer := logger.StartTimer("test operation")
 	time.Sleep(10 * time.Millisecond)
@@ -221,7 +221,7 @@ func TestTimerWithResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	// Test success
 	timer1 := logger.StartTimer("success operation")
@@ -258,7 +258,7 @@ func TestGlobalLogger(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	SetGlobal(logger)
 
@@ -299,7 +299,7 @@ func TestLoggerContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	// Test with only script
 	logger.SetScript("my-script")

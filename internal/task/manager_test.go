@@ -14,7 +14,7 @@ func TestFindMergedTasks_ExternallyCleanedUp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create .taw/agents directory
 	agentsDir := filepath.Join(tempDir, ".taw", "agents")

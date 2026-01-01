@@ -47,7 +47,7 @@ var watchWaitCmd = &cobra.Command{
 
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("watch-wait")
 			logger.SetTask(taskName)
 			logging.SetGlobal(logger)
@@ -62,9 +62,6 @@ var watchWaitCmd = &cobra.Command{
 		var lastContent string
 		var lastPromptKey string
 		notified := false
-		promptActive := false
-		wasWaiting := false
-		waitReason := ""
 
 		for {
 			if !tm.HasPane(paneID) {
@@ -114,18 +111,9 @@ var watchWaitCmd = &cobra.Command{
 			contentChanged := content != lastContent
 			if contentChanged {
 				lastContent = content
-			}
 
-			currentWait := wasWaiting
-			currentReason := waitReason
-			if contentChanged {
 				waitDetected, reason := detectWaitInContent(content)
-				currentWait = waitDetected && !isFinal
-				if waitDetected {
-					currentReason = reason
-				} else if !currentWait {
-					currentReason = ""
-				}
+
 				if waitDetected && !isFinal {
 					if err := ensureWaitingWindow(tm, windowID, taskName); err != nil {
 						logging.Trace("Failed to rename window: %v", err)
@@ -135,35 +123,24 @@ var watchWaitCmd = &cobra.Command{
 						notifyWaitingWithDisplay(tm, taskName, reason)
 						notified = true
 					}
-					if !promptActive {
-						if prompt, ok := parseAskUserQuestion(content); ok {
-							promptKey := prompt.key()
-							if promptKey != "" && promptKey != lastPromptKey {
-								promptActive = true
-								lastPromptKey = promptKey
-								choice, err := promptUserChoice(tm, prompt)
-								promptActive = false
-								if err != nil {
-									logging.Trace("Prompt choice failed: %v", err)
-								} else if choice != "" {
-									if err := sendAgentResponse(tm, paneID, choice); err != nil {
-										logging.Trace("Failed to send prompt response: %v", err)
-									} else {
-										logging.Debug("Sent prompt response: %s", choice)
-									}
+					if prompt, ok := parseAskUserQuestion(content); ok {
+						promptKey := prompt.key()
+						if promptKey != "" && promptKey != lastPromptKey {
+							lastPromptKey = promptKey
+							choice, promptErr := promptUserChoice(tm, prompt)
+							if promptErr != nil {
+								logging.Trace("Prompt choice failed: %v", promptErr)
+							} else if choice != "" {
+								if sendErr := sendAgentResponse(tm, paneID, choice); sendErr != nil {
+									logging.Trace("Failed to send prompt response: %v", sendErr)
+								} else {
+									logging.Debug("Sent prompt response: %s", choice)
 								}
 							}
 						}
 					}
 				}
 			}
-
-			if isFinal {
-				currentWait = false
-			}
-
-			wasWaiting = currentWait
-			waitReason = currentReason
 
 			time.Sleep(waitPollInterval)
 		}
@@ -419,8 +396,8 @@ func promptUserChoice(tm tmux.Client, prompt askPrompt) (string, error) {
 		return "", err
 	}
 	outPath := outFile.Name()
-	outFile.Close()
-	defer os.Remove(outPath)
+	_ = outFile.Close()
+	defer func() { _ = os.Remove(outPath) }()
 
 	scriptFile, err := os.CreateTemp("", "taw-choice-*.sh")
 	if err != nil {
@@ -429,16 +406,16 @@ func promptUserChoice(tm tmux.Client, prompt askPrompt) (string, error) {
 	scriptPath := scriptFile.Name()
 	scriptContent := buildPromptScript(prompt.Question, prompt.Options, outPath)
 	if _, err := scriptFile.WriteString(scriptContent); err != nil {
-		scriptFile.Close()
-		os.Remove(scriptPath)
+		_ = scriptFile.Close()
+		_ = os.Remove(scriptPath)
 		return "", err
 	}
-	scriptFile.Close()
+	_ = scriptFile.Close()
 	if err := os.Chmod(scriptPath, 0700); err != nil {
-		os.Remove(scriptPath)
+		_ = os.Remove(scriptPath)
 		return "", err
 	}
-	defer os.Remove(scriptPath)
+	defer func() { _ = os.Remove(scriptPath) }()
 
 	opts := tmux.PopupOpts{
 		Width:  waitPopupWidth,

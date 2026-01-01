@@ -115,7 +115,7 @@ func runMain(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to setup logging: %w", err)
 	}
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 	logger.SetScript("taw")
 	logging.SetGlobal(logger)
 
@@ -167,7 +167,7 @@ func startNewSession(app *app.App, tm tmux.Client) error {
 		logging.Log("Found %d merged tasks to clean up", len(merged))
 		for _, t := range merged {
 			logging.Log("Auto-cleaning merged task: %s", t.Name)
-			mgr.CleanupTask(t)
+			_ = mgr.CleanupTask(t)
 			fmt.Printf("✅ Cleaned up merged task: %s\n", t.Name)
 		}
 	}
@@ -197,7 +197,7 @@ func startNewSession(app *app.App, tm tmux.Client) error {
 	// Setup git repo marker if applicable
 	if app.IsGitRepo {
 		markerPath := filepath.Join(app.TawDir, constants.GitRepoMarker)
-		os.WriteFile(markerPath, []byte{}, 0644)
+		_ = os.WriteFile(markerPath, []byte{}, 0644)
 	}
 
 	// Write embedded claude files to .taw/.claude/
@@ -219,7 +219,7 @@ func startNewSession(app *app.App, tm tmux.Client) error {
 		for _, t := range incomplete {
 			logging.Log("Reopening incomplete task: %s", t.Name)
 			// Remove old tab-lock so handle-task can create a new one
-			t.RemoveTabLock()
+			_ = t.RemoveTabLock()
 			// Re-run handle-task to create window and restart Claude
 			handleCmd := exec.Command(tawBin, "internal", "handle-task", app.SessionName, t.AgentDir)
 			if err := handleCmd.Start(); err != nil {
@@ -233,8 +233,8 @@ func startNewSession(app *app.App, tm tmux.Client) error {
 	// Send new-task command to the _ window
 	// Use SendKeysLiteral for the command and SendKeys for Enter
 	newTaskCmd := fmt.Sprintf("%s internal new-task %s", tawBin, app.SessionName)
-	tm.SendKeysLiteral(app.SessionName+":"+constants.NewWindowName, newTaskCmd)
-	tm.SendKeys(app.SessionName+":"+constants.NewWindowName, "Enter")
+	_ = tm.SendKeysLiteral(app.SessionName+":"+constants.NewWindowName, newTaskCmd)
+	_ = tm.SendKeys(app.SessionName+":"+constants.NewWindowName, "Enter")
 
 	// Attach to session
 	return tm.AttachSession(app.SessionName)
@@ -273,7 +273,7 @@ func attachToSession(app *app.App, tm tmux.Client) error {
 			if t.HasTabLock() {
 				if windowID, err := t.LoadWindowID(); err == nil && windowID != "" {
 					logging.Debug("Killing window %s for merged task %s", windowID, t.Name)
-					tm.KillWindow(windowID)
+					_ = tm.KillWindow(windowID)
 					windowKilled = true
 				}
 			}
@@ -281,10 +281,10 @@ func attachToSession(app *app.App, tm tmux.Client) error {
 			if !windowKilled {
 				if windowID, ok := taskWindowMap[t.Name]; ok {
 					logging.Debug("Killing window %s (by name) for merged task %s", windowID, t.Name)
-					tm.KillWindow(windowID)
+					_ = tm.KillWindow(windowID)
 				}
 			}
-			mgr.CleanupTask(t)
+			_ = mgr.CleanupTask(t)
 			fmt.Printf("✅ Cleaned up merged task: %s\n", t.Name)
 		}
 	}
@@ -295,7 +295,7 @@ func attachToSession(app *app.App, tm tmux.Client) error {
 		logging.Log("Found %d orphaned windows to close", len(orphanedWindows))
 		for _, windowID := range orphanedWindows {
 			logging.Debug("Closing orphaned window: %s", windowID)
-			tm.KillWindow(windowID)
+			_ = tm.KillWindow(windowID)
 			fmt.Printf("✅ Closed orphaned window: %s\n", windowID)
 		}
 	}
@@ -308,7 +308,7 @@ func attachToSession(app *app.App, tm tmux.Client) error {
 		for _, t := range incomplete {
 			logging.Log("Reopening incomplete task: %s (reason: window not found)", t.Name)
 			// Remove old tab-lock so handle-task can create a new one
-			t.RemoveTabLock()
+			_ = t.RemoveTabLock()
 			// Re-run handle-task to create window and restart Claude
 			handleCmd := exec.Command(tawBin, "internal", "handle-task", app.SessionName, t.AgentDir)
 			if err := handleCmd.Start(); err != nil {
@@ -333,45 +333,45 @@ func setupTmuxConfig(app *app.App, tm tmux.Client) error {
 	}
 
 	// Disable default prefix key (Ctrl+B) so we can use it for toggle-bottom
-	tm.SetOption("prefix", "None", true)
-	tm.SetOption("prefix2", "None", true)
+	_ = tm.SetOption("prefix", "None", true)
+	_ = tm.SetOption("prefix2", "None", true)
 
 	// Setup status bar
-	tm.SetOption("status", "on", true)
-	tm.SetOption("status-position", "bottom", true)
-	tm.SetOption("status-left", " "+app.SessionName+" ", true)
-	tm.SetOption("status-left-length", "30", true)
-	tm.SetOption("status-right", " ⌃T:tasks ⌃L:logs ⌃B:shell ⌃/:help ", true)
-	tm.SetOption("status-right-length", "100", true)
+	_ = tm.SetOption("status", "on", true)
+	_ = tm.SetOption("status-position", "bottom", true)
+	_ = tm.SetOption("status-left", " "+app.SessionName+" ", true)
+	_ = tm.SetOption("status-left-length", "30", true)
+	_ = tm.SetOption("status-right", " ⌃T:tasks ⌃L:logs ⌃B:shell ⌃/:help ", true)
+	_ = tm.SetOption("status-right-length", "100", true)
 
 	// Window status format - removes index numbers (0:, 1:, 2:) and asterisk (*)
 	// Current window uses blue background and bold for visual distinction
-	tm.SetOption("window-status-format", "#[fg=colour231] #W ", true)
-	tm.SetOption("window-status-current-format", "#[fg=colour231,bg=colour24,bold] #W ", true)
-	tm.SetOption("window-status-separator", "", true)
+	_ = tm.SetOption("window-status-format", "#[fg=colour231] #W ", true)
+	_ = tm.SetOption("window-status-current-format", "#[fg=colour231,bg=colour24,bold] #W ", true)
+	_ = tm.SetOption("window-status-separator", "", true)
 
 	// Pane border styling for visual distinction
-	tm.SetOption("pane-border-style", "fg=colour238", true)            // Dim border for inactive panes
-	tm.SetOption("pane-active-border-style", "fg=colour39,bold", true) // Bright cyan border for active pane
+	_ = tm.SetOption("pane-border-style", "fg=colour238", true)            // Dim border for inactive panes
+	_ = tm.SetOption("pane-active-border-style", "fg=colour39,bold", true) // Bright cyan border for active pane
 
 	// Popup styling
-	tm.SetOption("popup-style", "fg=terminal,bg=terminal", true)
-	tm.SetOption("popup-border-style", "fg=colour244", true)
+	_ = tm.SetOption("popup-style", "fg=terminal,bg=terminal", true)
+	_ = tm.SetOption("popup-border-style", "fg=colour244", true)
 
 	// Enable mouse mode
-	tm.SetOption("mouse", "on", true)
+	_ = tm.SetOption("mouse", "on", true)
 
 	// Enable vi-style copy mode and clipboard integration
-	tm.SetOption("mode-keys", "vi", true)
-	tm.SetOption("set-clipboard", "on", true)
+	_ = tm.SetOption("mode-keys", "vi", true)
+	_ = tm.SetOption("set-clipboard", "on", true)
 
 	// Allow escape sequences to pass through to the terminal (tmux 3.3+)
 	// Enables OSC 52 clipboard, terminal images, hyperlinks, etc.
-	tm.SetOption("allow-passthrough", "all", true)
+	_ = tm.SetOption("allow-passthrough", "all", true)
 
 	// Auto-copy to system clipboard when mouse selection ends
 	// In copy-mode, commands must use "send-keys -X" format
-	tm.Bind(tmux.BindOpts{
+	_ = tm.Bind(tmux.BindOpts{
 		Key:     "MouseDragEnd1Pane",
 		Command: "send-keys -X copy-pipe-and-cancel 'pbcopy'",
 		Table:   "copy-mode-vi",
@@ -426,7 +426,7 @@ func updateGitignore(projectDir string) {
 	// Prompt user to add rules (default Y)
 	fmt.Print("Add .taw/ gitignore rules (keeps config and memory tracked)? [Y/n]: ")
 	var answer string
-	fmt.Scanln(&answer)
+	_, _ = fmt.Scanln(&answer)
 	answer = strings.TrimSpace(strings.ToLower(answer))
 
 	// Default is Y
@@ -439,23 +439,23 @@ func updateGitignore(projectDir string) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Ensure there's a newline before our rules
 	if len(content) > 0 && content[len(content)-1] != '\n' {
-		f.WriteString("\n")
+		_, _ = f.WriteString("\n")
 	}
 
 	// Add header comment if adding .taw/ for the first time
 	if !hasTawIgnore {
-		f.WriteString("\n# TAW\n")
-		f.WriteString(".taw/\n")
+		_, _ = f.WriteString("\n# TAW\n")
+		_, _ = f.WriteString(".taw/\n")
 	}
 	if !hasConfigException {
-		f.WriteString("!.taw/config\n")
+		_, _ = f.WriteString("!.taw/config\n")
 	}
 	if !hasMemoryException {
-		f.WriteString("!.taw/memory\n")
+		_, _ = f.WriteString("!.taw/memory\n")
 	}
 }
 
@@ -509,7 +509,7 @@ func runClean(cmd *cobra.Command, args []string) error {
 	// Kill tmux session if exists
 	if tm.HasSession(application.SessionName) {
 		fmt.Println("Killing tmux session...")
-		tm.KillSession(application.SessionName)
+		_ = tm.KillSession(application.SessionName)
 	}
 
 	// Clean up tasks
@@ -522,13 +522,13 @@ func runClean(cmd *cobra.Command, args []string) error {
 		tasks, _ := mgr.ListTasks()
 		for _, t := range tasks {
 			fmt.Printf("Cleaning up task: %s\n", t.Name)
-			mgr.CleanupTask(t)
+			_ = mgr.CleanupTask(t)
 		}
 	}
 
 	// Remove .taw directory
 	fmt.Println("Removing .taw directory...")
-	os.RemoveAll(application.TawDir)
+	_ = os.RemoveAll(application.TawDir)
 
 	fmt.Println("Done!")
 	return nil
@@ -571,7 +571,7 @@ func runSetupWizard(app *app.App) error {
 		fmt.Print("\nSelect [1-2, default: 1]: ")
 
 		var choice string
-		fmt.Scanln(&choice)
+		_, _ = fmt.Scanln(&choice)
 
 		switch choice {
 		case "2":
@@ -596,7 +596,7 @@ func runSetupWizard(app *app.App) error {
 	}
 
 	var choice string
-	fmt.Scanln(&choice)
+	_, _ = fmt.Scanln(&choice)
 
 	switch choice {
 	case "2":

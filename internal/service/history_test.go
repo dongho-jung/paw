@@ -53,7 +53,7 @@ func TestHistoryService_SaveCompleted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create service with mock
 	svc := NewHistoryService(tmpDir)
@@ -105,7 +105,7 @@ func TestHistoryService_SaveCancelled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create service with mock
 	svc := NewHistoryService(tmpDir)
@@ -139,7 +139,7 @@ func TestHistoryService_LoadTaskContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a history file manually
 	historyContent := `Original task content
@@ -210,7 +210,7 @@ func TestHistoryService_EmptyPaneContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	svc := NewHistoryService(tmpDir)
 	svc.SetClaudeClient(&mockClaudeClient{})

@@ -37,7 +37,7 @@ var toggleNewCmd = &cobra.Command{
 		// Setup logging
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("toggle-new")
 			logging.SetGlobal(logger)
 		}
@@ -101,7 +101,7 @@ var newTaskCmd = &cobra.Command{
 		// Setup logging
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("new-task")
 			logging.SetGlobal(logger)
 		}
@@ -134,18 +134,18 @@ var newTaskCmd = &cobra.Command{
 				continue
 			}
 			if _, err := tmpFile.WriteString(content); err != nil {
-				tmpFile.Close()
-				os.Remove(tmpFile.Name())
+				_ = tmpFile.Close()
+				_ = os.Remove(tmpFile.Name())
 				fmt.Printf("Failed to write task content: %v\n", err)
 				continue
 			}
-			tmpFile.Close()
+			_ = tmpFile.Close()
 
 			// Spawn task creation in a separate window (non-blocking)
 			tawBin, _ := os.Executable()
 			spawnCmd := exec.Command(tawBin, "internal", "spawn-task", sessionName, tmpFile.Name())
 			if err := spawnCmd.Start(); err != nil {
-				os.Remove(tmpFile.Name())
+				_ = os.Remove(tmpFile.Name())
 				logging.Warn("Failed to start spawn-task: %v", err)
 				fmt.Printf("Failed to start task: %v\n", err)
 				continue
@@ -178,7 +178,7 @@ var spawnTaskCmd = &cobra.Command{
 		content := string(contentBytes)
 
 		// Clean up temp file
-		os.Remove(contentFile)
+		_ = os.Remove(contentFile)
 
 		app, err := getAppFromSession(sessionName)
 		if err != nil {
@@ -188,7 +188,7 @@ var spawnTaskCmd = &cobra.Command{
 		// Setup logging
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("spawn-task")
 			logging.SetGlobal(logger)
 		}
@@ -278,7 +278,7 @@ var handleTaskCmd = &cobra.Command{
 		// Setup logging
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("handle-task")
 			logger.SetTask(taskName)
 			logging.SetGlobal(logger)
@@ -318,7 +318,7 @@ var handleTaskCmd = &cobra.Command{
 				timer := logging.StartTimer("worktree setup")
 				if err := mgr.SetupWorktree(t); err != nil {
 					timer.StopWithResult(false, err.Error())
-					t.RemoveTabLock()
+					_ = t.RemoveTabLock()
 					return fmt.Errorf("failed to setup worktree: %w", err)
 				}
 				timer.StopWithResult(true, fmt.Sprintf("branch=%s, path=%s", taskName, t.WorktreeDir))
@@ -366,7 +366,7 @@ var handleTaskCmd = &cobra.Command{
 		})
 		if err != nil {
 			logging.Error("Failed to create tmux window: %v", err)
-			t.RemoveTabLock()
+			_ = t.RemoveTabLock()
 			return fmt.Errorf("failed to create window: %w", err)
 		}
 		logging.Trace("handleTaskCmd: task window created windowID=%s name=%s", windowID, windowName)

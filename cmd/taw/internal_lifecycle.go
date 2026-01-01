@@ -61,7 +61,7 @@ var endTaskCmd = &cobra.Command{
 		// Setup logging
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("end-task")
 			logger.SetTask(targetTask.Name)
 			logging.SetGlobal(logger)
@@ -141,11 +141,11 @@ var endTaskCmd = &cobra.Command{
 				for retries := 0; retries < constants.MergeLockMaxRetries; retries++ {
 					f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 					if err == nil {
-						_, writeErr := f.WriteString(fmt.Sprintf("%s\n%d", targetTask.Name, os.Getpid()))
+						_, writeErr := fmt.Fprintf(f, "%s\n%d", targetTask.Name, os.Getpid())
 						closeErr := f.Close()
 						if writeErr != nil || closeErr != nil {
 							// Failed to write lock info, remove and retry
-							os.Remove(lockFile)
+							_ = os.Remove(lockFile)
 							logging.Warn("Failed to write lock file: write=%v, close=%v", writeErr, closeErr)
 							time.Sleep(constants.MergeLockRetryInterval)
 							continue
@@ -165,7 +165,7 @@ var endTaskCmd = &cobra.Command{
 				} else {
 					lockSpinner.Stop(true, "")
 					// Ensure lock is released on exit
-					defer os.Remove(lockFile)
+					defer func() { _ = os.Remove(lockFile) }()
 
 					// Stash any uncommitted changes in project dir
 					hasLocalChanges := gitClient.HasChanges(app.ProjectDir)
@@ -304,7 +304,7 @@ var endTaskCmd = &cobra.Command{
 				logging.Debug("Using pre-captured pane content from: %s", paneCaptureFile)
 			}
 			// Clean up temp file
-			os.Remove(paneCaptureFile)
+			_ = os.Remove(paneCaptureFile)
 		} else {
 			// Capture pane content directly
 			paneContent, captureErr = tm.CapturePane(windowID+".0", constants.PaneCaptureLines)
@@ -369,7 +369,7 @@ var endTaskUICmd = &cobra.Command{
 		// Setup logging
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("end-task-ui")
 			logging.SetGlobal(logger)
 		}
@@ -397,11 +397,11 @@ var endTaskUICmd = &cobra.Command{
 			} else {
 				if _, err := tmpFile.WriteString(paneContent); err != nil {
 					logging.Warn("Failed to write pane capture to temp file: %v", err)
-					tmpFile.Close()
-					os.Remove(tmpFile.Name())
+					_ = tmpFile.Close()
+					_ = os.Remove(tmpFile.Name())
 				} else {
 					capturePath = tmpFile.Name()
-					tmpFile.Close()
+					_ = tmpFile.Close()
 					logging.Debug("Pre-captured agent pane to: %s", capturePath)
 				}
 			}
@@ -446,7 +446,7 @@ var endTaskUICmd = &cobra.Command{
 		if err != nil {
 			// Clean up temp file if we created one
 			if capturePath != "" {
-				os.Remove(capturePath)
+				_ = os.Remove(capturePath)
 			}
 			return fmt.Errorf("failed to create end-task pane: %w", err)
 		}
@@ -471,7 +471,7 @@ var cancelTaskCmd = &cobra.Command{
 		// Setup logging
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("cancel-task")
 			logging.SetGlobal(logger)
 		}
@@ -567,7 +567,7 @@ var cancelTaskCmd = &cobra.Command{
 							if len(warningName) > 14 {
 								warningName = warningName[:14]
 							}
-							tm.RenameWindow(windowID, warningName)
+							_ = tm.RenameWindow(windowID, warningName)
 							notify.PlaySound(notify.SoundError)
 							return nil // Don't cleanup - keep task for manual resolution
 						} else {
@@ -668,7 +668,7 @@ var cancelTaskUICmd = &cobra.Command{
 		// Setup logging
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("cancel-task-ui")
 			logging.SetGlobal(logger)
 		}
@@ -726,7 +726,7 @@ var doneTaskCmd = &cobra.Command{
 		// Setup logging
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("done-task")
 			logging.SetGlobal(logger)
 		}
@@ -752,7 +752,7 @@ var doneTaskCmd = &cobra.Command{
 			!strings.HasPrefix(windowName, constants.EmojiWaiting) &&
 			!strings.HasPrefix(windowName, constants.EmojiDone) &&
 			!strings.HasPrefix(windowName, constants.EmojiWarning) {
-			tm.DisplayMessage("Not a task window", 1500)
+			_ = tm.DisplayMessage("Not a task window", 1500)
 			return nil
 		}
 

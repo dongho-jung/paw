@@ -319,7 +319,6 @@ func (m *LogViewer) View() tea.View {
 	hint := "↑↓←→:scroll s:tail w:wrap l:level g/G:top/end q:close"
 	padding := m.width - len(status) - len(hint)
 	if padding < 0 {
-		padding = 0
 		hint = "q:close"
 		padding = m.width - len(status) - len(hint)
 		if padding < 0 {

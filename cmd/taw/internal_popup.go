@@ -30,8 +30,8 @@ var popupShellCmd = &cobra.Command{
 		// Check if shell pane exists - if so, close it (toggle off)
 		paneID, _ := tm.GetOption("@taw_shell_pane_id")
 		if paneID != "" && tm.HasPane(paneID) {
-			tm.KillPane(paneID)
-			tm.SetOption("@taw_shell_pane_id", "", true)
+			_ = tm.KillPane(paneID)
+			_ = tm.SetOption("@taw_shell_pane_id", "", true)
 			return nil
 		}
 
@@ -58,7 +58,7 @@ var popupShellCmd = &cobra.Command{
 		}
 
 		// Store pane ID for toggle
-		tm.SetOption("@taw_shell_pane_id", strings.TrimSpace(newPaneID), true)
+		_ = tm.SetOption("@taw_shell_pane_id", strings.TrimSpace(newPaneID), true)
 
 		return nil
 	},
@@ -87,7 +87,7 @@ var toggleLogCmd = &cobra.Command{
 		// Run log viewer in popup (closes with q/Esc/Ctrl+L)
 		logCmd := fmt.Sprintf("%s internal log-viewer %s", tawBin, logPath)
 
-		tm.DisplayPopup(tmux.PopupOpts{
+		_ = tm.DisplayPopup(tmux.PopupOpts{
 			Width:  "90%",
 			Height: "80%",
 			Title:  " Log Viewer ",
@@ -130,15 +130,15 @@ var toggleHelpCmd = &cobra.Command{
 		}
 		tmpPath := tmpFile.Name()
 		if _, err := tmpFile.WriteString(helpContent); err != nil {
-			tmpFile.Close()
+			_ = tmpFile.Close()
 			return fmt.Errorf("failed to write help content: %w", err)
 		}
-		tmpFile.Close()
+		_ = tmpFile.Close()
 
 		// Build command (closes with q/Esc, temp file cleaned up on exit)
 		popupCmd := fmt.Sprintf("less '%s'; rm -f '%s' 2>/dev/null || true", tmpPath, tmpPath)
 
-		tm.DisplayPopup(tmux.PopupOpts{
+		_ = tm.DisplayPopup(tmux.PopupOpts{
 			Width:  "80%",
 			Height: "80%",
 			Title:  " Help ",
@@ -164,7 +164,7 @@ var toggleGitStatusCmd = &cobra.Command{
 
 		// Check if this is a git repo
 		if !app.IsGitRepo {
-			tm.DisplayMessage("Not a git repository", 2000)
+			_ = tm.DisplayMessage("Not a git repository", 2000)
 			return nil
 		}
 
@@ -179,7 +179,7 @@ var toggleGitStatusCmd = &cobra.Command{
 		// Uses less -R to preserve colors and allow scrolling, closes with q
 		popupCmd := fmt.Sprintf("cd '%s' && git -c color.status=always status | less -R", panePath)
 
-		tm.DisplayPopup(tmux.PopupOpts{
+		_ = tm.DisplayPopup(tmux.PopupOpts{
 			Width:     "80%",
 			Height:    "80%",
 			Title:     " Git Status ",
@@ -233,7 +233,7 @@ var toggleTaskListCmd = &cobra.Command{
 		// Run task list viewer in popup (closes with q/Esc/Ctrl+T)
 		listCmd := fmt.Sprintf("%s internal task-list-viewer %s", tawBin, sessionName)
 
-		tm.DisplayPopup(tmux.PopupOpts{
+		_ = tm.DisplayPopup(tmux.PopupOpts{
 			Width:     "90%",
 			Height:    "80%",
 			Title:     " Tasks ",
@@ -261,7 +261,7 @@ var taskListViewerCmd = &cobra.Command{
 		// Setup logging
 		logger, _ := logging.New(app.GetLogPath(), app.Debug)
 		if logger != nil {
-			defer logger.Close()
+			defer func() { _ = logger.Close() }()
 			logger.SetScript("task-list-viewer")
 			logging.SetGlobal(logger)
 		}
@@ -323,8 +323,8 @@ var taskListViewerCmd = &cobra.Command{
 				if _, err := os.Stat(worktreeDir); err == nil {
 					// Commit any changes first
 					if gitClient.HasChanges(worktreeDir) {
-						gitClient.AddAll(worktreeDir)
-						gitClient.Commit(worktreeDir, "chore: auto-commit before push")
+						_ = gitClient.AddAll(worktreeDir)
+						_ = gitClient.Commit(worktreeDir, "chore: auto-commit before push")
 					}
 					return gitClient.Push(worktreeDir, "origin", item.Name, true)
 				}
