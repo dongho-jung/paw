@@ -20,9 +20,9 @@ You are in `$PROJECT_DIR`. Changes are made directly to project files.
 
 ```
 $TAW_DIR/agents/$TASK_NAME/
-├── task           # Your task description (READ THIS FIRST)
-├── log            # Progress log (WRITE HERE)
-└── attach         # Reattach script
+└── task           # Your task description (READ THIS FIRST)
+
+$TAW_DIR/log        # Unified log file (all tasks write here)
 ```
 
 ---
@@ -241,13 +241,13 @@ $TAW_BIN internal rename-window $WINDOW_ID "✅${TASK_NAME:0:12}"  # Done
 |---------|-------------|
 | `/test` | Manually run tests |
 
-Note: Git-related commands (/commit, /pr, /merge) are unavailable in non-git mode. Run `⌃R → end-task` to finish tasks.
+Note: Git-related commands (/commit, /pr, /merge) are unavailable in non-git mode. Run `⌃D` to finish tasks.
 
 ---
 
 ## Handling Unrelated Requests
 
 If a request is unrelated to the current task:
-> "This seems unrelated to `$TASK_NAME`. Run `⌃R → new-task` to create a new task."
+> "This seems unrelated to `$TASK_NAME`. Run `⌃N` to create a new task."
 
 Small related fixes (typos, etc.) can be handled within the current task.

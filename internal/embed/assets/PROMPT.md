@@ -23,9 +23,10 @@ You are in `$WORKTREE_DIR` on branch `$TASK_NAME`. Changes are isolated from mai
 ```
 $TAW_DIR/agents/$TASK_NAME/
 ├── task           # Your task description (READ THIS FIRST)
-├── log            # Progress log (WRITE HERE)
 ├── origin/        # -> PROJECT_DIR (symlink)
 └── worktree/      # Your working directory
+
+$TAW_DIR/log        # Unified log file (all tasks write here)
 ```
 
 ---
@@ -236,7 +237,7 @@ Run verification → success? → commit → push → call end-task
 2. `git push -u origin $TASK_NAME`
 3. `$TAW_BIN internal rename-window $WINDOW_ID "💬${TASK_NAME:0:12}"`
 4. Log: "Work complete - user review required (verification unavailable/failed)"
-5. Message the user: "Verification is needed. Please review and run `⌃R → end-task` to finish."
+5. Message the user: "Verification is needed. Please review and run `⌃D` to finish."
 
 **CRITICAL:**
 - In `auto-merge` mode, do **not** create a PR. end-task merges to main and cleans up.
@@ -405,7 +406,7 @@ Automatic execution is the default, but you can invoke commands manually if need
 
 **Completing a task**:
 - `auto-merge` mode: Call end-task as described above to finish automatically.
-- Other modes: User runs `⌃R → end-task` to commit → PR/merge → clean up.
+- Other modes: User runs `⌃D` to commit → PR/merge → clean up.
 
 ---
 
@@ -452,6 +453,6 @@ This means: **complete the task autonomously** including all steps below.
 ## Handling Unrelated Requests
 
 If a request is unrelated to the current task:
-> "This seems unrelated to `$TASK_NAME`. Run `⌃R → new-task` to create a new task."
+> "This seems unrelated to `$TASK_NAME`. Run `⌃N` to create a new task."
 
 Small related fixes (typos, etc.) can be handled within the current task.

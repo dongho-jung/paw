@@ -85,6 +85,7 @@ taw/                           # This repository
 └── .taw/                      # Created by taw
     ├── config                 # Project config (YAML, created during setup)
     ├── log                    # Consolidated logs (all scripts write here)
+    ├── memory                 # Project memory (YAML, shared across tasks)
     ├── PROMPT.md              # Project prompt (user-customizable)
     ├── .is-git-repo           # Git mode marker (exists only in git repos)
     ├── .claude/               # Claude settings and slash commands (copied from embed)
@@ -100,6 +101,7 @@ taw/                           # This repository
         ├── .tab-lock/         # Tab creation lock (atomic mkdir prevents races)
         │   └── window_id      # Tmux window ID (used in cleanup)
         ├── .session-started   # Session marker (for resume on reopen)
+        ├── .status            # Task status (working/waiting/done, persisted for resume)
         └── .pr                # PR number (when created)
 ```
 
@@ -131,7 +133,7 @@ TAW uses multiple notification channels to alert users (macOS only):
 | Task completed           | Hero        | -                    | `✅ Task completed: {name}` |
 | User input needed        | Funk        | Yes                  | `💬 {name} needs input` |
 | Cancel pending (⌃C)      | Tink        | -                    | -                 |
-| Error (merge failed etc) | Basso       | -                    | `⚠️ Merge failed: {name}` |
+| Error (merge failed etc) | Basso       | -                    | `⚠️ Merge failed: {name} - manual resolution needed` |
 
 - Sounds use macOS system sounds (`/System/Library/Sounds/`)
 - Statusline messages display via `tmux display-message -d 2000`
