@@ -165,3 +165,8 @@ TAW uses multiple notification channels to alert users (macOS only):
 ### Keep docs in sync
 
 - Reflect any changes you make in docs such as README or CLAUDE.md.
+
+### English only
+
+- **All code, comments, and documentation must be written in English.**
+- This includes: variable names, function names, commit messages, PR descriptions, inline comments, and documentation files.
