@@ -1798,12 +1798,17 @@ var executeCmd = &cobra.Command{
 }
 
 var doubleQuitCmd = &cobra.Command{
-	Use:    "double-quit [session]",
+	Use:    "double-quit [session] [key]",
 	Short:  "Check for double Ctrl+C/D to quit",
-	Args:   cobra.ExactArgs(1),
+	Args:   cobra.RangeArgs(1, 2),
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sessionName := args[0]
+		keyToForward := ""
+		if len(args) > 1 {
+			keyToForward = args[1]
+		}
+
 		tm := tmux.New(sessionName)
 
 		// Check last quit attempt time
@@ -1820,6 +1825,20 @@ var doubleQuitCmd = &cobra.Command{
 		}
 
 		tm.SetOption("@taw_last_quit", fmt.Sprintf("%d", now), true)
+
+		// Show hint message
+		keyName := "Ctrl+C"
+		if keyToForward == "C-d" {
+			keyName = "Ctrl+D"
+		}
+		tm.DisplayMessage(fmt.Sprintf("Press %s again to exit", keyName), 1500)
+
+		// Forward the key to the current pane if not a double-quit
+		if keyToForward != "" {
+			// Send the key to the active pane
+			tm.Run("send-keys", keyToForward)
+		}
+
 		return nil
 	},
 }

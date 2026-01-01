@@ -17,11 +17,10 @@ func buildKeybindings(tawBin, sessionName string) []tmux.BindOpts {
 	cmdPalette := fmt.Sprintf("run-shell '%s internal command-palette %s'", tawBin, sessionName)
 
 	// Double quit command (Ctrl+C/D twice to exit)
-	// First send the key to pane, then check for double quit in background
-	// Note: Use ';' not '\;' for command separation since we're using exec.Command (no shell)
-	// '\;' would be interpreted as a literal semicolon character by tmux's parser
-	cmdDoubleQuitC := fmt.Sprintf("send-keys C-c ; run-shell -b '%s internal double-quit %s'", tawBin, sessionName)
-	cmdDoubleQuitD := fmt.Sprintf("send-keys C-d ; run-shell -b '%s internal double-quit %s'", tawBin, sessionName)
+	// The key is passed as an argument to double-quit, which will forward it to the pane
+	// if it's not a double-quit. This avoids tmux command chaining issues with ';'.
+	cmdDoubleQuitC := fmt.Sprintf("run-shell -b '%s internal double-quit %s C-c'", tawBin, sessionName)
+	cmdDoubleQuitD := fmt.Sprintf("run-shell -b '%s internal double-quit %s C-d'", tawBin, sessionName)
 
 	return []tmux.BindOpts{
 		// Navigation (Alt-based)
