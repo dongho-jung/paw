@@ -91,3 +91,26 @@ const (
 	TmuxSocketPrefix = "taw-"
 	NewWindowName    = EmojiNew + "new"
 )
+
+// Pane capture settings
+const (
+	PaneCaptureLines = 10000 // Number of lines to capture from pane history
+	SummaryMaxLen    = 8000  // Max characters to send for summary generation
+)
+
+// Merge lock settings
+const (
+	MergeLockMaxRetries    = 30                    // Maximum retries to acquire merge lock
+	MergeLockRetryInterval = 1 * time.Second       // Interval between lock retries
+)
+
+// Double-press detection
+const (
+	DoublePressIntervalSec = 2 // Seconds to wait for second keypress
+)
+
+// Task window handling
+const (
+	WindowIDWaitMaxAttempts = 60                      // Max attempts to wait for window ID file
+	WindowIDWaitInterval    = 500 * time.Millisecond  // Interval between checks
+)
