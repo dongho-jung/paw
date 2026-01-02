@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/donghojung/taw/internal/constants"
-	"github.com/donghojung/taw/internal/logging"
-	"github.com/donghojung/taw/internal/tmux"
+	"github.com/dongho-jung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/logging"
+	"github.com/dongho-jung/taw/internal/tmux"
 )
 
 // Client defines the interface for Claude CLI operations.

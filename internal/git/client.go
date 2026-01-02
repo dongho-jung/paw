@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/donghojung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/constants"
 )
 
 // Client defines the interface for git operations.

@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/donghojung/taw/internal/logging"
+	"github.com/dongho-jung/taw/internal/logging"
 )
 
 // SoundType represents different notification sounds.

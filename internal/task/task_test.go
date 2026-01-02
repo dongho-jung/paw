@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/donghojung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/constants"
 )
 
 func TestNewTask(t *testing.T) {

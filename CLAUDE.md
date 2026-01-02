@@ -10,7 +10,7 @@ make build
 make install
 
 # Or install directly with go install
-go install github.com/donghojung/taw@latest
+go install github.com/dongho-jung/taw@latest
 ```
 
 > **Note (macOS)**: `make install` automatically runs `xattr -cr` and `codesign -fs -` to prevent the `zsh: killed` error.

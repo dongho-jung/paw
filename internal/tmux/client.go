@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/donghojung/taw/internal/constants"
-	"github.com/donghojung/taw/internal/logging"
+	"github.com/dongho-jung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/logging"
 )
 
 // Client defines the interface for tmux operations.

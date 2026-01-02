@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/donghojung/taw/internal/tmux"
+	"github.com/dongho-jung/taw/internal/tmux"
 )
 
 // mockClaudeClient is a mock implementation of claude.Client for testing.

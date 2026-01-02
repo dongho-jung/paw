@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/donghojung/taw/internal/config"
-	"github.com/donghojung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/config"
+	"github.com/dongho-jung/taw/internal/constants"
 )
 
 // App represents the main application context with all dependencies.

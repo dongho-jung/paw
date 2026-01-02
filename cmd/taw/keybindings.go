@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/donghojung/taw/internal/tmux"
+	"github.com/dongho-jung/taw/internal/tmux"
 )
 
 // buildKeybindings creates tmux keybindings for TAW.

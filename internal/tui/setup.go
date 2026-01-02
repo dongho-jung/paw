@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 
-	"github.com/donghojung/taw/internal/config"
+	"github.com/dongho-jung/taw/internal/config"
 )
 
 // SetupWizard provides an interactive setup wizard.

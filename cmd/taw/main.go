@@ -10,14 +10,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/donghojung/taw/internal/app"
-	"github.com/donghojung/taw/internal/config"
-	"github.com/donghojung/taw/internal/constants"
-	"github.com/donghojung/taw/internal/embed"
-	"github.com/donghojung/taw/internal/git"
-	"github.com/donghojung/taw/internal/logging"
-	"github.com/donghojung/taw/internal/task"
-	"github.com/donghojung/taw/internal/tmux"
+	"github.com/dongho-jung/taw/internal/app"
+	"github.com/dongho-jung/taw/internal/config"
+	"github.com/dongho-jung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/embed"
+	"github.com/dongho-jung/taw/internal/git"
+	"github.com/dongho-jung/taw/internal/logging"
+	"github.com/dongho-jung/taw/internal/task"
+	"github.com/dongho-jung/taw/internal/tmux"
 )
 
 var (

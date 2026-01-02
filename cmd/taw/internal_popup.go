@@ -11,12 +11,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 
-	"github.com/donghojung/taw/internal/embed"
-	"github.com/donghojung/taw/internal/git"
-	"github.com/donghojung/taw/internal/logging"
-	"github.com/donghojung/taw/internal/task"
-	"github.com/donghojung/taw/internal/tmux"
-	"github.com/donghojung/taw/internal/tui"
+	"github.com/dongho-jung/taw/internal/embed"
+	"github.com/dongho-jung/taw/internal/git"
+	"github.com/dongho-jung/taw/internal/logging"
+	"github.com/dongho-jung/taw/internal/task"
+	"github.com/dongho-jung/taw/internal/tmux"
+	"github.com/dongho-jung/taw/internal/tui"
 )
 
 var popupShellCmd = &cobra.Command{

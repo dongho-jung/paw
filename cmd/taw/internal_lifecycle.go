@@ -10,15 +10,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/donghojung/taw/internal/config"
-	"github.com/donghojung/taw/internal/constants"
-	"github.com/donghojung/taw/internal/git"
-	"github.com/donghojung/taw/internal/logging"
-	"github.com/donghojung/taw/internal/notify"
-	"github.com/donghojung/taw/internal/service"
-	"github.com/donghojung/taw/internal/task"
-	"github.com/donghojung/taw/internal/tmux"
-	"github.com/donghojung/taw/internal/tui"
+	"github.com/dongho-jung/taw/internal/config"
+	"github.com/dongho-jung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/git"
+	"github.com/dongho-jung/taw/internal/logging"
+	"github.com/dongho-jung/taw/internal/notify"
+	"github.com/dongho-jung/taw/internal/service"
+	"github.com/dongho-jung/taw/internal/task"
+	"github.com/dongho-jung/taw/internal/tmux"
+	"github.com/dongho-jung/taw/internal/tui"
 )
 
 var paneCaptureFile string

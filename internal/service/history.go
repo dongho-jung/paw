@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/donghojung/taw/internal/claude"
-	"github.com/donghojung/taw/internal/logging"
+	"github.com/dongho-jung/taw/internal/claude"
+	"github.com/dongho-jung/taw/internal/logging"
 )
 
 // HistoryService handles task history operations.

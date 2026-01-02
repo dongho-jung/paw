@@ -8,10 +8,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/donghojung/taw/internal/constants"
-	"github.com/donghojung/taw/internal/logging"
-	"github.com/donghojung/taw/internal/notify"
-	"github.com/donghojung/taw/internal/tmux"
+	"github.com/dongho-jung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/logging"
+	"github.com/dongho-jung/taw/internal/notify"
+	"github.com/dongho-jung/taw/internal/tmux"
 )
 
 const (

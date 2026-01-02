@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/donghojung/taw/internal/claude"
-	"github.com/donghojung/taw/internal/config"
-	"github.com/donghojung/taw/internal/constants"
-	"github.com/donghojung/taw/internal/git"
-	"github.com/donghojung/taw/internal/github"
-	"github.com/donghojung/taw/internal/logging"
-	"github.com/donghojung/taw/internal/tmux"
+	"github.com/dongho-jung/taw/internal/claude"
+	"github.com/dongho-jung/taw/internal/config"
+	"github.com/dongho-jung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/git"
+	"github.com/dongho-jung/taw/internal/github"
+	"github.com/dongho-jung/taw/internal/logging"
+	"github.com/dongho-jung/taw/internal/tmux"
 )
 
 // Manager handles task lifecycle operations.

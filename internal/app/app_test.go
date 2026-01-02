@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/donghojung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/constants"
 )
 
 func TestNew(t *testing.T) {

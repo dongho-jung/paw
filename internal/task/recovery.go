@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/donghojung/taw/internal/git"
+	"github.com/dongho-jung/taw/internal/git"
 )
 
 // RecoveryManager handles recovery of corrupted tasks.

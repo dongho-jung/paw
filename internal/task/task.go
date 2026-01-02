@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/donghojung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/constants"
 )
 
 // Status represents the status of a task.

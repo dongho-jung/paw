@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 
-	"github.com/donghojung/taw/internal/task"
+	"github.com/dongho-jung/taw/internal/task"
 )
 
 // RecoverUI provides UI for recovering corrupted tasks.

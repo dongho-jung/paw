@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/donghojung/taw/internal/config"
+	"github.com/dongho-jung/taw/internal/config"
 )
 
 func TestFindMergedTasks_ExternallyCleanedUp(t *testing.T) {

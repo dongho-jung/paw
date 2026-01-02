@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/donghojung/taw/internal/constants"
+	"github.com/dongho-jung/taw/internal/constants"
 )
 
 // WorkMode defines how tasks work with git.

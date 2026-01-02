@@ -82,7 +82,7 @@ changelog:
 
 release:
   github:
-    owner: donghojung
+    owner: dongho-jung
     name: taw
   draft: false
   prerelease: auto
@@ -93,7 +93,7 @@ release:
 
     ### Using Go
     ```bash
-    go install github.com/donghojung/taw@{{.Tag}}
+    go install github.com/dongho-jung/taw@{{.Tag}}
     ```
 
     ### Manual Download
