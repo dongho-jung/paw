@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -415,7 +414,7 @@ func parseAskUserQuestionUI(content string) (askPrompt, bool) {
 	}
 
 	var prompt askPrompt
-	var firstOptionIndex int = -1
+	firstOptionIndex := -1
 
 	// Scan ALL lines looking for numbered options ("> 1. Option" or "  2. Option")
 	for i := 0; i < len(lines); i++ {
@@ -521,114 +520,6 @@ func isUIHintLine(line string) bool {
 		}
 	}
 	return false
-}
-
-func promptUserChoice(tm tmux.Client, prompt askPrompt) (string, error) {
-	if prompt.Question == "" || len(prompt.Options) == 0 {
-		return "", nil
-	}
-
-	outFile, err := os.CreateTemp("", "taw-choice-*.txt")
-	if err != nil {
-		return "", err
-	}
-	outPath := outFile.Name()
-	_ = outFile.Close()
-	defer func() { _ = os.Remove(outPath) }()
-
-	scriptFile, err := os.CreateTemp("", "taw-choice-*.sh")
-	if err != nil {
-		return "", err
-	}
-	scriptPath := scriptFile.Name()
-	scriptContent := buildPromptScript(prompt.Question, prompt.Options, outPath)
-	if _, err := scriptFile.WriteString(scriptContent); err != nil {
-		_ = scriptFile.Close()
-		_ = os.Remove(scriptPath)
-		return "", err
-	}
-	_ = scriptFile.Close()
-	if err := os.Chmod(scriptPath, 0700); err != nil {
-		_ = os.Remove(scriptPath)
-		return "", err
-	}
-	defer func() { _ = os.Remove(scriptPath) }()
-
-	opts := tmux.PopupOpts{
-		Width:  waitPopupWidth,
-		Height: waitPopupHeight,
-		Title:  " TAW: " + truncate(strings.ReplaceAll(prompt.Question, "\n", " "), 60) + " ",
-		Close:  true,
-	}
-
-	if err := tm.DisplayPopup(opts, scriptPath); err != nil {
-		logging.Trace("Popup prompt failed: %v", err)
-		return "", err
-	}
-
-	choiceBytes, err := os.ReadFile(outPath)
-	if err != nil {
-		return "", err
-	}
-
-	choice := strings.TrimSpace(string(choiceBytes))
-	return choice, nil
-}
-
-func buildPromptScript(question string, options []string, outPath string) string {
-	var optionsLine strings.Builder
-	optionsLine.WriteString("options=(")
-	for i, option := range options {
-		if i > 0 {
-			optionsLine.WriteString(" ")
-		}
-		optionsLine.WriteString(shellQuote(option))
-	}
-	optionsLine.WriteString(")")
-
-	return fmt.Sprintf(`#!/usr/bin/env bash
-set -euo pipefail
-
-question=%s
-%s
-out=%s
-
-printf "%%s\n\n" "$question"
-index=1
-for option in "${options[@]}"; do
-  printf "  %%d) %%s\n" "$index" "$option"
-  index=$((index+1))
-done
-printf "\nSelect [1-%%d]: " "${#options[@]}"
-
-while true; do
-  read -r -n1 key
-  if [[ "$key" =~ [0-9] ]]; then
-    idx=$((key-1))
-    if [[ $idx -ge 0 && $idx -lt ${#options[@]} ]]; then
-      echo "${options[$idx]}" > "$out"
-      exit 0
-    fi
-  fi
-done
-`, shellQuote(question), optionsLine.String(), shellQuote(outPath))
-}
-
-func truncate(value string, limit int) string {
-	if len(value) <= limit {
-		return value
-	}
-	if limit <= 3 {
-		return value[:limit]
-	}
-	return value[:limit-3] + "..."
-}
-
-func shellQuote(value string) string {
-	if value == "" {
-		return "''"
-	}
-	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
 }
 
 func sendAgentResponse(tm tmux.Client, paneID, response string) error {

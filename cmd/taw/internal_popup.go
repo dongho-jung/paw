@@ -310,7 +310,7 @@ var setupWizardCmd = &cobra.Command{
 
 		fmt.Println("\n✅ Settings applied!")
 		fmt.Println("Press Enter to close...")
-		fmt.Scanln()
+		_, _ = fmt.Scanln()
 
 		return nil
 	},
