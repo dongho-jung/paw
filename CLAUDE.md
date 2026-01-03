@@ -62,19 +62,21 @@ go tool cover -html=coverage.out -o coverage.html
 
 | Package | Coverage | Notes |
 |---------|----------|-------|
-| internal/constants | 100% | Fully tested |
 | internal/config | ~93% | Fully tested |
 | internal/logging | ~93% | Fully tested |
-| internal/app | ~83% | Fully tested |
-| internal/embed | ~79% | Fully tested |
-| internal/service | ~90% | History service with mocks |
-| internal/task | ~25% | Manager tests require mocks |
-| internal/claude | ~17% | CLI operations need mocks |
-| internal/git | ~8% | Requires git repository |
+| internal/app | ~79% | Core functionality tested |
+| internal/service | ~80% | History service with mocks |
+| internal/embed | ~69% | Asset loading tested |
+| internal/constants | ~57% | Pattern matching tested |
+| internal/task | ~22% | Manager tests require mocks |
+| internal/claude | ~15% | CLI operations need mocks |
+| internal/git | ~7% | Requires git repository |
 | internal/github | 0% | Requires `gh` CLI |
 | internal/tmux | 0% | Requires tmux server |
 | internal/notify | 0% | Platform-specific (macOS) |
 | internal/tui | 0% | Interactive UI components |
+| cmd/taw | ~4% | Cobra command handlers |
+| cmd/taw-notify | 0% | macOS-only CGO binary |
 
 ## Directory structure
 
