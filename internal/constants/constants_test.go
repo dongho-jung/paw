@@ -112,3 +112,127 @@ func TestConstants(t *testing.T) {
 		t.Errorf("NewWindowName = %q, want %q", NewWindowName, EmojiNew+"new")
 	}
 }
+
+func TestTruncateForWindowName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "short name unchanged",
+			input:    "my-task",
+			expected: "my-task",
+		},
+		{
+			name:     "exact length unchanged",
+			input:    "exactly12chr",
+			expected: "exactly12chr",
+		},
+		{
+			name:     "long name truncated",
+			input:    "this-is-a-very-long-task-name",
+			expected: "this-is-a-ve",
+		},
+		{
+			name:     "empty string unchanged",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "unicode name truncated by bytes",
+			input:    "한글태스크",
+			expected: "한글태스", // 4 chars * 3 bytes = 12 bytes
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := TruncateForWindowName(tt.input)
+			if result != tt.expected {
+				t.Errorf("TruncateForWindowName(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+			if len(result) > MaxWindowNameLen {
+				t.Errorf("TruncateForWindowName(%q) length = %d, want <= %d", tt.input, len(result), MaxWindowNameLen)
+			}
+		})
+	}
+}
+
+func TestDisplayLimits(t *testing.T) {
+	// Verify limit constants have sensible values
+	if MaxDisplayNameLen <= 0 {
+		t.Errorf("MaxDisplayNameLen should be positive, got %d", MaxDisplayNameLen)
+	}
+	if MaxTaskNameLen <= 0 {
+		t.Errorf("MaxTaskNameLen should be positive, got %d", MaxTaskNameLen)
+	}
+	if MinTaskNameLen <= 0 {
+		t.Errorf("MinTaskNameLen should be positive, got %d", MinTaskNameLen)
+	}
+	if MinTaskNameLen > MaxTaskNameLen {
+		t.Errorf("MinTaskNameLen (%d) should be <= MaxTaskNameLen (%d)", MinTaskNameLen, MaxTaskNameLen)
+	}
+	if MaxWindowNameLen <= 0 {
+		t.Errorf("MaxWindowNameLen should be positive, got %d", MaxWindowNameLen)
+	}
+}
+
+func TestTimeoutConstants(t *testing.T) {
+	// Verify timeout constants have sensible values
+	if ClaudeReadyMaxAttempts <= 0 {
+		t.Errorf("ClaudeReadyMaxAttempts should be positive, got %d", ClaudeReadyMaxAttempts)
+	}
+	if ClaudeReadyPollInterval <= 0 {
+		t.Errorf("ClaudeReadyPollInterval should be positive, got %v", ClaudeReadyPollInterval)
+	}
+	if WorktreeTimeout <= 0 {
+		t.Errorf("WorktreeTimeout should be positive, got %v", WorktreeTimeout)
+	}
+	if TmuxCommandTimeout <= 0 {
+		t.Errorf("TmuxCommandTimeout should be positive, got %v", TmuxCommandTimeout)
+	}
+}
+
+func TestFileAndDirNames(t *testing.T) {
+	// Verify file/dir name constants are non-empty
+	names := map[string]string{
+		"TawDirName":       TawDirName,
+		"AgentsDirName":    AgentsDirName,
+		"HistoryDirName":   HistoryDirName,
+		"ConfigFileName":   ConfigFileName,
+		"LogFileName":      LogFileName,
+		"MemoryFileName":   MemoryFileName,
+		"PromptFileName":   PromptFileName,
+		"TaskFileName":     TaskFileName,
+		"TabLockDirName":   TabLockDirName,
+		"WindowIDFileName": WindowIDFileName,
+		"PRFileName":       PRFileName,
+		"GitRepoMarker":    GitRepoMarker,
+		"GlobalPromptLink": GlobalPromptLink,
+		"ClaudeLink":       ClaudeLink,
+	}
+
+	for name, value := range names {
+		if value == "" {
+			t.Errorf("%s should not be empty", name)
+		}
+	}
+}
+
+func TestEmojiConstants(t *testing.T) {
+	// Verify emoji constants are non-empty
+	emojis := map[string]string{
+		"EmojiWorking": EmojiWorking,
+		"EmojiWaiting": EmojiWaiting,
+		"EmojiDone":    EmojiDone,
+		"EmojiWarning": EmojiWarning,
+		"EmojiNew":     EmojiNew,
+	}
+
+	for name, value := range emojis {
+		if value == "" {
+			t.Errorf("%s should not be empty", name)
+		}
+	}
+}

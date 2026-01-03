@@ -423,3 +423,141 @@ func TestTaskSessionMarker(t *testing.T) {
 		t.Error("Session marker file is empty, should contain timestamp")
 	}
 }
+
+func TestTaskStatus(t *testing.T) {
+	tempDir := t.TempDir()
+	agentDir := filepath.Join(tempDir, "test-task")
+	if err := os.MkdirAll(agentDir, 0755); err != nil {
+		t.Fatalf("Failed to create agent dir: %v", err)
+	}
+
+	task := New("test-task", agentDir)
+
+	// Test GetStatusFilePath
+	expectedPath := filepath.Join(agentDir, ".status")
+	if task.GetStatusFilePath() != expectedPath {
+		t.Errorf("GetStatusFilePath() = %q, want %q", task.GetStatusFilePath(), expectedPath)
+	}
+
+	// Load status when file doesn't exist should return Pending
+	status, err := task.LoadStatus()
+	if err != nil {
+		t.Fatalf("LoadStatus() error = %v", err)
+	}
+	if status != StatusPending {
+		t.Errorf("LoadStatus() = %q, want %q when file doesn't exist", status, StatusPending)
+	}
+
+	// Save status
+	for _, testStatus := range []Status{StatusWorking, StatusWaiting, StatusDone} {
+		if err := task.SaveStatus(testStatus); err != nil {
+			t.Fatalf("SaveStatus(%q) error = %v", testStatus, err)
+		}
+
+		if task.Status != testStatus {
+			t.Errorf("task.Status = %q, want %q after SaveStatus()", task.Status, testStatus)
+		}
+
+		// Load and verify
+		loaded, err := task.LoadStatus()
+		if err != nil {
+			t.Fatalf("LoadStatus() error = %v", err)
+		}
+		if loaded != testStatus {
+			t.Errorf("LoadStatus() = %q, want %q", loaded, testStatus)
+		}
+	}
+}
+
+func TestTaskGetSystemPromptPath(t *testing.T) {
+	agentDir := "/path/to/agents/test-task"
+	task := New("test-task", agentDir)
+
+	expectedPath := filepath.Join(agentDir, ".system-prompt")
+	if task.GetSystemPromptPath() != expectedPath {
+		t.Errorf("GetSystemPromptPath() = %q, want %q", task.GetSystemPromptPath(), expectedPath)
+	}
+}
+
+func TestTaskGetUserPromptPath(t *testing.T) {
+	agentDir := "/path/to/agents/test-task"
+	task := New("test-task", agentDir)
+
+	expectedPath := filepath.Join(agentDir, ".user-prompt")
+	if task.GetUserPromptPath() != expectedPath {
+		t.Errorf("GetUserPromptPath() = %q, want %q", task.GetUserPromptPath(), expectedPath)
+	}
+}
+
+func TestStatusConstants(t *testing.T) {
+	// Verify status constants have expected string values
+	statuses := map[Status]string{
+		StatusPending:   "pending",
+		StatusWorking:   "working",
+		StatusWaiting:   "waiting",
+		StatusDone:      "done",
+		StatusCorrupted: "corrupted",
+	}
+
+	for status, expected := range statuses {
+		if string(status) != expected {
+			t.Errorf("Status %q = %q, want %q", status, string(status), expected)
+		}
+	}
+}
+
+func TestCorruptedReasonConstants(t *testing.T) {
+	// Verify corrupted reason constants have expected string values
+	reasons := map[CorruptedReason]string{
+		CorruptMissingWorktree: "missing_worktree",
+		CorruptNotInGit:        "not_in_git",
+		CorruptInvalidGit:      "invalid_git",
+		CorruptMissingBranch:   "missing_branch",
+	}
+
+	for reason, expected := range reasons {
+		if string(reason) != expected {
+			t.Errorf("CorruptedReason %q = %q, want %q", reason, string(reason), expected)
+		}
+	}
+}
+
+func TestTaskSetupSymlinksOverwrite(t *testing.T) {
+	tempDir := t.TempDir()
+	projectDir1 := filepath.Join(tempDir, "project1")
+	projectDir2 := filepath.Join(tempDir, "project2")
+	agentDir := filepath.Join(tempDir, "agents", "test-task")
+
+	for _, dir := range []string{projectDir1, projectDir2, agentDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("Failed to create dir: %v", err)
+		}
+	}
+
+	task := New("test-task", agentDir)
+
+	// Create first symlink
+	if err := task.SetupSymlinks(projectDir1); err != nil {
+		t.Fatalf("SetupSymlinks(project1) error = %v", err)
+	}
+
+	// Overwrite with second symlink
+	if err := task.SetupSymlinks(projectDir2); err != nil {
+		t.Fatalf("SetupSymlinks(project2) error = %v", err)
+	}
+
+	// Verify symlink points to second project
+	target, err := os.Readlink(task.GetOriginPath())
+	if err != nil {
+		t.Fatalf("Failed to read symlink: %v", err)
+	}
+
+	// The target should be a relative path to projectDir2
+	resolvedTarget := filepath.Join(agentDir, target)
+	absTarget, _ := filepath.Abs(resolvedTarget)
+	absProject2, _ := filepath.Abs(projectDir2)
+
+	if absTarget != absProject2 {
+		t.Errorf("Symlink target = %q, want %q", absTarget, absProject2)
+	}
+}
