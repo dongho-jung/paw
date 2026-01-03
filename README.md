@@ -211,6 +211,7 @@ brew install tmux gh
 | Toggle git status | `⌃G` |
 | Toggle bottom (shell) | `⌃B` |
 | Toggle help | `⌃/` |
+| Toggle setup | `⌃,` |
 
 ## Log viewer
 

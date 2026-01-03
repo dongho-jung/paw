@@ -87,9 +87,12 @@ taw/                           # This repository
 │   ├── internal_create.go     # Task creation commands (toggleNew, newTask, spawnTask, handleTask)
 │   ├── internal_lifecycle.go  # Task lifecycle commands (endTask, cancelTask, doneTask)
 │   ├── internal_popup.go      # Popup/UI commands (toggleLog, toggleHelp, taskList)
-│   └── internal_utils.go      # Utility commands and helpers (ctrlC, renameWindow)
+│   ├── internal_utils.go      # Utility commands and helpers (ctrlC, renameWindow)
+│   ├── keybindings.go         # Tmux keybinding definitions
+│   └── wait.go                # Wait detection for user input prompts
 ├── cmd/taw-notify/            # Notification helper (macOS app bundle)
-│   ├── main.go                # CGO code for UserNotifications
+│   ├── main.go                # CGO code for UserNotifications (darwin only)
+│   ├── doc.go                 # Stub for non-darwin platforms
 │   └── Info.plist             # App bundle configuration
 ├── internal/                  # Go internal packages
 │   ├── app/                   # Application context
@@ -101,6 +104,7 @@ taw/                           # This repository
 │   │       ├── HELP.md        # Help text
 │   │       ├── PROMPT.md      # System prompt (git mode)
 │   │       ├── PROMPT-nogit.md # System prompt (non-git mode)
+│   │       ├── tmux.conf      # Base tmux configuration
 │   │       └── claude/        # Claude settings and slash commands
 │   ├── git/                   # Git/worktree management
 │   ├── github/                # GitHub API client
