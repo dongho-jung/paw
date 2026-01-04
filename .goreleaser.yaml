@@ -11,14 +11,31 @@ before:
     - go mod download
 
 builds:
-  - id: paw
+  # Darwin build (includes paw-notify.app in archive)
+  - id: paw-darwin
+    main: ./cmd/paw
+    binary: paw
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.Commit={{.Commit}}
+      - -X main.Date={{.Date}}
+
+  # Non-darwin build (linux, windows)
+  - id: paw-other
     main: ./cmd/paw
     binary: paw
     env:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
       - windows
     goarch:
       - amd64
@@ -38,7 +55,7 @@ archives:
     formats:
       - tar.gz
     builds:
-      - paw
+      - paw-darwin
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
@@ -50,8 +67,6 @@ archives:
       - src: paw-notify.app
         dst: .
         strip_parent: true
-    filter:
-      - goos: darwin
 
   # Non-darwin archives (linux, windows)
   - id: default
@@ -62,7 +77,7 @@ archives:
         formats:
           - zip
     builds:
-      - paw
+      - paw-other
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
@@ -71,9 +86,6 @@ archives:
     files:
       - README.md
       - LICENSE*
-    filter:
-      - goos: linux
-      - goos: windows
 
 checksum:
   name_template: 'checksums.txt'
