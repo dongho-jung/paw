@@ -39,7 +39,8 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 	// #{m:pattern,string} checks if string matches pattern (⭐️* = starts with ⭐️)
 	// Use "Escape Tab" instead of "M-Tab" because send-keys M-Tab may not produce
 	// the correct escape sequence (\x1b\x09) that bubbletea expects for "alt+tab"
-	cmdAltTab := `if "#{m:⭐️*,#{window_name}}" "send-keys Escape Tab" "select-pane -t :.+"`
+	// -F flag is required so tmux evaluates the format as a boolean, not as a shell command
+	cmdAltTab := `if -F "#{m:⭐️*,#{window_name}}" "send-keys Escape Tab" "select-pane -t :.+"`
 
 	return []tmux.BindOpts{
 		// Navigation (Alt-based)
