@@ -203,7 +203,7 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Button == tea.MouseLeft && m.focusPanel == FocusPanelLeft {
 			m.textarea.Focus()
 
-			textareaStartY := 4
+			textareaStartY := 1
 			textareaStartX := 2
 
 			targetRow := msg.Y - textareaStartY
@@ -386,28 +386,12 @@ func (m *TaskInput) updateOptionFocus() {
 
 // View renders the task input.
 func (m *TaskInput) View() tea.View {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("39")).
-		MarginBottom(1)
-
-	titleDimStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("240")).
-		MarginBottom(1)
-
 	helpStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
 		MarginTop(1)
 
-	// Build left panel (task input)
+	// Build left panel (task input) - no title, starts at same height as Options box
 	var leftPanel strings.Builder
-	if m.focusPanel == FocusPanelLeft {
-		leftPanel.WriteString(titleStyle.Render("New Task"))
-	} else {
-		leftPanel.WriteString(titleDimStyle.Render("New Task"))
-	}
-	leftPanel.WriteString("\n\n")
 	leftPanel.WriteString(m.textarea.View())
 
 	// Build right panel (options)
@@ -439,7 +423,7 @@ func (m *TaskInput) View() tea.View {
 	// Set real cursor based on focus
 	if m.focusPanel == FocusPanelLeft {
 		if cursor := m.textarea.Cursor(); cursor != nil {
-			cursor.Y += 4
+			cursor.Y += 1 // Only account for top border (no title anymore)
 			cursor.X += 1
 			v.Cursor = cursor
 		}
@@ -498,7 +482,7 @@ func (m *TaskInput) renderOptionsPanel() string {
 	} else {
 		content.WriteString(titleDimStyle.Render("Options"))
 	}
-	content.WriteString("\n\n")
+	content.WriteString("\n")
 
 	// Model field
 	{
