@@ -184,7 +184,7 @@ func checkNotifyApp() checkResult {
 
 	if _, err := os.Stat(binaryPath); err != nil {
 		result.ok = false
-		result.message = "not installed - run 'make install' to install"
+		result.message = "not installed - run 'brew reinstall paw' or 'make install'"
 		return result
 	}
 
