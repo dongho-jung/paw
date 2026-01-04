@@ -153,8 +153,8 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// If empty, don't submit - just continue
 			return m, nil
 
-		// Open options panel: F2 key (Ctrl+. is mapped to F2 in keybindings.go)
-		case "f2":
+		// Open options panel: Ctrl+.
+		case "ctrl+.":
 			m.showOptions = true
 			m.optsUI = NewTaskOptsUI(m.options, m.activeTasks)
 			m.textarea.Blur()

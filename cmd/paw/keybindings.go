@@ -33,9 +33,6 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 	cmdToggleHelp := fmt.Sprintf("run-shell '%s internal toggle-help %s'", pawBin, sessionName)
 	cmdToggleSetup := fmt.Sprintf("run-shell '%s internal toggle-setup %s'", pawBin, sessionName)
 
-	// Ctrl+. sends F2 to open task options (used in new task window)
-	cmdTaskOpts := "send-keys F2"
-
 	return []tmux.BindOpts{
 		// Navigation (Alt-based)
 		{Key: "M-Tab", Command: "select-pane -t :.+", NoPrefix: true},
@@ -57,6 +54,6 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 
 		// Settings
 		{Key: "C-,", Command: cmdToggleSetup, NoPrefix: true}, // Ctrl+, for setup
-		{Key: "C-.", Command: cmdTaskOpts, NoPrefix: true},    // Ctrl+. for task options (sends F2)
+		// Note: Ctrl+. is handled directly by the TUI (task input) for options panel
 	}
 }
