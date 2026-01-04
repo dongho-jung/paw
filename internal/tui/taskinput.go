@@ -44,6 +44,7 @@ type TaskInput struct {
 	height      int
 	options     *config.TaskOptions
 	activeTasks []string // Active task names for dependency selection
+	isDark      bool     // Cached dark mode detection (must be detected before bubbletea starts)
 
 	// Inline options editing
 	focusPanel   FocusPanel
@@ -68,6 +69,9 @@ func NewTaskInput() *TaskInput {
 
 // NewTaskInputWithTasks creates a new task input model with active task list.
 func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
+	// Detect dark mode BEFORE bubbletea starts (HasDarkBackground reads from stdin)
+	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+
 	ta := textarea.New()
 	ta.Placeholder = "Describe your task here...\n\nExamples:\n- Add user authentication\n- Fix bug in login form\n- Refactor API handlers"
 	ta.Focus()
@@ -90,6 +94,8 @@ func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240")).
 		Padding(0, 1)
+	// Keep text readable when blurred (border color already indicates focus)
+	ta.Styles.Blurred.Text = ta.Styles.Focused.Text
 	ta.Styles.Focused.CursorLine = lipgloss.NewStyle()
 	ta.Styles.Focused.Prompt = lipgloss.NewStyle()
 	ta.Styles.Blurred.Prompt = lipgloss.NewStyle()
@@ -123,6 +129,7 @@ func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
 		height:       15,
 		options:      opts,
 		activeTasks:  activeTasks,
+		isDark:       isDark,
 		focusPanel:   FocusPanelLeft,
 		optField:     OptFieldModel,
 		modelIdx:     modelIdx,
@@ -388,9 +395,8 @@ func (m *TaskInput) updateOptionFocus() {
 
 // View renders the task input.
 func (m *TaskInput) View() tea.View {
-	// Adaptive color for help text
-	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
-	lightDark := lipgloss.LightDark(isDark)
+	// Adaptive color for help text (use cached isDark value)
+	lightDark := lipgloss.LightDark(m.isDark)
 	dimColor := lightDark(lipgloss.Color("245"), lipgloss.Color("240"))
 
 	helpStyle := lipgloss.NewStyle().
@@ -451,11 +457,10 @@ func (m *TaskInput) View() tea.View {
 func (m *TaskInput) renderOptionsPanel(panelHeight int) string {
 	isFocused := m.focusPanel == FocusPanelRight
 
-	// Adaptive colors for light/dark terminal themes
+	// Adaptive colors for light/dark terminal themes (use cached isDark value)
 	// Light theme: use darker colors for visibility on white background
 	// Dark theme: use lighter colors for visibility on dark background
-	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
-	lightDark := lipgloss.LightDark(isDark)
+	lightDark := lipgloss.LightDark(m.isDark)
 	normalColor := lightDark(lipgloss.Color("236"), lipgloss.Color("252"))
 	dimColor := lightDark(lipgloss.Color("245"), lipgloss.Color("240"))
 

@@ -38,6 +38,7 @@ type TaskOptsUI struct {
 	done        bool
 	cancelled   bool
 	activeTasks []string // List of active task names for dependency selection
+	isDark      bool     // Cached dark mode detection (must be detected before bubbletea starts)
 }
 
 // TaskOptsResult contains the result of the task options UI.
@@ -48,6 +49,9 @@ type TaskOptsResult struct {
 
 // NewTaskOptsUI creates a new task options UI.
 func NewTaskOptsUI(currentOpts *config.TaskOptions, activeTasks []string) *TaskOptsUI {
+	// Detect dark mode BEFORE bubbletea starts (HasDarkBackground reads from stdin)
+	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+
 	opts := config.DefaultTaskOptions()
 	if currentOpts != nil {
 		opts.Merge(currentOpts)
@@ -104,6 +108,7 @@ func NewTaskOptsUI(currentOpts *config.TaskOptions, activeTasks []string) *TaskO
 		taskInput:   taskInput,
 		hookInput:   hookInput,
 		activeTasks: activeTasks,
+		isDark:      isDark,
 	}
 }
 
@@ -259,11 +264,10 @@ func (m *TaskOptsUI) updateFocus() {
 
 // View renders the task options UI.
 func (m *TaskOptsUI) View() tea.View {
-	// Adaptive colors for light/dark terminal themes
+	// Adaptive colors for light/dark terminal themes (use cached isDark value)
 	// Light theme: use darker colors for visibility on white background
 	// Dark theme: use lighter colors for visibility on dark background
-	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
-	lightDark := lipgloss.LightDark(isDark)
+	lightDark := lipgloss.LightDark(m.isDark)
 	normalColor := lightDark(lipgloss.Color("236"), lipgloss.Color("252"))
 	dimColor := lightDark(lipgloss.Color("245"), lipgloss.Color("240"))
 
