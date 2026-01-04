@@ -147,8 +147,9 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 		// Adjust textarea size (leave space for options panel)
+		// No max height cap - allow flexible scaling with terminal size
 		newWidth := min(msg.Width-50, 80) // Leave room for options panel
-		newHeight := min(msg.Height-8, 20)
+		newHeight := msg.Height - 8       // Reserve space for help text and borders
 		if newWidth > 40 {
 			m.textarea.SetWidth(newWidth)
 		}
@@ -394,8 +395,15 @@ func (m *TaskInput) View() tea.View {
 	var leftPanel strings.Builder
 	leftPanel.WriteString(m.textarea.View())
 
+	// Calculate panel height to match textarea
+	// Textarea rendered height: internal height + 2 (top/bottom borders)
+	// Options panel adds: 2 (borders) + 0 (no vertical padding with Padding(0, 2))
+	// To match: panelContentHeight + 2 = textareaRenderedHeight
+	textareaRenderedHeight := m.textarea.Height() + 2
+	panelHeight := max(textareaRenderedHeight-2, 1)
+
 	// Build right panel (options)
-	rightPanel := m.renderOptionsPanel()
+	rightPanel := m.renderOptionsPanel(panelHeight)
 
 	// Join panels horizontally with gap
 	gapStyle := lipgloss.NewStyle().Width(4)
@@ -433,7 +441,8 @@ func (m *TaskInput) View() tea.View {
 }
 
 // renderOptionsPanel renders the options panel for the right side.
-func (m *TaskInput) renderOptionsPanel() string {
+// The height parameter sets the panel height to match the textarea.
+func (m *TaskInput) renderOptionsPanel(panelHeight int) string {
 	isFocused := m.focusPanel == FocusPanelRight
 
 	titleStyle := lipgloss.NewStyle().
@@ -472,8 +481,9 @@ func (m *TaskInput) renderOptionsPanel() string {
 	panelStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
-		Padding(1, 2).
-		Width(36)
+		Padding(0, 2). // No vertical padding - Options title provides spacing
+		Width(36).
+		Height(panelHeight) // Match textarea height
 
 	var content strings.Builder
 
