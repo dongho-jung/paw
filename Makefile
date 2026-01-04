@@ -15,7 +15,7 @@ GO_PATH=$(shell which go 2>/dev/null || echo "/opt/homebrew/bin/go")
 LOCAL_BIN=~/.local/bin
 LOCAL_SHARE=~/.local/share/paw
 
-.PHONY: all build build-notify install clean test fmt lint run help
+.PHONY: all build build-notify install uninstall install-global uninstall-global clean test fmt lint run help
 
 all: build
 
@@ -75,6 +75,20 @@ install-global: build
 	sudo cp $(BINARY_NAME) /usr/local/bin/
 	sudo xattr -cr /usr/local/bin/$(BINARY_NAME)
 	sudo codesign -fs - /usr/local/bin/$(BINARY_NAME)
+	@echo "Done!"
+
+## Uninstall from ~/.local/bin and ~/.local/share/paw
+uninstall:
+	@echo "Uninstalling $(BINARY_NAME) from $(LOCAL_BIN)..."
+	@rm -f $(LOCAL_BIN)/$(BINARY_NAME)
+	@echo "Uninstalling $(NOTIFY_APP) from $(LOCAL_SHARE)..."
+	@rm -rf $(LOCAL_SHARE)
+	@echo "Done!"
+
+## Uninstall from /usr/local/bin (requires sudo)
+uninstall-global:
+	@echo "Uninstalling $(BINARY_NAME) from /usr/local/bin..."
+	sudo rm -f /usr/local/bin/$(BINARY_NAME)
 	@echo "Done!"
 
 ## Clean build artifacts
@@ -138,14 +152,16 @@ help:
 	@echo "  make [target]"
 	@echo ""
 	@echo "Targets:"
-	@echo "  build          Build the binary"
-	@echo "  install        Install to ~/.local/bin"
-	@echo "  install-global Install to /usr/local/bin (requires sudo)"
-	@echo "  clean          Remove build artifacts"
-	@echo "  test           Run tests"
-	@echo "  test-coverage  Run tests with coverage report"
-	@echo "  fmt            Format code"
-	@echo "  lint           Run linter"
-	@echo "  deps           Download dependencies"
-	@echo "  run            Build and run"
-	@echo "  help           Show this help"
+	@echo "  build            Build the binary"
+	@echo "  install          Install to ~/.local/bin"
+	@echo "  uninstall        Uninstall from ~/.local/bin"
+	@echo "  install-global   Install to /usr/local/bin (requires sudo)"
+	@echo "  uninstall-global Uninstall from /usr/local/bin (requires sudo)"
+	@echo "  clean            Remove build artifacts"
+	@echo "  test             Run tests"
+	@echo "  test-coverage    Run tests with coverage report"
+	@echo "  fmt              Format code"
+	@echo "  lint             Run linter"
+	@echo "  deps             Download dependencies"
+	@echo "  run              Build and run"
+	@echo "  help             Show this help"

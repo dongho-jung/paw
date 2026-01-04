@@ -9,6 +9,9 @@ make build
 # Install to ~/.local/bin
 make install
 
+# Uninstall from ~/.local/bin
+make uninstall
+
 # Or install directly with go install
 go install github.com/dongho-jung/paw@latest
 ```
