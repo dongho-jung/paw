@@ -95,7 +95,7 @@ View all active and completed tasks with preview panel.
   l           Cycle log level filter (L0+ → L1+ → ... → L5 only)
   ⌃O/q/Esc    Close the log viewer
 
-## Task Options (⌃. or F2 in new task window)
+## Task Options (⌃. in new task window)
 
 Configure per-task settings before submission:
 

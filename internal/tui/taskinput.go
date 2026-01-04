@@ -153,7 +153,7 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// If empty, don't submit - just continue
 			return m, nil
 
-		// Open options panel: F2 (Ctrl+. may not work in all terminals)
+		// Open options panel: F2 key (Ctrl+. is mapped to F2 in keybindings.go)
 		case "f2":
 			m.showOptions = true
 			m.optsUI = NewTaskOptsUI(m.options, m.activeTasks)
@@ -226,7 +226,7 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the task input.
 func (m *TaskInput) View() tea.View {
-	// If options panel is showing, render it instead
+	// If options panel is showing (full screen), render it instead
 	if m.showOptions && m.optsUI != nil {
 		return m.optsUI.View()
 	}
@@ -240,28 +240,29 @@ func (m *TaskInput) View() tea.View {
 		Foreground(lipgloss.Color("240")).
 		MarginTop(1)
 
-	optsIndicatorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240"))
+	// Build left panel (task input)
+	var leftPanel strings.Builder
+	leftPanel.WriteString(titleStyle.Render("New Task"))
+	leftPanel.WriteString("\n\n")
+	leftPanel.WriteString(m.textarea.View())
 
-	optsValueStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39"))
+	// Build right panel (options summary)
+	rightPanel := m.renderOptionsPanel()
 
+	// Join panels horizontally with gap
+	gapStyle := lipgloss.NewStyle().Width(4)
+	combined := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		leftPanel.String(),
+		gapStyle.Render(""),
+		rightPanel,
+	)
+
+	// Add help text at bottom
 	var sb strings.Builder
-
-	sb.WriteString(titleStyle.Render("New Task"))
-	sb.WriteString("\n\n")
-	sb.WriteString(m.textarea.View())
+	sb.WriteString(combined)
 	sb.WriteString("\n")
-
-	// Show current options summary
-	optsStr := m.formatOptionsIndicator()
-	if optsStr != "" {
-		sb.WriteString(optsIndicatorStyle.Render("Options: "))
-		sb.WriteString(optsValueStyle.Render(optsStr))
-		sb.WriteString("\n")
-	}
-
-	sb.WriteString(helpStyle.Render("Alt+Enter/F5: Submit  |  F2: Options  |  Esc: Cancel"))
+	sb.WriteString(helpStyle.Render("Alt+Enter/F5: Submit  |  ⌃.: Options  |  Esc: Cancel"))
 
 	v := tea.NewView(sb.String())
 	v.AltScreen = true
@@ -281,6 +282,79 @@ func (m *TaskInput) View() tea.View {
 	}
 
 	return v
+}
+
+// renderOptionsPanel renders the compact options panel for the right side.
+func (m *TaskInput) renderOptionsPanel() string {
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("39")).
+		MarginBottom(1)
+
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252")).
+		Width(18)
+
+	valueStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39"))
+
+	dimStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240"))
+
+	panelStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		Padding(1, 2).
+		Width(40)
+
+	var content strings.Builder
+
+	content.WriteString(titleStyle.Render("Options"))
+	content.WriteString("\n\n")
+
+	// Model
+	content.WriteString(labelStyle.Render("Model:"))
+	content.WriteString(valueStyle.Render(string(m.options.Model)))
+	content.WriteString("\n")
+
+	// Ultrathink
+	content.WriteString(labelStyle.Render("Ultrathink:"))
+	if m.options.Ultrathink {
+		content.WriteString(valueStyle.Render("on"))
+	} else {
+		content.WriteString(dimStyle.Render("off"))
+	}
+	content.WriteString("\n")
+
+	// Depends on
+	content.WriteString(labelStyle.Render("Depends on:"))
+	if m.options.DependsOn != nil && m.options.DependsOn.TaskName != "" {
+		content.WriteString(valueStyle.Render(fmt.Sprintf("%s (%s)",
+			m.options.DependsOn.TaskName,
+			m.options.DependsOn.Condition)))
+	} else {
+		content.WriteString(dimStyle.Render("none"))
+	}
+	content.WriteString("\n")
+
+	// Worktree hook
+	content.WriteString(labelStyle.Render("Worktree hook:"))
+	if m.options.WorktreeHook != "" {
+		hookPreview := m.options.WorktreeHook
+		if len(hookPreview) > 15 {
+			hookPreview = hookPreview[:12] + "..."
+		}
+		content.WriteString(valueStyle.Render(hookPreview))
+	} else {
+		content.WriteString(dimStyle.Render("none"))
+	}
+	content.WriteString("\n")
+
+	// Hint at bottom
+	content.WriteString("\n")
+	content.WriteString(dimStyle.Render("Press ⌃. to edit"))
+
+	return panelStyle.Render(content.String())
 }
 
 // formatOptionsIndicator returns a compact representation of current options.
