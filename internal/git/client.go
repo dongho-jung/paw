@@ -60,6 +60,7 @@ type Client interface {
 	MergeSquash(dir, branch, message string) error
 	MergeAbort(dir string) error
 	HasConflicts(dir string) (bool, []string, error)
+	HasOngoingMerge(dir string) bool
 	CheckoutOurs(dir, path string) error
 	CheckoutTheirs(dir, path string) error
 	FindMergeCommit(dir, branch, into string) (string, error)
@@ -404,6 +405,24 @@ func (c *gitClient) HasConflicts(dir string) (bool, []string, error) {
 
 	files := strings.Split(output, "\n")
 	return true, files, nil
+}
+
+// HasOngoingMerge checks if there's an ongoing merge operation.
+// This is indicated by the presence of MERGE_HEAD in the git directory.
+func (c *gitClient) HasOngoingMerge(dir string) bool {
+	gitDir, err := c.runOutput(dir, "rev-parse", "--git-dir")
+	if err != nil {
+		return false
+	}
+
+	// Make gitDir absolute if it's relative
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(dir, gitDir)
+	}
+
+	mergeHeadPath := filepath.Join(gitDir, "MERGE_HEAD")
+	_, err = os.Stat(mergeHeadPath)
+	return err == nil
 }
 
 func (c *gitClient) CheckoutOurs(dir, path string) error {
