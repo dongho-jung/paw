@@ -1,0 +1,144 @@
+// Package config handles TAW configuration parsing and management.
+package config
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+)
+
+// Model represents the Claude model to use.
+type Model string
+
+const (
+	ModelHaiku  Model = "haiku"
+	ModelSonnet Model = "sonnet"
+	ModelOpus   Model = "opus"
+)
+
+// DefaultModel is the default model for new tasks.
+const DefaultModel = ModelOpus
+
+// ValidModels returns all valid model options.
+func ValidModels() []Model {
+	return []Model{ModelOpus, ModelSonnet, ModelHaiku}
+}
+
+// DependsOnCondition defines when a task should run relative to another task.
+type DependsOnCondition string
+
+const (
+	DependsOnNone    DependsOnCondition = ""
+	DependsOnSuccess DependsOnCondition = "success"
+	DependsOnFailure DependsOnCondition = "failure"
+	DependsOnAlways  DependsOnCondition = "always"
+)
+
+// TaskDependency represents a dependency on another task.
+type TaskDependency struct {
+	TaskName  string             `json:"task_name"`
+	Condition DependsOnCondition `json:"condition"`
+}
+
+// TaskOptions represents per-task settings that can override project config.
+type TaskOptions struct {
+	// Model specifies which Claude model to use (haiku, sonnet, opus)
+	Model Model `json:"model,omitempty"`
+
+	// Ultrathink enables extended thinking mode
+	Ultrathink bool `json:"ultrathink"`
+
+	// DependsOn specifies a task dependency
+	DependsOn *TaskDependency `json:"depends_on,omitempty"`
+
+	// WorktreeHook overrides the project's worktree hook for this task
+	WorktreeHook string `json:"worktree_hook,omitempty"`
+}
+
+// DefaultTaskOptions returns the default task options.
+func DefaultTaskOptions() *TaskOptions {
+	return &TaskOptions{
+		Model:      DefaultModel,
+		Ultrathink: true,
+	}
+}
+
+// GetOptionsPath returns the path to the task options file.
+func GetOptionsPath(agentDir string) string {
+	return filepath.Join(agentDir, ".options.json")
+}
+
+// Save writes the task options to a file in the agent directory.
+func (o *TaskOptions) Save(agentDir string) error {
+	data, err := json.MarshalIndent(o, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal task options: %w", err)
+	}
+
+	optionsPath := GetOptionsPath(agentDir)
+	if err := os.WriteFile(optionsPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write task options: %w", err)
+	}
+
+	return nil
+}
+
+// LoadTaskOptions loads task options from the agent directory.
+func LoadTaskOptions(agentDir string) (*TaskOptions, error) {
+	optionsPath := GetOptionsPath(agentDir)
+
+	data, err := os.ReadFile(optionsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return DefaultTaskOptions(), nil
+		}
+		return nil, fmt.Errorf("failed to read task options: %w", err)
+	}
+
+	var opts TaskOptions
+	if err := json.Unmarshal(data, &opts); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal task options: %w", err)
+	}
+
+	return &opts, nil
+}
+
+// Merge applies non-zero values from another TaskOptions.
+func (o *TaskOptions) Merge(other *TaskOptions) {
+	if other == nil {
+		return
+	}
+
+	if other.Model != "" {
+		o.Model = other.Model
+	}
+	// Ultrathink is always applied (even if false)
+	o.Ultrathink = other.Ultrathink
+
+	if other.DependsOn != nil {
+		o.DependsOn = other.DependsOn
+	}
+
+	if other.WorktreeHook != "" {
+		o.WorktreeHook = other.WorktreeHook
+	}
+}
+
+// Clone creates a deep copy of the task options.
+func (o *TaskOptions) Clone() *TaskOptions {
+	clone := &TaskOptions{
+		Model:        o.Model,
+		Ultrathink:   o.Ultrathink,
+		WorktreeHook: o.WorktreeHook,
+	}
+
+	if o.DependsOn != nil {
+		clone.DependsOn = &TaskDependency{
+			TaskName:  o.DependsOn.TaskName,
+			Condition: o.DependsOn.Condition,
+		}
+	}
+
+	return clone
+}

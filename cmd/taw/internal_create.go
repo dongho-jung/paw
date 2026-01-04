@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -113,10 +114,13 @@ var newTaskCmd = &cobra.Command{
 			logging.SetGlobal(logger)
 		}
 
+		// Get active task names for dependency selection
+		activeTasks := getActiveTaskNames(app.AgentsDir)
+
 		// Loop continuously for task creation
 		for {
-			// Use inline task input TUI
-			result, err := tui.RunTaskInput()
+			// Use inline task input TUI with active task list
+			result, err := tui.RunTaskInputWithTasks(activeTasks)
 			if err != nil {
 				fmt.Printf("Failed to get task input: %v\n", err)
 				continue
@@ -148,17 +152,48 @@ var newTaskCmd = &cobra.Command{
 			}
 			_ = tmpFile.Close()
 
+			// Save options to temp file
+			var optsTmpPath string
+			if result.Options != nil {
+				optsTmpFile, err := os.CreateTemp("", "taw-task-opts-*.json")
+				if err != nil {
+					_ = os.Remove(tmpFile.Name())
+					fmt.Printf("Failed to create options temp file: %v\n", err)
+					continue
+				}
+				optsData, _ := json.Marshal(result.Options)
+				if _, err := optsTmpFile.Write(optsData); err != nil {
+					_ = optsTmpFile.Close()
+					_ = os.Remove(optsTmpFile.Name())
+					_ = os.Remove(tmpFile.Name())
+					fmt.Printf("Failed to write task options: %v\n", err)
+					continue
+				}
+				_ = optsTmpFile.Close()
+				optsTmpPath = optsTmpFile.Name()
+			}
+
 			// Spawn task creation in a separate window (non-blocking)
 			tawBin, _ := os.Executable()
-			spawnCmd := exec.Command(tawBin, "internal", "spawn-task", sessionName, tmpFile.Name())
+			spawnArgs := []string{"internal", "spawn-task", sessionName, tmpFile.Name()}
+			if optsTmpPath != "" {
+				spawnArgs = append(spawnArgs, optsTmpPath)
+			}
+			spawnCmd := exec.Command(tawBin, spawnArgs...)
 			if err := spawnCmd.Start(); err != nil {
 				_ = os.Remove(tmpFile.Name())
+				if optsTmpPath != "" {
+					_ = os.Remove(optsTmpPath)
+				}
 				logging.Warn("Failed to start spawn-task: %v", err)
 				fmt.Printf("Failed to start task: %v\n", err)
 				continue
 			}
 
-			logging.Debug("Task spawned in background, content file: %s", tmpFile.Name())
+			logging.Debug("Task spawned in background, content file: %s, opts file: %s", tmpFile.Name(), optsTmpPath)
+
+			// Refresh active tasks list
+			activeTasks = getActiveTaskNames(app.AgentsDir)
 
 			// Immediately loop back to create another task
 			// The spawn-task process will handle everything in a separate window
@@ -166,16 +201,35 @@ var newTaskCmd = &cobra.Command{
 	},
 }
 
+// getActiveTaskNames returns a list of active task names from the agents directory.
+func getActiveTaskNames(agentsDir string) []string {
+	var names []string
+	entries, err := os.ReadDir(agentsDir)
+	if err != nil {
+		return names
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			names = append(names, entry.Name())
+		}
+	}
+	return names
+}
+
 var spawnTaskCmd = &cobra.Command{
-	Use:   "spawn-task [session] [content-file]",
+	Use:   "spawn-task [session] [content-file] [options-file]",
 	Short: "Spawn a task in a separate window (shows progress)",
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.RangeArgs(2, 3),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		logging.Trace("spawnTaskCmd: start session=%s contentFile=%s", args[0], args[1])
 		defer logging.Trace("spawnTaskCmd: end")
 
 		sessionName := args[0]
 		contentFile := args[1]
+		var optsFile string
+		if len(args) > 2 {
+			optsFile = args[2]
+		}
 
 		// Read content from temp file
 		contentBytes, err := os.ReadFile(contentFile)
@@ -183,6 +237,22 @@ var spawnTaskCmd = &cobra.Command{
 			return fmt.Errorf("failed to read content file: %w", err)
 		}
 		content := string(contentBytes)
+
+		// Read options from temp file if provided
+		var taskOpts *config.TaskOptions
+		if optsFile != "" {
+			optsBytes, err := os.ReadFile(optsFile)
+			if err != nil {
+				logging.Warn("Failed to read options file: %v", err)
+			} else {
+				taskOpts = &config.TaskOptions{}
+				if err := json.Unmarshal(optsBytes, taskOpts); err != nil {
+					logging.Warn("Failed to parse options file: %v", err)
+					taskOpts = nil
+				}
+			}
+			_ = os.Remove(optsFile)
+		}
 
 		// Clean up temp file
 		_ = os.Remove(contentFile)
@@ -241,6 +311,15 @@ var spawnTaskCmd = &cobra.Command{
 		}
 
 		logging.Log("Task created: %s", newTask.Name)
+
+		// Save task options if provided
+		if taskOpts != nil {
+			if err := taskOpts.Save(newTask.AgentDir); err != nil {
+				logging.Warn("Failed to save task options: %v", err)
+			} else {
+				logging.Debug("Task options saved: model=%s, ultrathink=%v", taskOpts.Model, taskOpts.Ultrathink)
+			}
+		}
 
 		// Handle task (creates actual window, starts Claude)
 		handleCmd := exec.Command(tawBin, "internal", "handle-task", sessionName, newTask.AgentDir)
@@ -301,6 +380,14 @@ var handleTaskCmd = &cobra.Command{
 			return err
 		}
 		logging.Trace("Task loaded: content_length=%d", len(t.Content))
+
+		// Load task options
+		taskOpts, err := config.LoadTaskOptions(agentDir)
+		if err != nil {
+			logging.Warn("Failed to load task options: %v", err)
+			taskOpts = config.DefaultTaskOptions()
+		}
+		logging.Debug("Task options: model=%s, ultrathink=%v", taskOpts.Model, taskOpts.Ultrathink)
 
 		// Create tab-lock atomically
 		created, err := t.CreateTabLock()
@@ -475,6 +562,12 @@ exec "%s" internal end-task "%s" "%s"
 			worktreeDirExport = fmt.Sprintf("export WORKTREE_DIR='%s'\n", workDir)
 		}
 
+		// Build model flag for Claude command
+		modelFlag := ""
+		if taskOpts.Model != "" && taskOpts.Model != config.DefaultModel {
+			modelFlag = fmt.Sprintf(" --model %s", taskOpts.Model)
+		}
+
 		var startAgentContent string
 		if isReopen {
 			// Resume mode: use --continue to automatically continue previous session
@@ -490,9 +583,9 @@ export TAW_BIN='%s'
 export SESSION_NAME='%s'
 
 # Continue the previous Claude session (--continue auto-selects last session)
-exec claude --continue --dangerously-skip-permissions
+exec claude --continue --dangerously-skip-permissions%s
 `, taskName, app.TawDir, app.ProjectDir, worktreeDirExport, windowID,
-				app.Config.OnComplete, filepath.Dir(filepath.Dir(tawBin)), tawBin, sessionName)
+				app.Config.OnComplete, filepath.Dir(filepath.Dir(tawBin)), tawBin, sessionName, modelFlag)
 			logging.Log("Session resume: using --continue flag for task %s", taskName)
 		} else {
 			// New session: start fresh with system prompt
@@ -510,13 +603,13 @@ export SESSION_NAME='%s'
 
 # System prompt is base64 encoded to avoid shell escaping issues
 # Using heredoc with single-quoted delimiter prevents any shell interpretation
-exec claude --dangerously-skip-permissions --system-prompt "$(base64 -d <<'__PROMPT_END__'
+exec claude --dangerously-skip-permissions%s --system-prompt "$(base64 -d <<'__PROMPT_END__'
 %s
 __PROMPT_END__
 )"
 `, taskName, app.TawDir, app.ProjectDir, worktreeDirExport, windowID,
 				app.Config.OnComplete, filepath.Dir(filepath.Dir(tawBin)), tawBin, sessionName,
-				encodedPrompt)
+				modelFlag, encodedPrompt)
 		}
 
 		if err := os.WriteFile(startAgentScriptPath, []byte(startAgentContent), 0755); err != nil {
@@ -581,8 +674,14 @@ __PROMPT_END__
 			time.Sleep(200 * time.Millisecond)
 
 			// Send task instruction - tell Claude to read from file
-			taskInstruction := fmt.Sprintf("ultrathink Read and execute the task from '%s'", t.GetUserPromptPath())
-			logging.Trace("Sending task instruction: length=%d", len(taskInstruction))
+			// Include "ultrathink" prefix if enabled in task options
+			var taskInstruction string
+			if taskOpts.Ultrathink {
+				taskInstruction = fmt.Sprintf("ultrathink Read and execute the task from '%s'", t.GetUserPromptPath())
+			} else {
+				taskInstruction = fmt.Sprintf("Read and execute the task from '%s'", t.GetUserPromptPath())
+			}
+			logging.Trace("Sending task instruction: length=%d, ultrathink=%v", len(taskInstruction), taskOpts.Ultrathink)
 			if err := claudeClient.SendInputWithRetry(tm, agentPane, taskInstruction, 5); err != nil {
 				logging.Warn("Failed to send task instruction: %v", err)
 				// As a last resort, try the basic send

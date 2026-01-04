@@ -140,6 +140,7 @@ taw/                           # This repository
         │   └── window_id      # Tmux window ID (used in cleanup)
         ├── .session-started   # Session marker (for resume on reopen)
         ├── .status            # Task status (working/waiting/done, persisted for resume)
+        ├── .options.json      # Task options (model, ultrathink, depends_on, worktree_hook)
         └── .pr                # PR number (when created)
 ```
 

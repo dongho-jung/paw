@@ -2,31 +2,44 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/textarea"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/mattn/go-runewidth"
+
+	"github.com/dongho-jung/taw/internal/config"
 )
 
 // TaskInput provides an inline text input for task content.
 type TaskInput struct {
-	textarea  textarea.Model
-	submitted bool
-	cancelled bool
-	width     int
-	height    int
+	textarea    textarea.Model
+	submitted   bool
+	cancelled   bool
+	width       int
+	height      int
+	options     *config.TaskOptions
+	showOptions bool // When true, options panel is shown
+	optsUI      *TaskOptsUI
+	activeTasks []string // Active task names for dependency selection
 }
 
 // TaskInputResult contains the result of the task input.
 type TaskInputResult struct {
 	Content   string
+	Options   *config.TaskOptions
 	Cancelled bool
 }
 
 // NewTaskInput creates a new task input model.
 func NewTaskInput() *TaskInput {
+	return NewTaskInputWithTasks(nil)
+}
+
+// NewTaskInputWithTasks creates a new task input model with active task list.
+func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
 	ta := textarea.New()
 	ta.Placeholder = "Describe your task here...\n\nExamples:\n- Add user authentication\n- Fix bug in login form\n- Refactor API handlers"
 	ta.Focus()
@@ -54,9 +67,11 @@ func NewTaskInput() *TaskInput {
 	ta.Styles.Blurred.Prompt = lipgloss.NewStyle()
 
 	return &TaskInput{
-		textarea: ta,
-		width:    80,
-		height:   15,
+		textarea:    ta,
+		width:       80,
+		height:      15,
+		options:     config.DefaultTaskOptions(),
+		activeTasks: activeTasks,
 	}
 }
 
@@ -65,10 +80,47 @@ func (m *TaskInput) Init() tea.Cmd {
 	return textarea.Blink
 }
 
+// taskOptsResultMsg is sent when the options panel is closed.
+type taskOptsResultMsg struct {
+	options   *config.TaskOptions
+	cancelled bool
+}
+
 // Update handles messages and updates the model.
 func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
+
+	// Handle options result message
+	if resultMsg, ok := msg.(taskOptsResultMsg); ok {
+		m.showOptions = false
+		m.optsUI = nil
+		if !resultMsg.cancelled {
+			m.options = resultMsg.options
+		}
+		m.textarea.Focus()
+		return m, nil
+	}
+
+	// If options panel is showing, delegate to it
+	if m.showOptions && m.optsUI != nil {
+		var optsModel tea.Model
+		optsModel, cmd = m.optsUI.Update(msg)
+		m.optsUI = optsModel.(*TaskOptsUI)
+		cmds = append(cmds, cmd)
+
+		// Check if options UI is done
+		if m.optsUI.done {
+			result := m.optsUI.Result()
+			m.showOptions = false
+			m.optsUI = nil
+			if !result.Cancelled {
+				m.options = result.Options
+			}
+			m.textarea.Focus()
+		}
+		return m, tea.Batch(cmds...)
+	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -99,6 +151,13 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 			// If empty, don't submit - just continue
+			return m, nil
+
+		// Open options panel: F2 (Ctrl+. may not work in all terminals)
+		case "f2":
+			m.showOptions = true
+			m.optsUI = NewTaskOptsUI(m.options, m.activeTasks)
+			m.textarea.Blur()
 			return m, nil
 		}
 
@@ -167,6 +226,11 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the task input.
 func (m *TaskInput) View() tea.View {
+	// If options panel is showing, render it instead
+	if m.showOptions && m.optsUI != nil {
+		return m.optsUI.View()
+	}
+
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("39")).
@@ -176,13 +240,28 @@ func (m *TaskInput) View() tea.View {
 		Foreground(lipgloss.Color("240")).
 		MarginTop(1)
 
+	optsIndicatorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240"))
+
+	optsValueStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39"))
+
 	var sb strings.Builder
 
 	sb.WriteString(titleStyle.Render("New Task"))
 	sb.WriteString("\n\n")
 	sb.WriteString(m.textarea.View())
 	sb.WriteString("\n")
-	sb.WriteString(helpStyle.Render("Alt+Enter or F5: Submit  |  Esc: Cancel"))
+
+	// Show current options summary
+	optsStr := m.formatOptionsIndicator()
+	if optsStr != "" {
+		sb.WriteString(optsIndicatorStyle.Render("Options: "))
+		sb.WriteString(optsValueStyle.Render(optsStr))
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString(helpStyle.Render("Alt+Enter/F5: Submit  |  F2: Options  |  Esc: Cancel"))
 
 	v := tea.NewView(sb.String())
 	v.AltScreen = true
@@ -202,6 +281,47 @@ func (m *TaskInput) View() tea.View {
 	}
 
 	return v
+}
+
+// formatOptionsIndicator returns a compact representation of current options.
+func (m *TaskInput) formatOptionsIndicator() string {
+	if m.options == nil {
+		return ""
+	}
+
+	var parts []string
+
+	// Model (only show if not default)
+	if m.options.Model != config.DefaultModel {
+		parts = append(parts, string(m.options.Model))
+	}
+
+	// Ultrathink (show if disabled, since it's on by default)
+	if !m.options.Ultrathink {
+		parts = append(parts, "no-ultrathink")
+	}
+
+	// Dependency
+	if m.options.DependsOn != nil && m.options.DependsOn.TaskName != "" {
+		parts = append(parts, fmt.Sprintf("after:%s(%s)",
+			m.options.DependsOn.TaskName,
+			m.options.DependsOn.Condition))
+	}
+
+	// Worktree hook
+	if m.options.WorktreeHook != "" {
+		hookPreview := m.options.WorktreeHook
+		if len(hookPreview) > 20 {
+			hookPreview = hookPreview[:17] + "..."
+		}
+		parts = append(parts, fmt.Sprintf("hook:%s", hookPreview))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	return strings.Join(parts, ", ")
 }
 
 func (m *TaskInput) moveCursorToVisualColumn(targetCol int) {
@@ -246,13 +366,19 @@ func (m *TaskInput) moveCursorToVisualColumn(targetCol int) {
 func (m *TaskInput) Result() TaskInputResult {
 	return TaskInputResult{
 		Content:   strings.TrimSpace(m.textarea.Value()),
+		Options:   m.options,
 		Cancelled: m.cancelled,
 	}
 }
 
 // RunTaskInput runs the task input and returns the result.
 func RunTaskInput() (*TaskInputResult, error) {
-	m := NewTaskInput()
+	return RunTaskInputWithTasks(nil)
+}
+
+// RunTaskInputWithTasks runs the task input with active task list and returns the result.
+func RunTaskInputWithTasks(activeTasks []string) (*TaskInputResult, error) {
+	m := NewTaskInputWithTasks(activeTasks)
 	p := tea.NewProgram(m)
 
 	finalModel, err := p.Run()

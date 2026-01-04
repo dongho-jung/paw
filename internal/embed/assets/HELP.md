@@ -16,6 +16,7 @@ Claude Code-based autonomous agent work environment
 
 ### Task Commands
   ⌃N          New task
+  ⌃.          Task options (in new task window)
   ⌃K          Cancel task (double-press within 2s)
   ⌃F          Finish task (complete and cleanup)
   ⌃Q          Quit taw
@@ -93,6 +94,15 @@ View all active and completed tasks with preview panel.
   w           Toggle word wrap
   l           Cycle log level filter (L0+ → L1+ → ... → L5 only)
   ⌃O/q/Esc    Close the log viewer
+
+## Task Options (⌃. or F2 in new task window)
+
+Configure per-task settings before submission:
+
+  Model         Claude model (opus/sonnet/haiku)
+  Ultrathink    Extended thinking mode (on/off)
+  Depends on    Run after another task (success/failure/always)
+  Worktree hook Override project hook for this task
 
 ## Environment Variables (for agents)
 
