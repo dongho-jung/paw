@@ -404,9 +404,10 @@ func setupTmuxConfig(app *app.App, tm tmux.Client) error {
 		tawBin = "taw"
 	}
 
-	// Disable default prefix key (Ctrl+B) so we can use it for toggle-bottom
-	_ = tm.SetOption("prefix", "None", true)
-	_ = tm.SetOption("prefix2", "None", true)
+	// Change prefix to an unused key (M-F12) so C-b is available for toggle-bottom
+	// Note: "None" is not a valid tmux key, so we use an obscure key instead
+	_ = tm.SetOption("prefix", "M-F12", true)
+	_ = tm.SetOption("prefix2", "M-F12", true)
 
 	// Setup status bar
 	_ = tm.SetOption("status", "on", true)
