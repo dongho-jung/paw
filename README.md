@@ -7,27 +7,8 @@ A project management system built on Claude Code.
 
 ## Installation
 
-### Using Go
-
 ```bash
-go install github.com/dongho-jung/taw@latest
-```
-
-### From Releases
-
-Download the latest release from [GitHub Releases](https://github.com/dongho-jung/taw/releases) and extract the binary to your PATH.
-
-**macOS users**: After extracting, you may need to run:
-```bash
-xattr -cr taw && codesign -fs - taw
-```
-
-### From Source
-
-```bash
-git clone https://github.com/dongho-jung/taw.git
-cd taw
-make install
+brew install dongho-jung/tap/taw
 ```
 
 ## Overview

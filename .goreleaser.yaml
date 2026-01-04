@@ -80,6 +80,21 @@ changelog:
     - title: Others
       order: 999
 
+brews:
+  - repository:
+      owner: dongho-jung
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/dongho-jung/taw
+    description: A project management system built on Claude Code
+    license: MIT
+    dependencies:
+      - name: tmux
+    install: |
+      bin.install "taw"
+    test: |
+      system "#{bin}/taw", "version"
+
 release:
   github:
     owner: dongho-jung
@@ -91,15 +106,7 @@ release:
   footer: |
     ## Installation
 
-    ### Using Go
+    ### Homebrew (macOS/Linux)
     ```bash
-    go install github.com/dongho-jung/taw@{{.Tag}}
-    ```
-
-    ### Manual Download
-    Download the appropriate archive for your platform from the assets below, extract it, and add the binary to your PATH.
-
-    **macOS users**: After extracting, you may need to run:
-    ```bash
-    xattr -cr taw && codesign -fs - taw
+    brew install dongho-jung/tap/taw
     ```
