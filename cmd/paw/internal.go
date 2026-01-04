@@ -32,6 +32,7 @@ func init() {
 	internalCmd.AddCommand(toggleLogCmd)
 	internalCmd.AddCommand(logViewerCmd)
 	internalCmd.AddCommand(toggleHelpCmd)
+	internalCmd.AddCommand(helpViewerCmd)
 	internalCmd.AddCommand(toggleGitStatusCmd)
 	internalCmd.AddCommand(toggleTaskListCmd)
 	internalCmd.AddCommand(taskListViewerCmd)

@@ -111,32 +111,19 @@ var logViewerCmd = &cobra.Command{
 
 var toggleHelpCmd = &cobra.Command{
 	Use:   "toggle-help [session]",
-	Short: "Show help popup",
+	Short: "Toggle help popup",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sessionName := args[0]
 		tm := tmux.New(sessionName)
 
-		// Get help content from embedded assets
-		helpContent, err := embed.GetHelp()
+		pawBin, err := os.Executable()
 		if err != nil {
-			return fmt.Errorf("failed to get help content: %w", err)
+			pawBin = "paw"
 		}
 
-		// Write to temp file
-		tmpFile, err := os.CreateTemp("", "paw-help-*.md")
-		if err != nil {
-			return fmt.Errorf("failed to create temp file: %w", err)
-		}
-		tmpPath := tmpFile.Name()
-		if _, err := tmpFile.WriteString(helpContent); err != nil {
-			_ = tmpFile.Close()
-			return fmt.Errorf("failed to write help content: %w", err)
-		}
-		_ = tmpFile.Close()
-
-		// Build command (closes with q/Esc, temp file cleaned up on exit)
-		popupCmd := fmt.Sprintf("less '%s'; rm -f '%s' 2>/dev/null || true", tmpPath, tmpPath)
+		// Run help viewer in popup (closes with q/Esc/Ctrl+/)
+		helpCmd := fmt.Sprintf("%s internal help-viewer", pawBin)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
 			Width:  "80%",
@@ -144,8 +131,24 @@ var toggleHelpCmd = &cobra.Command{
 			Title:  " Help ",
 			Close:  true,
 			Style:  "fg=terminal,bg=terminal",
-		}, popupCmd)
+		}, helpCmd)
 		return nil
+	},
+}
+
+var helpViewerCmd = &cobra.Command{
+	Use:    "help-viewer",
+	Short:  "Run the help viewer",
+	Args:   cobra.NoArgs,
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Get help content from embedded assets
+		helpContent, err := embed.GetHelp()
+		if err != nil {
+			return fmt.Errorf("failed to get help content: %w", err)
+		}
+
+		return tui.RunHelpViewer(helpContent)
 	},
 }
 

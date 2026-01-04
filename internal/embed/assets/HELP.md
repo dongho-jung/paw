@@ -114,5 +114,11 @@ Configure per-task settings before submission:
   PAW_BIN       PAW binary path
   SESSION_NAME  tmux session name
 
----
-Press q to exit
+## Help Viewer (⌃/)
+
+  ↑↓j/k       Scroll vertically
+  ←/→h/l      Scroll horizontally
+  g/G         Jump to top/bottom
+  PgUp/PgDn   Page scroll
+  ⌃U/D        Half-page scroll
+  ⌃//q/Esc    Close the help viewer
