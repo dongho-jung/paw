@@ -2,6 +2,7 @@
 package tui
 
 import (
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/textarea"
@@ -387,8 +388,13 @@ func (m *TaskInput) updateOptionFocus() {
 
 // View renders the task input.
 func (m *TaskInput) View() tea.View {
+	// Adaptive color for help text
+	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+	lightDark := lipgloss.LightDark(isDark)
+	dimColor := lightDark(lipgloss.Color("245"), lipgloss.Color("240"))
+
 	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
+		Foreground(dimColor).
 		MarginTop(1)
 
 	// Build left panel (task input) - no title, starts at same height as Options box
@@ -445,6 +451,14 @@ func (m *TaskInput) View() tea.View {
 func (m *TaskInput) renderOptionsPanel(panelHeight int) string {
 	isFocused := m.focusPanel == FocusPanelRight
 
+	// Adaptive colors for light/dark terminal themes
+	// Light theme: use darker colors for visibility on white background
+	// Dark theme: use lighter colors for visibility on dark background
+	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+	lightDark := lipgloss.LightDark(isDark)
+	normalColor := lightDark(lipgloss.Color("236"), lipgloss.Color("252"))
+	dimColor := lightDark(lipgloss.Color("245"), lipgloss.Color("240"))
+
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("39")).
@@ -452,11 +466,11 @@ func (m *TaskInput) renderOptionsPanel(panelHeight int) string {
 
 	titleDimStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("240")).
+		Foreground(dimColor).
 		MarginBottom(1)
 
 	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252")).
+		Foreground(normalColor).
 		Width(12)
 
 	selectedLabelStyle := lipgloss.NewStyle().
@@ -465,16 +479,16 @@ func (m *TaskInput) renderOptionsPanel(panelHeight int) string {
 		Width(12)
 
 	valueStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252"))
+		Foreground(normalColor)
 
 	selectedValueStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
 		Bold(true)
 
 	dimStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240"))
+		Foreground(dimColor)
 
-	borderColor := lipgloss.Color("240")
+	borderColor := dimColor
 	if isFocused {
 		borderColor = lipgloss.Color("39")
 	}

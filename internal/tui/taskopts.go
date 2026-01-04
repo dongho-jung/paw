@@ -2,6 +2,7 @@
 package tui
 
 import (
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/textinput"
@@ -258,13 +259,21 @@ func (m *TaskOptsUI) updateFocus() {
 
 // View renders the task options UI.
 func (m *TaskOptsUI) View() tea.View {
+	// Adaptive colors for light/dark terminal themes
+	// Light theme: use darker colors for visibility on white background
+	// Dark theme: use lighter colors for visibility on dark background
+	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+	lightDark := lipgloss.LightDark(isDark)
+	normalColor := lightDark(lipgloss.Color("236"), lipgloss.Color("252"))
+	dimColor := lightDark(lipgloss.Color("245"), lipgloss.Color("240"))
+
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("39")).
 		MarginBottom(1)
 
 	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252")).
+		Foreground(normalColor).
 		Width(20)
 
 	selectedLabelStyle := lipgloss.NewStyle().
@@ -273,17 +282,17 @@ func (m *TaskOptsUI) View() tea.View {
 		Width(20)
 
 	valueStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252"))
+		Foreground(normalColor)
 
 	selectedValueStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
 		Bold(true)
 
 	dimStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240"))
+		Foreground(dimColor)
 
 	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
+		Foreground(dimColor).
 		MarginTop(1)
 
 	var sb strings.Builder
