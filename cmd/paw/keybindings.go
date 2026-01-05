@@ -11,6 +11,7 @@ import (
 //   - Ctrl+N: New task
 //   - Ctrl+K: Send Ctrl+C (double-press to cancel task)
 //   - Ctrl+F: Finish task
+//   - Ctrl+M: Merge task to main (keeps task window)
 //   - Ctrl+U: Sync task with main (fetch and rebase)
 //   - Ctrl+Q: Quit paw
 //   - Ctrl+T: Toggle tasks
@@ -26,6 +27,7 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 	cmdNewTask := fmt.Sprintf("run-shell '%s internal toggle-new %s'", pawBin, sessionName)
 	cmdCtrlC := fmt.Sprintf("run-shell '%s internal ctrl-c %s'", pawBin, sessionName)
 	cmdDoneTask := fmt.Sprintf("run-shell '%s internal done-task %s'", pawBin, sessionName)
+	cmdMergeTask := fmt.Sprintf("run-shell '%s internal merge-task-ui %s'", pawBin, sessionName)
 	cmdSyncTask := fmt.Sprintf("run-shell '%s internal sync-task %s'", pawBin, sessionName)
 	cmdQuit := "detach-client"
 	cmdToggleTasks := fmt.Sprintf("run-shell '%s internal toggle-task-list %s'", pawBin, sessionName)
@@ -52,6 +54,7 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 		{Key: "C-n", Command: cmdNewTask, NoPrefix: true},
 		{Key: "C-k", Command: cmdCtrlC, NoPrefix: true},
 		{Key: "C-f", Command: cmdDoneTask, NoPrefix: true},
+		{Key: "C-m", Command: cmdMergeTask, NoPrefix: true},
 		{Key: "C-u", Command: cmdSyncTask, NoPrefix: true},
 		{Key: "C-q", Command: cmdQuit, NoPrefix: true},
 

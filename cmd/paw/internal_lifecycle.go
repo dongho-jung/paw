@@ -758,6 +758,329 @@ var cancelTaskUICmd = &cobra.Command{
 	},
 }
 
+var mergeTaskCmd = &cobra.Command{
+	Use:   "merge-task [session] [window-id]",
+	Short: "Merge task to main branch (keeps task window)",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sessionName := args[0]
+		windowID := args[1]
+
+		app, err := getAppFromSession(sessionName)
+		if err != nil {
+			return err
+		}
+
+		// Setup logging
+		logger, _ := logging.New(app.GetLogPath(), app.Debug)
+		if logger != nil {
+			defer func() { _ = logger.Close() }()
+			logger.SetScript("merge-task")
+			logging.SetGlobal(logger)
+		}
+
+		logging.Trace("mergeTaskCmd: start session=%s windowID=%s", sessionName, windowID)
+		defer logging.Trace("mergeTaskCmd: end")
+
+		tm := tmux.New(sessionName)
+
+		fmt.Println()
+		fmt.Println("  ╭─────────────────────────────────────╮")
+		fmt.Println("  │         Merging to Main...          │")
+		fmt.Println("  ╰─────────────────────────────────────╯")
+		fmt.Println()
+
+		// Find task by window ID
+		findSpinner := tui.NewSimpleSpinner("Finding task")
+		findSpinner.Start()
+
+		mgr := task.NewManager(app.AgentsDir, app.ProjectDir, app.PawDir, app.IsGitRepo, app.Config)
+		tasks, err := mgr.ListTasks()
+		if err != nil {
+			findSpinner.Stop(false, "Failed")
+			return fmt.Errorf("failed to list tasks: %w", err)
+		}
+
+		var targetTask *task.Task
+		for _, t := range tasks {
+			if id, _ := t.LoadWindowID(); id == windowID {
+				targetTask = t
+				break
+			}
+		}
+
+		if targetTask == nil {
+			findSpinner.Stop(false, "Not found")
+			fmt.Println("  ✗ Task not found")
+			return nil
+		}
+		findSpinner.Stop(true, "Found")
+		fmt.Printf("  Task: %s\n\n", targetTask.Name)
+
+		if !app.IsGitRepo {
+			fmt.Println("  ✗ Not a git repository")
+			return nil
+		}
+
+		gitClient := git.New()
+		workDir := mgr.GetWorkingDirectory(targetTask)
+		mainBranch := gitClient.GetMainBranch(app.ProjectDir)
+
+		// Check if already merged
+		if gitClient.BranchMerged(app.ProjectDir, targetTask.Name, mainBranch) {
+			fmt.Printf("  ○ Already merged to %s\n", mainBranch)
+			return nil
+		}
+
+		// Commit any uncommitted changes first
+		hasChanges := gitClient.HasChanges(workDir)
+		if hasChanges {
+			commitSpinner := tui.NewSimpleSpinner("Committing changes")
+			commitSpinner.Start()
+
+			if err := gitClient.AddAll(workDir); err != nil {
+				logging.Warn("Failed to add changes: %v", err)
+			}
+			diffStat, _ := gitClient.GetDiffStat(workDir)
+			message := fmt.Sprintf("chore: auto-commit before merge\n\n%s", diffStat)
+			if err := gitClient.Commit(workDir, message); err != nil {
+				commitSpinner.Stop(false, err.Error())
+			} else {
+				commitSpinner.Stop(true, "")
+			}
+		}
+
+		// Push task branch
+		pushSpinner := tui.NewSimpleSpinner("Pushing task branch")
+		pushSpinner.Start()
+
+		if err := gitClient.Push(workDir, "origin", targetTask.Name, true); err != nil {
+			pushSpinner.Stop(false, err.Error())
+			logging.Warn("Failed to push task branch: %v", err)
+		} else {
+			pushSpinner.Stop(true, targetTask.Name)
+		}
+
+		// Acquire merge lock
+		lockSpinner := tui.NewSimpleSpinner("Acquiring merge lock")
+		lockSpinner.Start()
+
+		lockFile := filepath.Join(app.PawDir, "merge.lock")
+		lockAcquired := false
+		for retries := 0; retries < constants.MergeLockMaxRetries; retries++ {
+			f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+			if err == nil {
+				_, writeErr := fmt.Fprintf(f, "%s\n%d", targetTask.Name, os.Getpid())
+				closeErr := f.Close()
+				if writeErr != nil || closeErr != nil {
+					_ = os.Remove(lockFile)
+					time.Sleep(constants.MergeLockRetryInterval)
+					continue
+				}
+				lockAcquired = true
+				break
+			}
+
+			if isStaleLock(lockFile) {
+				_ = os.Remove(lockFile)
+				continue
+			}
+
+			time.Sleep(constants.MergeLockRetryInterval)
+		}
+
+		if !lockAcquired {
+			lockSpinner.Stop(false, "timeout")
+			fmt.Println("  ✗ Failed to acquire merge lock")
+			return nil
+		}
+		lockSpinner.Stop(true, "")
+		defer func() { _ = os.Remove(lockFile) }()
+
+		// Check for ongoing merge or conflicts
+		hasConflicts, conflictFiles, _ := gitClient.HasConflicts(app.ProjectDir)
+		hasOngoingMerge := gitClient.HasOngoingMerge(app.ProjectDir)
+
+		if hasConflicts || hasOngoingMerge {
+			fmt.Println("  ⚠️  Project has unresolved conflicts or ongoing merge")
+			if hasConflicts && len(conflictFiles) > 0 {
+				for _, f := range conflictFiles {
+					fmt.Printf("    - %s\n", f)
+				}
+			}
+			fmt.Printf("\n  Please resolve in: %s\n", app.ProjectDir)
+			return nil
+		}
+
+		// Stash local changes in project dir
+		hasLocalChanges := gitClient.HasChanges(app.ProjectDir)
+		if hasLocalChanges {
+			if err := gitClient.StashPush(app.ProjectDir, "paw-merge-temp"); err != nil {
+				logging.Warn("Failed to stash changes: %v", err)
+			}
+		}
+
+		// Remember current branch
+		currentBranch, _ := gitClient.GetCurrentBranch(app.ProjectDir)
+
+		mergeSuccess := true
+
+		// Fetch from origin
+		fetchSpinner := tui.NewSimpleSpinner("Fetching from origin")
+		fetchSpinner.Start()
+		if err := gitClient.Fetch(app.ProjectDir, "origin"); err != nil {
+			fetchSpinner.Stop(false, err.Error())
+		} else {
+			fetchSpinner.Stop(true, "")
+		}
+
+		// Checkout main
+		checkoutSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Checking out %s", mainBranch))
+		checkoutSpinner.Start()
+		if err := gitClient.Checkout(app.ProjectDir, mainBranch); err != nil {
+			checkoutSpinner.Stop(false, err.Error())
+			mergeSuccess = false
+		} else {
+			checkoutSpinner.Stop(true, "")
+
+			// Pull latest
+			pullSpinner := tui.NewSimpleSpinner("Pulling latest")
+			pullSpinner.Start()
+			if err := gitClient.Pull(app.ProjectDir); err != nil {
+				pullSpinner.Stop(false, err.Error())
+			} else {
+				pullSpinner.Stop(true, "")
+			}
+
+			// Squash merge
+			mergeSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Merging %s", targetTask.Name))
+			mergeSpinner.Start()
+			mergeMsg := fmt.Sprintf("feat: %s", targetTask.Name)
+			if err := gitClient.MergeSquash(app.ProjectDir, targetTask.Name, mergeMsg); err != nil {
+				mergeSpinner.Stop(false, "conflict")
+				_ = gitClient.MergeAbort(app.ProjectDir)
+				mergeSuccess = false
+			} else {
+				mergeSpinner.Stop(true, "")
+
+				// Push main
+				pushMainSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Pushing %s", mainBranch))
+				pushMainSpinner.Start()
+				if err := gitClient.Push(app.ProjectDir, "origin", mainBranch, false); err != nil {
+					pushMainSpinner.Stop(false, err.Error())
+					mergeSuccess = false
+				} else {
+					pushMainSpinner.Stop(true, "")
+				}
+			}
+
+			// Restore original branch
+			if currentBranch != "" && currentBranch != mainBranch {
+				_ = gitClient.Checkout(app.ProjectDir, currentBranch)
+			}
+		}
+
+		// Restore stashed changes
+		if hasLocalChanges {
+			_ = gitClient.StashPop(app.ProjectDir)
+		}
+
+		fmt.Println()
+		if mergeSuccess {
+			fmt.Printf("  ✅ Merged to %s (task window kept)\n", mainBranch)
+			logging.Log("Merged task %s to %s", targetTask.Name, mainBranch)
+			notify.PlaySound(notify.SoundTaskCompleted)
+			_ = tm.DisplayMessage(fmt.Sprintf("✅ Merged: %s → %s", targetTask.Name, mainBranch), 2000)
+		} else {
+			fmt.Println("  ✗ Merge failed - manual resolution needed")
+			warningName := constants.EmojiWarning + targetTask.Name
+			_ = tm.RenameWindow(windowID, warningName)
+			notify.PlaySound(notify.SoundError)
+			_ = tm.DisplayMessage(fmt.Sprintf("⚠️ Merge failed: %s", targetTask.Name), 3000)
+		}
+
+		return nil
+	},
+}
+
+var mergeTaskUICmd = &cobra.Command{
+	Use:   "merge-task-ui [session]",
+	Short: "Merge task with UI feedback (creates visible pane)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sessionName := args[0]
+
+		app, err := getAppFromSession(sessionName)
+		if err != nil {
+			return err
+		}
+
+		// Setup logging
+		logger, _ := logging.New(app.GetLogPath(), app.Debug)
+		if logger != nil {
+			defer func() { _ = logger.Close() }()
+			logger.SetScript("merge-task-ui")
+			logging.SetGlobal(logger)
+		}
+
+		logging.Trace("mergeTaskUICmd: start session=%s", sessionName)
+		defer logging.Trace("mergeTaskUICmd: end")
+
+		tm := tmux.New(sessionName)
+
+		// Get current window ID
+		windowID, err := tm.Display("#{window_id}")
+		if err != nil {
+			return fmt.Errorf("failed to get window ID: %w", err)
+		}
+		windowID = strings.TrimSpace(windowID)
+
+		// Get current window name
+		windowName, _ := tm.Display("#{window_name}")
+		windowName = strings.TrimSpace(windowName)
+
+		// Check if this is a task window
+		if !strings.HasPrefix(windowName, constants.EmojiWorking) &&
+			!strings.HasPrefix(windowName, constants.EmojiWaiting) &&
+			!strings.HasPrefix(windowName, constants.EmojiDone) &&
+			!strings.HasPrefix(windowName, constants.EmojiWarning) {
+			_ = tm.DisplayMessage("Not a task window", 1500)
+			return nil
+		}
+
+		// Get paw binary path
+		pawBin, err := os.Executable()
+		if err != nil {
+			pawBin = "paw"
+		}
+
+		// Get working directory from pane
+		panePath, err := tm.Display("#{pane_current_path}")
+		if err != nil || panePath == "" {
+			panePath = app.ProjectDir
+		}
+
+		// Build merge-task command
+		mergeTaskCmdStr := fmt.Sprintf("%s internal merge-task %s %s; echo; echo 'Press Enter to close...'; read",
+			pawBin, sessionName, windowID)
+
+		// Create a top pane (40% height)
+		_, err = tm.SplitWindowPane(tmux.SplitOpts{
+			Horizontal: false,
+			Size:       "40%",
+			StartDir:   panePath,
+			Command:    mergeTaskCmdStr,
+			Before:     true,
+			Full:       true,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create merge-task pane: %w", err)
+		}
+
+		return nil
+	},
+}
+
 var doneTaskCmd = &cobra.Command{
 	Use:   "done-task [session]",
 	Short: "Complete the current task",

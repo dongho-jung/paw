@@ -206,7 +206,7 @@ echo "ON_COMPLETE=$ON_COMPLETE"  # Check first
 **⚠️ CRITICAL: Only run auto-merge when verification succeeds!**
 
 ```
-Run verification → success? → commit → push → call end-task
+Run verification → success? → commit → call end-task
                    ↓ failure or verification impossible
                 Switch to 💬
 ```
@@ -225,19 +225,17 @@ Run verification → success? → commit → push → call end-task
 
 **When verification succeeds, run auto-merge:**
 1. Commit all changes.
-2. `git push -u origin $TASK_NAME`
-3. Log: "Verification complete - invoking end-task"
-4. **Call end-task** using the absolute **End-Task Script** path provided when the task started:
+2. Log: "Verification complete - invoking end-task"
+3. **Call end-task** using the absolute **End-Task Script** path provided when the task started:
    - The user prompt includes the End-Task Script path (e.g., `/path/to/.paw/agents/task-name/end-task`).
    - Execute that absolute path directly in bash.
    - Example: `/Users/xxx/projects/yyy/.paw/agents/my-task/end-task`
 
 **If verification is impossible or fails → switch to 💬:**
 1. Commit all changes.
-2. `git push -u origin $TASK_NAME`
-3. `$PAW_BIN internal rename-window $WINDOW_ID "💬${TASK_NAME:0:12}"`
-4. Log: "Work complete - user review required (verification unavailable/failed)"
-5. Message the user: "Verification is needed. Please review and run `⌃F` to finish."
+2. `$PAW_BIN internal rename-window $WINDOW_ID "💬${TASK_NAME:0:12}"`
+3. Log: "Work complete - user review required (verification unavailable/failed)"
+4. Message the user: "Verification is needed. Please review and run `⌃F` to finish."
 
 **CRITICAL:**
 - In `auto-merge` mode, do **not** create a PR. end-task merges to main and cleans up.
@@ -264,12 +262,11 @@ Commit → push → create PR → update status
 
 #### `auto-commit` or `confirm` mode
 ```
-Commit → push → update status (no PR/merge)
+Commit → update status (no push/PR/merge)
 ```
 1. Commit all changes.
-2. `git push -u origin $TASK_NAME`
-3. `$PAW_BIN internal rename-window $WINDOW_ID "✅..."`
-4. Log: "Work complete - branch pushed"
+2. `$PAW_BIN internal rename-window $WINDOW_ID "✅..."`
+3. Log: "Work complete - changes committed"
 
 ### Automatic handling on errors
 - **Build error**: Analyze the message → attempt a fix.

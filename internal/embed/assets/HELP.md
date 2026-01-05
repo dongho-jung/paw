@@ -18,6 +18,7 @@ Claude Code-based autonomous agent work environment
   ⌃N          New task
   ⌃K          Cancel task (double-press within 2s)
   ⌃F          Finish task (complete and cleanup)
+  ⌃M          Merge to main (keeps task window)
   ⌃U          Sync with main (fetch and rebase)
   ⌃Q          Quit paw
 

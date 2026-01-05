@@ -23,6 +23,8 @@ func init() {
 	internalCmd.AddCommand(endTaskUICmd)
 	internalCmd.AddCommand(cancelTaskCmd)
 	internalCmd.AddCommand(cancelTaskUICmd)
+	internalCmd.AddCommand(mergeTaskCmd)
+	internalCmd.AddCommand(mergeTaskUICmd)
 	internalCmd.AddCommand(doneTaskCmd)
 	internalCmd.AddCommand(recoverTaskCmd)
 	internalCmd.AddCommand(resumeAgentCmd)
