@@ -46,6 +46,8 @@ func init() {
 	internalCmd.AddCommand(loadingScreenCmd)
 	internalCmd.AddCommand(toggleSetupCmd)
 	internalCmd.AddCommand(setupWizardCmd)
+	internalCmd.AddCommand(branchMenuCmd)
+	internalCmd.AddCommand(branchMenuTUICmd)
 
 	// Utility commands
 	internalCmd.AddCommand(ctrlCCmd)

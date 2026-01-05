@@ -11,15 +11,13 @@ import (
 //   - Ctrl+N: New task
 //   - Ctrl+K: Send Ctrl+C (double-press to cancel task)
 //   - Ctrl+F: Finish task
-//   - Alt+M: Merge task to main (keeps task window)
-//   - Ctrl+U: Sync task with main (fetch and rebase)
+//   - Ctrl+]: Branch menu (↑ merge to main, ↓ sync from main)
 //   - Ctrl+Q: Quit paw
 //   - Ctrl+T: Toggle tasks
 //   - Ctrl+O: Toggle logs
 //   - Ctrl+G: Toggle git status
 //   - Ctrl+B: Toggle bottom (shell)
 //   - Ctrl+/: Toggle help
-//   - Ctrl+,: Toggle setup (disabled - requires extended-keys which breaks IME)
 //   - Alt+Left/Right: Move window
 //   - Alt+Tab: Cycle pane (in task windows) / Cycle options (in new task window)
 func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
@@ -27,15 +25,13 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 	cmdNewTask := fmt.Sprintf("run-shell '%s internal toggle-new %s'", pawBin, sessionName)
 	cmdCtrlC := fmt.Sprintf("run-shell '%s internal ctrl-c %s'", pawBin, sessionName)
 	cmdDoneTask := fmt.Sprintf("run-shell '%s internal done-task %s'", pawBin, sessionName)
-	cmdMergeTask := fmt.Sprintf("run-shell '%s internal merge-task-ui %s'", pawBin, sessionName)
-	cmdSyncTask := fmt.Sprintf("run-shell '%s internal sync-task %s'", pawBin, sessionName)
+	cmdBranchMenu := fmt.Sprintf("run-shell '%s internal branch-menu %s'", pawBin, sessionName)
 	cmdQuit := "detach-client"
 	cmdToggleTasks := fmt.Sprintf("run-shell '%s internal toggle-task-list %s'", pawBin, sessionName)
 	cmdToggleLogs := fmt.Sprintf("run-shell '%s internal toggle-log %s'", pawBin, sessionName)
 	cmdToggleGitStatus := fmt.Sprintf("run-shell '%s internal toggle-git-status %s'", pawBin, sessionName)
 	cmdToggleBottom := fmt.Sprintf("run-shell '%s internal popup-shell %s'", pawBin, sessionName)
 	cmdToggleHelp := fmt.Sprintf("run-shell '%s internal toggle-help %s'", pawBin, sessionName)
-	// Note: cmdToggleSetup removed - Ctrl+, requires extended-keys which breaks IME input
 
 	// Alt+Tab: context-aware - pass through to TUI in new task window, cycle panes otherwise
 	// #{m:pattern,string} checks if string matches pattern (⭐️* = starts with ⭐️)
@@ -54,8 +50,7 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 		{Key: "C-n", Command: cmdNewTask, NoPrefix: true},
 		{Key: "C-k", Command: cmdCtrlC, NoPrefix: true},
 		{Key: "C-f", Command: cmdDoneTask, NoPrefix: true},
-		{Key: "M-m", Command: cmdMergeTask, NoPrefix: true},
-		{Key: "C-u", Command: cmdSyncTask, NoPrefix: true},
+		{Key: "C-]", Command: cmdBranchMenu, NoPrefix: true},
 		{Key: "C-q", Command: cmdQuit, NoPrefix: true},
 
 		// Toggle commands (Ctrl-based)

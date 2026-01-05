@@ -424,3 +424,61 @@ var taskListViewerCmd = &cobra.Command{
 		return nil
 	},
 }
+
+var branchMenuCmd = &cobra.Command{
+	Use:   "branch-menu [session]",
+	Short: "Show branch action menu popup",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sessionName := args[0]
+		tm := tmux.New(sessionName)
+
+		pawBin, err := os.Executable()
+		if err != nil {
+			pawBin = "paw"
+		}
+
+		// Run branch menu in small popup
+		menuCmd := fmt.Sprintf("%s internal branch-menu-tui %s", pawBin, sessionName)
+
+		return tm.DisplayPopup(tmux.PopupOpts{
+			Width:  "42",
+			Height: "8",
+			Title:  "",
+			Close:  true,
+			Style:  "fg=terminal,bg=terminal",
+		}, menuCmd)
+	},
+}
+
+var branchMenuTUICmd = &cobra.Command{
+	Use:   "branch-menu-tui [session]",
+	Short: "Run branch menu TUI (called from popup)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sessionName := args[0]
+
+		action, err := tui.RunBranchMenu()
+		if err != nil {
+			return err
+		}
+
+		pawBin, err := os.Executable()
+		if err != nil {
+			pawBin = "paw"
+		}
+
+		switch action {
+		case tui.BranchActionMerge:
+			// Run merge-task-ui
+			mergeCmd := exec.Command(pawBin, "internal", "merge-task-ui", sessionName)
+			return mergeCmd.Run()
+		case tui.BranchActionSync:
+			// Run sync-task
+			syncCmd := exec.Command(pawBin, "internal", "sync-task", sessionName)
+			return syncCmd.Run()
+		}
+		// Cancel - do nothing
+		return nil
+	},
+}
