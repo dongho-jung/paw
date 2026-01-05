@@ -11,7 +11,7 @@ import (
 //   - Ctrl+N: New task
 //   - Ctrl+K: Send Ctrl+C (double-press to cancel task)
 //   - Ctrl+F: Finish task
-//   - Ctrl+M: Merge task to main (keeps task window)
+//   - Alt+M: Merge task to main (keeps task window)
 //   - Ctrl+U: Sync task with main (fetch and rebase)
 //   - Ctrl+Q: Quit paw
 //   - Ctrl+T: Toggle tasks
@@ -54,7 +54,7 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 		{Key: "C-n", Command: cmdNewTask, NoPrefix: true},
 		{Key: "C-k", Command: cmdCtrlC, NoPrefix: true},
 		{Key: "C-f", Command: cmdDoneTask, NoPrefix: true},
-		{Key: "C-m", Command: cmdMergeTask, NoPrefix: true},
+		{Key: "M-m", Command: cmdMergeTask, NoPrefix: true},
 		{Key: "C-u", Command: cmdSyncTask, NoPrefix: true},
 		{Key: "C-q", Command: cmdQuit, NoPrefix: true},
 
