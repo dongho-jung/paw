@@ -193,7 +193,8 @@ func (m *TaskOptsUI) handleLeft() {
 			m.options.Model = config.ValidModels()[m.modelIdx]
 		}
 	case TaskOptsFieldUltrathink:
-		m.options.Ultrathink = false
+		// Left moves to [on] which is visually on the left
+		m.options.Ultrathink = true
 	case TaskOptsFieldDependsOnCondition:
 		if m.condIdx > 0 {
 			m.condIdx--
@@ -211,7 +212,8 @@ func (m *TaskOptsUI) handleRight() {
 			m.options.Model = models[m.modelIdx]
 		}
 	case TaskOptsFieldUltrathink:
-		m.options.Ultrathink = true
+		// Right moves to [off] which is visually on the right
+		m.options.Ultrathink = false
 	case TaskOptsFieldDependsOnCondition:
 		conditions := []config.DependsOnCondition{
 			config.DependsOnNone,

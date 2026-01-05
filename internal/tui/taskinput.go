@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/textarea"
-	"github.com/charmbracelet/bubbles/v2/textinput"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/mattn/go-runewidth"
@@ -30,10 +29,9 @@ const (
 	OptFieldUltrathink
 	OptFieldDependsOnTask
 	OptFieldDependsOnCondition
-	OptFieldWorktreeHook
 )
 
-const optFieldCount = 5
+const optFieldCount = 4
 
 // TaskInput provides an inline text input for task content.
 type TaskInput struct {
@@ -47,12 +45,11 @@ type TaskInput struct {
 	isDark      bool     // Cached dark mode detection (must be detected before bubbletea starts)
 
 	// Inline options editing
-	focusPanel   FocusPanel
-	optField     OptField
-	modelIdx     int
-	condIdx      int
-	depTaskInput textinput.Model
-	hookInput    textinput.Model
+	focusPanel FocusPanel
+	optField   OptField
+	modelIdx   int
+	condIdx    int
+	depTaskIdx int // Index into activeTasks (0 = none, 1+ = task index)
 }
 
 // TaskInputResult contains the result of the task input.
@@ -94,9 +91,13 @@ func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240")).
 		Padding(0, 1)
-	// Keep text readable when blurred (border color already indicates focus)
+	// Keep text and placeholder fully readable when blurred (border color already indicates focus)
+	// Copy all text-related styles from focused to blurred to prevent dimming
 	ta.Styles.Blurred.Text = ta.Styles.Focused.Text
+	ta.Styles.Blurred.Placeholder = ta.Styles.Focused.Placeholder
+	ta.Styles.Blurred.CursorLine = ta.Styles.Focused.CursorLine
 	ta.Styles.Focused.CursorLine = lipgloss.NewStyle()
+	ta.Styles.Blurred.CursorLine = lipgloss.NewStyle()
 	ta.Styles.Focused.Prompt = lipgloss.NewStyle()
 	ta.Styles.Blurred.Prompt = lipgloss.NewStyle()
 
@@ -111,31 +112,18 @@ func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
 		}
 	}
 
-	// Dependency task input
-	depTaskInput := textinput.New()
-	depTaskInput.Placeholder = "task-name"
-	depTaskInput.CharLimit = 64
-	depTaskInput.SetWidth(20)
-
-	// Worktree hook input
-	hookInput := textinput.New()
-	hookInput.Placeholder = "npm install"
-	hookInput.CharLimit = 256
-	hookInput.SetWidth(20)
-
 	return &TaskInput{
-		textarea:     ta,
-		width:        80,
-		height:       15,
-		options:      opts,
-		activeTasks:  activeTasks,
-		isDark:       isDark,
-		focusPanel:   FocusPanelLeft,
-		optField:     OptFieldModel,
-		modelIdx:     modelIdx,
-		condIdx:      0,
-		depTaskInput: depTaskInput,
-		hookInput:    hookInput,
+		textarea:    ta,
+		width:       80,
+		height:      15,
+		options:     opts,
+		activeTasks: activeTasks,
+		isDark:      isDark,
+		focusPanel:  FocusPanelLeft,
+		optField:    OptFieldModel,
+		modelIdx:    modelIdx,
+		condIdx:     0,
+		depTaskIdx:  0, // 0 = no dependency
 	}
 }
 
@@ -190,11 +178,8 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focusPanel == FocusPanelLeft {
 				m.focusPanel = FocusPanelRight
 				m.textarea.Blur()
-				m.updateOptionFocus()
 			} else {
 				m.focusPanel = FocusPanelLeft
-				m.depTaskInput.Blur()
-				m.hookInput.Blur()
 				m.textarea.Focus()
 			}
 			return m, nil
@@ -266,21 +251,17 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // updateOptionsPanel handles key events when the options panel is focused.
 func (m *TaskInput) updateOptionsPanel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
 	keyStr := msg.String()
 
 	switch keyStr {
 	case "tab", "down", "j":
 		m.applyOptionInputValues()
 		m.optField = OptField((int(m.optField) + 1) % optFieldCount)
-		m.updateOptionFocus()
 		return m, nil
 
 	case "shift+tab", "up", "k":
 		m.applyOptionInputValues()
 		m.optField = OptField((int(m.optField) - 1 + optFieldCount) % optFieldCount)
-		m.updateOptionFocus()
 		return m, nil
 
 	case "left", "h":
@@ -299,16 +280,6 @@ func (m *TaskInput) updateOptionsPanel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Update text inputs if focused
-	switch m.optField {
-	case OptFieldDependsOnTask:
-		m.depTaskInput, cmd = m.depTaskInput.Update(msg)
-		return m, cmd
-	case OptFieldWorktreeHook:
-		m.hookInput, cmd = m.hookInput.Update(msg)
-		return m, cmd
-	}
-
 	return m, nil
 }
 
@@ -321,7 +292,14 @@ func (m *TaskInput) handleOptionLeft() {
 			m.options.Model = config.ValidModels()[m.modelIdx]
 		}
 	case OptFieldUltrathink:
-		m.options.Ultrathink = false
+		// Left moves to [on] which is visually on the left
+		m.options.Ultrathink = true
+	case OptFieldDependsOnTask:
+		// Cycle through active tasks
+		if len(m.activeTasks) > 0 && m.depTaskIdx > 0 {
+			m.depTaskIdx--
+			m.updateDependsOn()
+		}
 	case OptFieldDependsOnCondition:
 		if m.condIdx > 0 {
 			m.condIdx--
@@ -340,7 +318,14 @@ func (m *TaskInput) handleOptionRight() {
 			m.options.Model = models[m.modelIdx]
 		}
 	case OptFieldUltrathink:
-		m.options.Ultrathink = true
+		// Right moves to [off] which is visually on the right
+		m.options.Ultrathink = false
+	case OptFieldDependsOnTask:
+		// Cycle through active tasks
+		if len(m.activeTasks) > 0 && m.depTaskIdx < len(m.activeTasks) {
+			m.depTaskIdx++
+			m.updateDependsOn()
+		}
 	case OptFieldDependsOnCondition:
 		conditions := []config.DependsOnCondition{
 			config.DependsOnNone,
@@ -364,33 +349,21 @@ func (m *TaskInput) updateDependsOn() {
 		config.DependsOnAlways,
 	}
 
-	if m.condIdx == 0 || m.depTaskInput.Value() == "" {
+	// depTaskIdx: 0 = none, 1+ = index into activeTasks
+	if m.condIdx == 0 || m.depTaskIdx == 0 || len(m.activeTasks) == 0 {
 		m.options.DependsOn = nil
 	} else {
+		taskName := m.activeTasks[m.depTaskIdx-1]
 		m.options.DependsOn = &config.TaskDependency{
-			TaskName:  m.depTaskInput.Value(),
+			TaskName:  taskName,
 			Condition: conditions[m.condIdx],
 		}
 	}
 }
 
-// applyOptionInputValues applies text input values to options.
+// applyOptionInputValues applies current selection values to options.
 func (m *TaskInput) applyOptionInputValues() {
 	m.updateDependsOn()
-	m.options.WorktreeHook = m.hookInput.Value()
-}
-
-// updateOptionFocus updates focus state for option inputs.
-func (m *TaskInput) updateOptionFocus() {
-	m.depTaskInput.Blur()
-	m.hookInput.Blur()
-
-	switch m.optField {
-	case OptFieldDependsOnTask:
-		m.depTaskInput.Focus()
-	case OptFieldWorktreeHook:
-		m.hookInput.Focus()
-	}
 }
 
 // View renders the task input.
@@ -501,7 +474,7 @@ func (m *TaskInput) renderOptionsPanel(panelHeight int) string {
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
 		Padding(0, 2). // No vertical padding - Options title provides spacing
-		Width(36).
+		Width(41).     // Wider to accommodate content
 		Height(panelHeight) // Match textarea height
 
 	var content strings.Builder
@@ -570,7 +543,7 @@ func (m *TaskInput) renderOptionsPanel(panelHeight int) string {
 		content.WriteString("\n")
 	}
 
-	// Depends on task field
+	// Depends on task field (dropdown selector)
 	{
 		isSelected := isFocused && m.optField == OptFieldDependsOnTask
 		label := labelStyle.Render("Depends on:")
@@ -578,7 +551,34 @@ func (m *TaskInput) renderOptionsPanel(panelHeight int) string {
 			label = selectedLabelStyle.Render("Depends on:")
 		}
 		content.WriteString(label)
-		content.WriteString(m.depTaskInput.View())
+
+		if len(m.activeTasks) == 0 {
+			content.WriteString(dimStyle.Render("(no tasks)"))
+		} else {
+			// Build options: [none] task1 task2 ...
+			options := make([]string, 0, len(m.activeTasks)+1)
+			options = append(options, "-") // none option
+			options = append(options, m.activeTasks...)
+
+			var parts []string
+			for i, opt := range options {
+				text := opt
+				if len(text) > 10 {
+					text = text[:9] + "…" // Truncate long names
+				}
+				if i == m.depTaskIdx {
+					if isSelected {
+						text = selectedValueStyle.Render("[" + text + "]")
+					} else {
+						text = valueStyle.Render("[" + text + "]")
+					}
+				} else {
+					text = dimStyle.Render(" " + text + " ")
+				}
+				parts = append(parts, text)
+			}
+			content.WriteString(strings.Join(parts, ""))
+		}
 		content.WriteString("\n")
 	}
 
@@ -616,18 +616,6 @@ func (m *TaskInput) renderOptionsPanel(panelHeight int) string {
 			parts = append(parts, text)
 		}
 		content.WriteString(strings.Join(parts, ""))
-		content.WriteString("\n")
-	}
-
-	// Worktree hook field
-	{
-		isSelected := isFocused && m.optField == OptFieldWorktreeHook
-		label := labelStyle.Render("Hook:")
-		if isSelected {
-			label = selectedLabelStyle.Render("Hook:")
-		}
-		content.WriteString(label)
-		content.WriteString(m.hookInput.View())
 		content.WriteString("\n")
 	}
 
