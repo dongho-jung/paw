@@ -35,9 +35,9 @@ The first launch automatically opens the task editor.
 ### Create a task
 
 To add another task inside the tmux session, press `⌃N`:
-- The editor opens so you can write the task content.
-- Save and exit to automatically launch the agent.
-- vi/vim/nvim start in insert mode automatically.
+- The inline task input UI opens in the `_` window.
+- Submit with `Alt+Enter` (or `F5`) to launch the agent; `Esc` cancels.
+- Use `⌥Tab` to edit per-task options (model, ultrathink, dependencies, worktree hook) before submitting.
 
 ### Slash Commands
 
@@ -151,6 +151,7 @@ on_complete: confirm
 |               | `auto-merge` | **Auto** commit + merge + clean up + close window (worktree mode only) |
 |               | `auto-pr` | Auto commit + create PR (worktree mode only) |
 | `worktree_hook` | (command) | Shell command(s) to run after worktree creation (e.g., `npm install`) |
+| `notifications` | `slack.webhook`, `ntfy.topic`, `ntfy.server` | Optional external alerts via Slack webhook or ntfy.sh |
 
 <details>
 <summary>Other configuration</summary>
@@ -159,30 +160,38 @@ on_complete: confirm
 - `.paw/PROMPT.md`: Project-specific prompt (per project)
 - `.paw/memory`: Project memory (YAML, update in place for reusable info)
 - Slash commands: Embedded in binary (copied to `.paw/.claude/commands/` on setup)
-- `EDITOR` environment variable: Editor for writing tasks (default: vim)
+- Notifications: Configure optional Slack/ntfy settings in `.paw/config`
 </details>
 
 ## Dependencies
 
-```bash
-brew install tmux gh
-```
+Use `paw check` to verify prerequisites.
+
+| Dependency | Required | Purpose |
+|------------|----------|---------|
+| tmux | Yes | Terminal multiplexer for managing task windows |
+| claude | Yes | Claude Code CLI for running agents |
+| git | Optional | Needed for worktree mode in git repositories |
+| gh | Optional | PR creation for `/pr` and `auto-pr` mode |
+| paw-notify.app (macOS) | Optional | Desktop notifications and action buttons |
+
+Install tmux/gh via Homebrew: `brew install tmux gh`. Install the Claude Code CLI from https://claude.ai/claude-code.
 
 ## tmux shortcuts
 
 ### Navigation
 | Action | Shortcut |
 |--------|----------|
-| Cycle panes | `⌥Tab` |
+| Cycle panes / task options (new task) | `⌥Tab` |
 | Move window | `⌥←/→` |
 
 ### Task Commands
 | Action | Shortcut |
 |--------|----------|
 | New task | `⌃N` |
-| Cancel task | `⌃K` |
+| Cancel task (double-press) | `⌃K` |
 | Finish task | `⌃F` |
-| Sync with main | `⌃U` |
+| Branch menu (↑ merge, ↓ sync) | `⌃]` |
 | Quit paw | `⌃Q` |
 
 ### Toggle Panels
