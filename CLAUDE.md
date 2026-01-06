@@ -65,20 +65,20 @@ go tool cover -html=coverage.out -o coverage.html
 
 | Package | Coverage | Notes |
 |---------|----------|-------|
-| internal/config | ~93% | Fully tested |
-| internal/logging | ~93% | Fully tested |
-| internal/app | ~79% | Core functionality tested |
-| internal/service | ~80% | History service with mocks |
-| internal/embed | ~69% | Asset loading tested |
-| internal/constants | ~57% | Pattern matching tested |
-| internal/task | ~22% | Manager tests require mocks |
-| internal/claude | ~15% | CLI operations need mocks |
-| internal/git | ~7% | Requires git repository |
-| internal/github | 0% | Requires `gh` CLI |
-| internal/tmux | 0% | Requires tmux server |
-| internal/notify | 0% | Platform-specific (macOS) |
+| internal/constants | 100.0% | Name/window helpers fully covered |
+| internal/logging | 92.6% | Core logging behavior covered |
+| internal/config | 85.4% | Config parsing/saving and hook formatting |
+| internal/app | 79.7% | App context and environment handling |
+| internal/service | 79.7% | History service with mocks |
+| internal/embed | 78.1% | Embedded asset loading |
+| internal/claude | 35.8% | CLI client command construction tested |
+| internal/notify | 32.1% | Slack/ntfy helpers covered; macOS paths limited |
+| internal/task | 26.1% | Manager logic partially covered |
+| internal/git | 6.1% | Git CLI wrappers minimally covered |
+| internal/github | 6.1% | gh CLI command construction only |
+| internal/tmux | 3.1% | Struct defaults and constants only |
 | internal/tui | 0% | Interactive UI components |
-| cmd/paw | ~4% | Cobra command handlers |
+| cmd/paw | 3.1% | Cobra command handlers |
 | cmd/paw-notify | 0% | macOS-only CGO binary |
 
 ## Directory structure
