@@ -275,6 +275,9 @@ func startNewSession(app *app.App, tm tmux.Client) error {
 	_ = tm.SendKeysLiteral(app.SessionName+":"+constants.NewWindowName, newTaskCmd)
 	_ = tm.SendKeys(app.SessionName+":"+constants.NewWindowName, "Enter")
 
+	// Set iTerm tab title before attaching
+	setTerminalTitle("[paw] " + app.SessionName)
+
 	// Attach to session
 	return tm.AttachSession(app.SessionName)
 }
@@ -376,6 +379,9 @@ func attachToSession(app *app.App, tm tmux.Client) error {
 	}
 
 	logging.Debug("Attaching to session: %s", app.SessionName)
+	// Set iTerm tab title before attaching
+	setTerminalTitle("[paw] " + app.SessionName)
+
 	// Attach to session
 	return tm.AttachSession(app.SessionName)
 }
@@ -470,6 +476,14 @@ func setupTmuxConfig(app *app.App, tm tmux.Client) error {
 	return nil
 }
 
+
+// setTerminalTitle sets the terminal (iTerm) tab title using OSC escape sequences.
+// This works with iTerm2 and other terminals that support OSC 0/1/2.
+func setTerminalTitle(title string) {
+	// OSC 0 sets both window and tab title
+	// Format: ESC ] 0 ; <title> BEL
+	fmt.Printf("\x1b]0;%s\x07", title)
+}
 
 // updateGitignore adds .paw gitignore rules if not already present
 // Rules: .paw/ (ignore all), !.paw/config (keep config), !.paw/memory (keep memory)
