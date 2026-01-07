@@ -53,3 +53,49 @@ var userPromptSubmitHookCmd = &cobra.Command{
 		return nil
 	},
 }
+
+// askUserQuestionHookCmd handles the PostToolUse hook for AskUserQuestion.
+// This is triggered when the user responds to an AskUserQuestion tool call
+// (e.g., by selecting an option from the UI), which doesn't trigger UserPromptSubmit.
+var askUserQuestionHookCmd = &cobra.Command{
+	Use:   "ask-user-question-hook",
+	Short: "Handle Claude PostToolUse hook for AskUserQuestion to set working status",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sessionName := os.Getenv("SESSION_NAME")
+		windowID := os.Getenv("WINDOW_ID")
+		taskName := os.Getenv("TASK_NAME")
+		if sessionName == "" || windowID == "" || taskName == "" {
+			return nil
+		}
+
+		if pawDir := os.Getenv("PAW_DIR"); pawDir != "" {
+			logger, _ := logging.New(filepath.Join(pawDir, constants.LogFileName), os.Getenv("PAW_DEBUG") == "1")
+			if logger != nil {
+				defer func() { _ = logger.Close() }()
+				logger.SetScript("ask-user-question-hook")
+				logger.SetTask(taskName)
+				logging.SetGlobal(logger)
+			}
+		}
+
+		logging.Trace("askUserQuestionHookCmd: start session=%s windowID=%s task=%s", sessionName, windowID, taskName)
+		defer logging.Trace("askUserQuestionHookCmd: end")
+
+		tm := tmux.New(sessionName)
+		paneID := windowID + ".0"
+		if !tm.HasPane(paneID) {
+			logging.Debug("askUserQuestionHookCmd: pane %s not found, skipping", paneID)
+			return nil
+		}
+
+		// Set window to working state (user answered AskUserQuestion, agent is now working)
+		newName := constants.EmojiWorking + constants.TruncateForWindowName(taskName)
+		if err := renameWindowCmd.RunE(renameWindowCmd, []string{windowID, newName}); err != nil {
+			logging.Warn("askUserQuestionHookCmd: failed to rename window: %v", err)
+			return nil
+		}
+
+		logging.Debug("askUserQuestionHookCmd: status updated to working")
+		return nil
+	},
+}

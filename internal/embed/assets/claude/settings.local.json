@@ -26,6 +26,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${PAW_BIN} internal ask-user-question-hook",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }
