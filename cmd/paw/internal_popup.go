@@ -639,16 +639,15 @@ var restorePanesCmd = &cobra.Command{
 		logging.Debug("Current pane count: %s", paneCount)
 
 		// Task window should have 2 panes: agent (0) and user (1)
-		if paneCount == "2" {
-			_ = tm.DisplayMessage("All panes are present", 2000)
-			return nil
-		}
-
 		// Get working directory (t and mgr already set above)
 		workDir := mgr.GetWorkingDirectory(t)
 
 		// Check which pane is missing and restore
-		if paneCount == "0" {
+		switch paneCount {
+		case "2":
+			_ = tm.DisplayMessage("All panes are present", 2000)
+			return nil
+		case "0":
 			// Both panes missing - respawn the window
 			logging.Info("Both panes missing, respawning agent pane")
 
@@ -671,7 +670,7 @@ var restorePanesCmd = &cobra.Command{
 			}
 
 			_ = tm.DisplayMessage("Restored both panes", 2000)
-		} else if paneCount == "1" {
+		case "1":
 			// One pane exists - need to determine which one is missing
 			// Check if the existing pane is running claude (agent) or shell (user)
 			paneCmd, err := tm.GetPaneCommand(windowID + ".0")
@@ -715,6 +714,10 @@ var restorePanesCmd = &cobra.Command{
 				}
 				_ = tm.DisplayMessage("Restored agent pane", 2000)
 			}
+		default:
+			logging.Warn("Unexpected pane count (%s), skipping restore", paneCount)
+			_ = tm.DisplayMessage(fmt.Sprintf("Unexpected pane count: %s", paneCount), 2000)
+			return nil
 		}
 
 		logging.Info("Panes restored for task: %s", t.Name)
