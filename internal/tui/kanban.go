@@ -27,13 +27,15 @@ type KanbanView struct {
 	// Scroll state
 	scrollOffset int
 	focused      bool
+	focusedCol   int // -1 = none, 0-3 = specific column
 }
 
 // NewKanbanView creates a new Kanban view.
 func NewKanbanView(isDark bool) *KanbanView {
 	return &KanbanView{
-		isDark:  isDark,
-		service: service.NewTaskDiscoveryService(),
+		isDark:     isDark,
+		service:    service.NewTaskDiscoveryService(),
+		focusedCol: -1, // No column focused initially
 	}
 }
 
@@ -75,15 +77,6 @@ func (k *KanbanView) Render() string {
 		Foreground(dimColor).
 		Italic(true)
 
-	borderColor := dimColor
-	if k.focused {
-		borderColor = lipgloss.Color("39")
-	}
-	panelStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
-		Padding(0, 1)
-
 	// Calculate column width (4 columns with gaps)
 	// Minimum width per column
 	if k.width < 40 {
@@ -110,7 +103,16 @@ func (k *KanbanView) Render() string {
 	var columnViews []string
 	maxHeight := k.height - 4 // Reserve space for title and border
 
-	for _, col := range columns {
+	for colIdx, col := range columns {
+		// Determine border color for this column
+		borderColor := dimColor
+		if k.focused && k.focusedCol == colIdx {
+			borderColor = lipgloss.Color("39")
+		}
+		panelStyle := lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(borderColor).
+			Padding(0, 1)
 		var content strings.Builder
 
 		// Column header
@@ -208,11 +210,38 @@ func (k *KanbanView) TaskCount() int {
 // SetFocused sets the focus state of the kanban view.
 func (k *KanbanView) SetFocused(focused bool) {
 	k.focused = focused
+	if !focused {
+		k.focusedCol = -1 // Clear column focus when unfocusing
+	}
 }
 
 // IsFocused returns whether the kanban view is focused.
 func (k *KanbanView) IsFocused() bool {
 	return k.focused
+}
+
+// SetFocusedColumn sets which column is focused (0-3), or -1 for none.
+func (k *KanbanView) SetFocusedColumn(col int) {
+	if col >= -1 && col < 4 {
+		k.focusedCol = col
+	}
+}
+
+// FocusedColumn returns the currently focused column index (-1 if none).
+func (k *KanbanView) FocusedColumn() int {
+	return k.focusedCol
+}
+
+// ColumnWidth returns the width of each column (including border).
+func (k *KanbanView) ColumnWidth() int {
+	if k.width < 40 {
+		return 0
+	}
+	columnWidth := (k.width - 6) / 4
+	if columnWidth < 15 {
+		columnWidth = 15
+	}
+	return columnWidth + 2 // +2 for left and right border
 }
 
 // ScrollUp scrolls the kanban view up by n lines.

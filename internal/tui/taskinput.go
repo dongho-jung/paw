@@ -260,6 +260,12 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.textarea.SetSelection(row, col, row, col)
 				}
 			}
+
+			// Handle Kanban column selection
+			if clickedPanel == FocusPanelKanban {
+				col := m.detectKanbanColumn(msg.X, msg.Y)
+				m.kanban.SetFocusedColumn(col)
+			}
 		}
 
 	case tea.MouseMotionMsg:
@@ -797,12 +803,30 @@ func (m *TaskInput) detectClickedPanel(x, y int) FocusPanel {
 	}
 
 	// Below top section = kanban (if visible)
-	if m.height > 20 && m.kanban.HasTasks() {
+	// Kanban is visible when height > 20 and width >= 40 (minimum width for Kanban to render)
+	if m.height > 20 && m.width >= 40 {
 		return FocusPanelKanban
 	}
 
 	// Default to current focus if no clear match
 	return m.focusPanel
+}
+
+// detectKanbanColumn determines which Kanban column was clicked based on X position.
+// Returns column index (0-3) or -1 if outside column area.
+func (m *TaskInput) detectKanbanColumn(x, y int) int {
+	colWidth := m.kanban.ColumnWidth()
+	if colWidth <= 0 {
+		return -1
+	}
+
+	// Kanban columns start at X=0
+	// Each column takes colWidth pixels
+	col := x / colWidth
+	if col >= 0 && col < 4 {
+		return col
+	}
+	return -1
 }
 
 // switchFocusTo switches focus to the specified panel.
