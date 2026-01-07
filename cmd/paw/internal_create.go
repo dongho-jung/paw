@@ -519,14 +519,14 @@ var handleTaskCmd = &cobra.Command{
 			userPrompt.WriteString("✅ **Auto-merge allowed when:**\n")
 			userPrompt.WriteString("- The Plan marks the change as automatically verifiable\n")
 			userPrompt.WriteString("- Build/tests/lint all pass\n\n")
-			userPrompt.WriteString("❌ **Do NOT auto-merge → switch to 💬 when:**\n")
+			userPrompt.WriteString("❌ **Do NOT auto-merge when:**\n")
 			userPrompt.WriteString("- Automated verification is not possible (UI/docs/config changes, etc.)\n")
 			userPrompt.WriteString("- Tests are missing or not relevant\n")
 			userPrompt.WriteString("- Verification fails\n\n")
 			userPrompt.WriteString("**If verification succeeds:**\n")
 			userPrompt.WriteString(fmt.Sprintf("→ Run `%s`\n\n", endTaskScriptPath))
 			userPrompt.WriteString("**If verification is impossible or fails:**\n")
-			userPrompt.WriteString("→ `tmux rename-window \"💬...\"` and wait for user review\n\n")
+			userPrompt.WriteString("→ Explain the blocker and stop; PAW will set the window status automatically.\n\n")
 		}
 
 		userPrompt.WriteString("---\n\n")

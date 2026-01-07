@@ -3,5 +3,18 @@
     "allow": [
       "Bash(echo:*)"
     ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${PAW_BIN} internal stop-hook",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
   }
 }

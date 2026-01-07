@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -185,6 +186,13 @@ func (c *claudeClient) runClaudeWithModel(prompt, model string, thinking bool, t
 	logging.Trace("runClaudeWithModel: executing claude %v with timeout=%v", args, timeout)
 
 	cmd := exec.CommandContext(ctx, "claude", args...)
+	env := append(os.Environ(), "PAW_STOP_HOOK=1")
+	if os.Getenv("PAW_BIN") == "" {
+		if exe, err := os.Executable(); err == nil {
+			env = append(env, "PAW_BIN="+exe)
+		}
+	}
+	cmd.Env = env
 	cmd.Stdin = strings.NewReader(prompt)
 
 	var stdout, stderr bytes.Buffer

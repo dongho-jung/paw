@@ -356,19 +356,8 @@ notes:
 
 ## Window Status
 
-Window ID is already stored in the `$WINDOW_ID` environment variable:
-
-```bash
-# Update status directly via tmux (inside the tmux session)
-$PAW_BIN internal rename-window $WINDOW_ID "🤖${TASK_NAME:0:12}"  # Working - in progress
-$PAW_BIN internal rename-window $WINDOW_ID "💬${TASK_NAME:0:12}"  # Waiting - awaiting user response
-$PAW_BIN internal rename-window $WINDOW_ID "✅${TASK_NAME:0:12}"  # Done - completed
-```
-
-**Switch to 💬 when:**
-- You ask a question via AskUserQuestion (switch before asking).
-- Automated verification is not possible and user confirmation is needed.
-- You hit 3 failed attempts and need user help.
+Window status is managed automatically by PAW (wait watcher + stop hook). Do not rename windows manually.
+If user input is needed, ask via AskUserQuestion and clearly state the question.
 
 ---
 
@@ -381,7 +370,7 @@ $PAW_BIN internal rename-window $WINDOW_ID "✅${TASK_NAME:0:12}"  # Done - comp
 - Commit granularity and messages
 - PR title and content
 
-**Ask the user** (switch to `$PAW_BIN internal rename-window $WINDOW_ID "💬..."` first):
+**Ask the user**:
 - When the task is complex and you need Plan confirmation
 - When requirements are unclear
 - When trade-offs between options are significant

@@ -75,6 +75,7 @@ Tasks merged externally (PR merge, direct branch merge, etc.) are cleaned up aut
 - 💬 Waiting (user input required)
 - ✅ Done
 - ⚠️ Warning (merge failed, needs manual resolution)
+- Status updates are automatic (wait watcher + Claude Code stop hook classification on exit).
 
 ## Configuration
 

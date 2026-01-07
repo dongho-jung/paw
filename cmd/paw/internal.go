@@ -55,6 +55,7 @@ func init() {
 	// Utility commands
 	internalCmd.AddCommand(ctrlCCmd)
 	internalCmd.AddCommand(renameWindowCmd)
+	internalCmd.AddCommand(stopHookCmd)
 	internalCmd.AddCommand(watchWaitCmd)
 
 	// Add flags to end-task command
