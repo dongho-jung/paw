@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -249,17 +250,85 @@ var endTaskCmd = &cobra.Command{
 							mergeSpinner.Start()
 							logging.Debug("Squash merging branch %s into %s...", targetTask.Name, mainBranch)
 							mergeMsg := fmt.Sprintf("feat: %s", targetTask.Name)
+							mergeConflictOccurred := false // Track if we had to resolve conflicts
 							if err := gitClient.MergeSquash(app.ProjectDir, targetTask.Name, mergeMsg); err != nil {
-								logging.Warn("Merge failed: %v - may need manual resolution", err)
-								// Abort merge on conflict
-								if abortErr := gitClient.MergeAbort(app.ProjectDir); abortErr != nil {
-									logging.Warn("Failed to abort merge: %v", abortErr)
-								}
-								mergeTimer.StopWithResult(false, "merge conflict")
+								logging.Warn("Merge failed: %v - checking for conflicts", err)
 								mergeSpinner.Stop(false, "conflict")
-								mergeSuccess = false
-							} else {
-								mergeSpinner.Stop(true, "")
+								mergeConflictOccurred = true
+
+								// Check if this is a conflict situation
+								hasConflicts, conflictFiles, _ := gitClient.HasConflicts(app.ProjectDir)
+								if hasConflicts && len(conflictFiles) > 0 {
+									// Try to resolve conflicts with Claude
+									fmt.Println()
+									fmt.Printf("  ⚠️  Merge conflicts detected in %d file(s):\n", len(conflictFiles))
+									for _, f := range conflictFiles {
+										fmt.Printf("      - %s\n", f)
+									}
+									fmt.Println()
+
+									resolveSpinner := tui.NewSimpleSpinner("Resolving conflicts with Claude")
+									resolveSpinner.Start()
+
+									// Get task content for context
+									taskContent, _ := targetTask.LoadContent()
+
+									// Run Claude to resolve conflicts
+									if resolveErr := resolveConflictsWithClaude(app.ProjectDir, targetTask.Name, taskContent, conflictFiles); resolveErr != nil {
+										logging.Warn("Claude conflict resolution failed: %v", resolveErr)
+										resolveSpinner.Stop(false, "failed")
+										// Abort merge
+										if abortErr := gitClient.MergeAbort(app.ProjectDir); abortErr != nil {
+											logging.Warn("Failed to abort merge: %v", abortErr)
+										}
+										mergeTimer.StopWithResult(false, "conflict resolution failed")
+										mergeSuccess = false
+									} else {
+										// Check if conflicts are actually resolved
+										stillHasConflicts, remainingFiles, _ := gitClient.HasConflicts(app.ProjectDir)
+										if stillHasConflicts && len(remainingFiles) > 0 {
+											logging.Warn("Conflicts still exist after Claude resolution: %v", remainingFiles)
+											resolveSpinner.Stop(false, "unresolved")
+											// Abort merge
+											if abortErr := gitClient.MergeAbort(app.ProjectDir); abortErr != nil {
+												logging.Warn("Failed to abort merge: %v", abortErr)
+											}
+											mergeTimer.StopWithResult(false, "conflicts remain")
+											mergeSuccess = false
+										} else {
+											resolveSpinner.Stop(true, "resolved")
+											logging.Log("Conflicts resolved by Claude, completing merge")
+
+											// Stage all changes and commit
+											if addErr := gitClient.AddAll(app.ProjectDir); addErr != nil {
+												logging.Warn("Failed to stage resolved files: %v", addErr)
+											}
+											if commitErr := gitClient.Commit(app.ProjectDir, mergeMsg); commitErr != nil {
+												logging.Warn("Failed to commit merge: %v", commitErr)
+												mergeTimer.StopWithResult(false, "commit failed")
+												mergeSuccess = false
+											} else {
+												// Merge completed successfully after conflict resolution
+												logging.Log("Merge completed after conflict resolution")
+											}
+										}
+									}
+								} else {
+									// No conflicts detected, but merge still failed - abort
+									logging.Warn("Merge failed without conflicts - may need manual resolution")
+									if abortErr := gitClient.MergeAbort(app.ProjectDir); abortErr != nil {
+										logging.Warn("Failed to abort merge: %v", abortErr)
+									}
+									mergeTimer.StopWithResult(false, "merge failed")
+									mergeSuccess = false
+								}
+							}
+							// If merge succeeded (either directly or after conflict resolution), push
+							if mergeSuccess {
+								// Only stop merge spinner if we didn't have conflicts (already stopped above)
+								if !mergeConflictOccurred {
+									mergeSpinner.Stop(true, "")
+								}
 
 								// Push merged main
 								pushMainSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Pushing %s to origin", mainBranch))
@@ -927,12 +996,70 @@ var mergeTaskCmd = &cobra.Command{
 			mergeSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Merging %s", targetTask.Name))
 			mergeSpinner.Start()
 			mergeMsg := fmt.Sprintf("feat: %s", targetTask.Name)
+			mergeConflictOccurred := false
 			if err := gitClient.MergeSquash(app.ProjectDir, targetTask.Name, mergeMsg); err != nil {
 				mergeSpinner.Stop(false, "conflict")
-				_ = gitClient.MergeAbort(app.ProjectDir)
-				mergeSuccess = false
-			} else {
-				mergeSpinner.Stop(true, "")
+				mergeConflictOccurred = true
+
+				// Check if this is a conflict situation
+				hasConflicts, conflictFiles, _ := gitClient.HasConflicts(app.ProjectDir)
+				if hasConflicts && len(conflictFiles) > 0 {
+					// Try to resolve conflicts with Claude
+					fmt.Println()
+					fmt.Printf("  ⚠️  Merge conflicts detected in %d file(s):\n", len(conflictFiles))
+					for _, f := range conflictFiles {
+						fmt.Printf("      - %s\n", f)
+					}
+					fmt.Println()
+
+					resolveSpinner := tui.NewSimpleSpinner("Resolving conflicts with Claude")
+					resolveSpinner.Start()
+
+					// Get task content for context
+					taskContent, _ := targetTask.LoadContent()
+
+					// Run Claude to resolve conflicts
+					if resolveErr := resolveConflictsWithClaude(app.ProjectDir, targetTask.Name, taskContent, conflictFiles); resolveErr != nil {
+						logging.Warn("Claude conflict resolution failed: %v", resolveErr)
+						resolveSpinner.Stop(false, "failed")
+						_ = gitClient.MergeAbort(app.ProjectDir)
+						mergeSuccess = false
+					} else {
+						// Check if conflicts are actually resolved
+						stillHasConflicts, remainingFiles, _ := gitClient.HasConflicts(app.ProjectDir)
+						if stillHasConflicts && len(remainingFiles) > 0 {
+							logging.Warn("Conflicts still exist after Claude resolution: %v", remainingFiles)
+							resolveSpinner.Stop(false, "unresolved")
+							_ = gitClient.MergeAbort(app.ProjectDir)
+							mergeSuccess = false
+						} else {
+							resolveSpinner.Stop(true, "resolved")
+							logging.Log("Conflicts resolved by Claude, completing merge")
+
+							// Stage all changes and commit
+							if addErr := gitClient.AddAll(app.ProjectDir); addErr != nil {
+								logging.Warn("Failed to stage resolved files: %v", addErr)
+							}
+							if commitErr := gitClient.Commit(app.ProjectDir, mergeMsg); commitErr != nil {
+								logging.Warn("Failed to commit merge: %v", commitErr)
+								mergeSuccess = false
+							} else {
+								logging.Log("Merge completed after conflict resolution")
+							}
+						}
+					}
+				} else {
+					// No conflicts detected, but merge still failed - abort
+					_ = gitClient.MergeAbort(app.ProjectDir)
+					mergeSuccess = false
+				}
+			}
+
+			// If merge succeeded (either directly or after conflict resolution), push
+			if mergeSuccess {
+				if !mergeConflictOccurred {
+					mergeSpinner.Stop(true, "")
+				}
 
 				// Push main
 				pushMainSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Pushing %s", mainBranch))
@@ -1163,6 +1290,63 @@ var recoverTaskCmd = &cobra.Command{
 		fmt.Printf("Task %s recovered successfully\n", taskName)
 		return nil
 	},
+}
+
+// resolveConflictsWithClaude attempts to resolve merge conflicts using Claude.
+// It runs Claude with a prompt asking it to resolve the conflicts in the given files.
+// Returns nil if conflicts were resolved, error otherwise.
+func resolveConflictsWithClaude(projectDir, taskName, taskContent string, conflictFiles []string) error {
+	if len(conflictFiles) == 0 {
+		return nil
+	}
+
+	// Build the prompt for Claude
+	filesStr := strings.Join(conflictFiles, "\n  - ")
+	prompt := fmt.Sprintf(`You are resolving merge conflicts in a git repository.
+
+## Conflicting Files
+  - %s
+
+## Task Context
+Task name: %s
+Task description:
+%s
+
+## Instructions
+1. Read each conflicting file listed above
+2. Look for conflict markers (<<<<<<< HEAD, =======, >>>>>>> branch)
+3. Resolve each conflict by keeping the correct code that makes sense for the task
+4. Save each resolved file using the Edit tool
+5. After resolving ALL conflicts, run: git add -A
+
+IMPORTANT:
+- Do NOT abort or skip any files
+- Resolve ALL conflicts before running git add
+- Make sure the final code is valid and compiles
+- If unsure, prefer keeping BOTH changes merged intelligently
+
+Start resolving the conflicts now.`, filesStr, taskName, taskContent)
+
+	logging.Debug("resolveConflictsWithClaude: starting conflict resolution for %d files", len(conflictFiles))
+	logging.Trace("resolveConflictsWithClaude: prompt=%s", prompt)
+
+	// Set a timeout for conflict resolution (5 minutes)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	// Run claude with the conflict resolution prompt
+	cmd := exec.CommandContext(ctx, "claude", "--dangerously-skip-permissions", prompt)
+	cmd.Dir = projectDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		logging.Warn("resolveConflictsWithClaude: claude command failed: %v", err)
+		return fmt.Errorf("claude conflict resolution failed: %w", err)
+	}
+
+	logging.Debug("resolveConflictsWithClaude: claude completed successfully")
+	return nil
 }
 
 // isStaleLock checks if the merge lock file is stale (the process that created it is no longer running).
