@@ -11,6 +11,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 
+	"github.com/dongho-jung/paw/internal/claude"
+	"github.com/dongho-jung/paw/internal/config"
 	"github.com/dongho-jung/paw/internal/embed"
 	"github.com/dongho-jung/paw/internal/git"
 	"github.com/dongho-jung/paw/internal/logging"
@@ -650,6 +652,79 @@ var restorePanesCmd = &cobra.Command{
 		}
 
 		logging.Info("Panes restored for task: %s", t.Name)
+
+		// Check for stdin injection failure: if agent pane exists but session marker doesn't,
+		// it means the task instruction was never sent
+		if err := checkAndRecoverStdinInjection(tm, t, windowID, agentDir); err != nil {
+			logging.Warn("Failed to recover stdin injection: %v", err)
+		}
+
 		return nil
 	},
+}
+
+// checkAndRecoverStdinInjection detects and recovers from failed stdin injection.
+// If Claude is running but the session marker doesn't exist, it sends the task instruction.
+func checkAndRecoverStdinInjection(tm tmux.Client, t *task.Task, windowID, agentDir string) error {
+	agentPane := windowID + ".0"
+
+	// Check if session marker exists (indicates task instruction was sent successfully)
+	if t.HasSessionMarker() {
+		logging.Trace("checkAndRecoverStdinInjection: session marker exists, skipping")
+		return nil
+	}
+
+	// Check if user prompt file exists (required to send task instruction)
+	userPromptPath := t.GetUserPromptPath()
+	if _, err := os.Stat(userPromptPath); os.IsNotExist(err) {
+		logging.Debug("checkAndRecoverStdinInjection: user prompt not found, skipping")
+		return nil
+	}
+
+	// Check if Claude is running in the agent pane
+	claudeClient := claude.New()
+	if !claudeClient.IsClaudeRunning(tm, agentPane) {
+		logging.Debug("checkAndRecoverStdinInjection: Claude not running, skipping")
+		return nil
+	}
+
+	// Claude is running but session marker doesn't exist - stdin injection likely failed
+	logging.Info("Detected failed stdin injection for task %s, recovering...", t.Name)
+
+	// Load task options to get ultrathink setting
+	taskOpts, err := config.LoadTaskOptions(agentDir)
+	if err != nil {
+		logging.Warn("Failed to load task options: %v", err)
+		taskOpts = config.DefaultTaskOptions()
+	}
+
+	// Build and send task instruction
+	var taskInstruction string
+	if taskOpts.Ultrathink {
+		taskInstruction = fmt.Sprintf("ultrathink Read and execute the task from '%s'", userPromptPath)
+	} else {
+		taskInstruction = fmt.Sprintf("Read and execute the task from '%s'", userPromptPath)
+	}
+
+	logging.Debug("Sending task instruction: ultrathink=%v", taskOpts.Ultrathink)
+
+	if err := claudeClient.SendInputWithRetry(tm, agentPane, taskInstruction, 5); err != nil {
+		// Try basic send as last resort
+		logging.Warn("SendInputWithRetry failed, trying basic send: %v", err)
+		if err := claudeClient.SendInput(tm, agentPane, taskInstruction); err != nil {
+			return fmt.Errorf("failed to send task instruction: %w", err)
+		}
+	}
+
+	// Create session marker to prevent re-sending on next restore
+	if err := t.CreateSessionMarker(); err != nil {
+		logging.Warn("Failed to create session marker: %v", err)
+	} else {
+		logging.Debug("Session marker created after stdin recovery")
+	}
+
+	_ = tm.DisplayMessage(fmt.Sprintf("Recovered task instruction for: %s", t.Name), 2000)
+	logging.Info("Successfully recovered stdin injection for task: %s", t.Name)
+
+	return nil
 }
