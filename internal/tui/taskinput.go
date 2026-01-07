@@ -797,7 +797,8 @@ func (m *TaskInput) detectClickedPanel(x, y int) FocusPanel {
 	}
 
 	// Below top section = kanban (if visible)
-	if m.height > 20 && m.kanban.HasTasks() {
+	// Kanban is visible when height > 20 and width >= 40 (minimum width for Kanban to render)
+	if m.height > 20 && m.width >= 40 {
 		return FocusPanelKanban
 	}
 
