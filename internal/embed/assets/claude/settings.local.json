@@ -15,6 +15,17 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${PAW_BIN} internal user-prompt-submit-hook",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }
