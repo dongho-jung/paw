@@ -18,8 +18,9 @@ import (
 type FocusPanel int
 
 const (
-	FocusPanelLeft  FocusPanel = iota // Task input textarea
-	FocusPanelRight                   // Options panel
+	FocusPanelLeft   FocusPanel = iota // Task input textarea
+	FocusPanelRight                    // Options panel
+	FocusPanelKanban                   // Kanban view
 )
 
 // OptField represents which option field is currently selected.
@@ -58,6 +59,13 @@ type TaskInput struct {
 
 	// Kanban view for tasks across all sessions
 	kanban *KanbanView
+
+	// Box position tracking for mouse focus (calculated during View)
+	// These track the Y coordinate where each section starts
+	textareaStartY   int
+	textareaEndY     int
+	optionsPanelEndX int
+	kanbanStartY     int
 }
 
 // tickMsg is used for periodic Kanban refresh.
@@ -210,15 +218,21 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		// Toggle panel: Alt+Tab (cycle between input box and options)
+		// Toggle panel: Alt+Tab (cycle between input box, options, and kanban)
 		case "alt+tab":
 			m.applyOptionInputValues()
-			if m.focusPanel == FocusPanelLeft {
-				m.focusPanel = FocusPanelRight
-				m.textarea.Blur()
-			} else {
-				m.focusPanel = FocusPanelLeft
-				m.textarea.Focus()
+			switch m.focusPanel {
+			case FocusPanelLeft:
+				m.switchFocusTo(FocusPanelRight)
+			case FocusPanelRight:
+				// Switch to Kanban if visible, otherwise back to Left
+				if m.height > 20 && m.kanban.HasTasks() {
+					m.switchFocusTo(FocusPanelKanban)
+				} else {
+					m.switchFocusTo(FocusPanelLeft)
+				}
+			case FocusPanelKanban:
+				m.switchFocusTo(FocusPanelLeft)
 			}
 			return m, nil
 		}
@@ -228,15 +242,30 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateOptionsPanel(msg)
 		}
 
+		// Kanban panel key handling
+		if m.focusPanel == FocusPanelKanban {
+			return m.updateKanbanPanel(msg)
+		}
+
 		// Left panel (textarea) - handle mouse clicks below
 
 	case tea.MouseClickMsg:
 		if msg.Button == tea.MouseLeft {
-			if row, col, ok := m.handleTextareaMouse(msg.X, msg.Y); ok {
-				m.mouseSelecting = true
-				m.selectAnchorRow = row
-				m.selectAnchorCol = col
-				m.textarea.SetSelection(row, col, row, col)
+			// Determine which panel was clicked and switch focus
+			clickedPanel := m.detectClickedPanel(msg.X, msg.Y)
+			if clickedPanel != m.focusPanel {
+				m.applyOptionInputValues()
+				m.switchFocusTo(clickedPanel)
+			}
+
+			// Handle textarea mouse selection if clicking in textarea
+			if clickedPanel == FocusPanelLeft {
+				if row, col, ok := m.handleTextareaMouse(msg.X, msg.Y); ok {
+					m.mouseSelecting = true
+					m.selectAnchorRow = row
+					m.selectAnchorCol = col
+					m.textarea.SetSelection(row, col, row, col)
+				}
 			}
 		}
 
@@ -254,6 +283,10 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textarea.ClearSelection()
 			}
 		}
+
+	case tea.MouseWheelMsg:
+		// Handle mouse scroll on the focused panel
+		m.handleMouseScroll(msg)
 	}
 
 	// Update textarea if left panel is focused
@@ -392,9 +425,20 @@ func (m *TaskInput) View() tea.View {
 		Foreground(dimColor).
 		MarginTop(1)
 
-	// Build left panel (task input)
-	var leftPanel strings.Builder
-	leftPanel.WriteString(m.textarea.View())
+	// Build left panel (task input) with scrollbar if needed
+	textareaView := m.textarea.View()
+
+	// Add scrollbar to textarea if content overflows
+	// Textarea height is 7, check if content has more lines
+	contentLines := strings.Count(m.textarea.Value(), "\n") + 1
+	visibleLines := 7
+	if contentLines > visibleLines {
+		scrollOffset := m.textarea.Line() // Use cursor line as scroll indicator
+		scrollbar := renderVerticalScrollbar(contentLines, visibleLines, scrollOffset, m.isDark)
+		if scrollbar != "" {
+			textareaView = lipgloss.JoinHorizontal(lipgloss.Top, textareaView, scrollbar)
+		}
+	}
 
 	// Build right panel (options)
 	rightPanel := m.renderOptionsPanel()
@@ -403,7 +447,7 @@ func (m *TaskInput) View() tea.View {
 	gapStyle := lipgloss.NewStyle().Width(4)
 	topSection := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		leftPanel.String(),
+		textareaView,
 		gapStyle.Render(""),
 		rightPanel,
 	)
@@ -424,10 +468,13 @@ func (m *TaskInput) View() tea.View {
 
 	// Add help text at bottom
 	sb.WriteString("\n")
-	if m.focusPanel == FocusPanelLeft {
+	switch m.focusPanel {
+	case FocusPanelLeft:
 		sb.WriteString(helpStyle.Render("Alt+Enter/F5: Submit  |  ⌥Tab: Options  |  Esc: Cancel"))
-	} else {
-		sb.WriteString(helpStyle.Render("↑/↓: Navigate  |  ←/→: Change  |  ⌥Tab: Task  |  Alt+Enter: Submit"))
+	case FocusPanelRight:
+		sb.WriteString(helpStyle.Render("↑/↓: Navigate  |  ←/→: Change  |  ⌥Tab: Tasks  |  Alt+Enter: Submit"))
+	case FocusPanelKanban:
+		sb.WriteString(helpStyle.Render("↑/↓: Scroll  |  ⌥Tab: Input  |  Alt+Enter: Submit  |  Esc: Cancel"))
 	}
 
 	v := tea.NewView(sb.String())
@@ -732,6 +779,142 @@ func (m *TaskInput) moveCursorToVisualColumn(targetCol int) {
 	}
 
 	m.textarea.SetCursorColumn(col)
+}
+
+// detectClickedPanel determines which panel was clicked based on mouse position.
+func (m *TaskInput) detectClickedPanel(x, y int) FocusPanel {
+	// Calculate approximate box boundaries
+	// Textarea: starts at Y=0, ends at textareaEndY (around 9 rows including border)
+	// Options panel: same Y range as textarea, but to the right
+	// Kanban: starts after textarea, takes remaining space
+
+	textareaHeight := 9 // 7 rows + 2 for border
+	textareaWidth := min(m.width-50, 80)
+	if textareaWidth < 40 {
+		textareaWidth = 40
+	}
+
+	// Check if click is in the top section (textarea or options)
+	if y < textareaHeight {
+		// Left side = textarea, right side = options
+		if x < textareaWidth+2 { // +2 for padding
+			return FocusPanelLeft
+		}
+		return FocusPanelRight
+	}
+
+	// Below top section = kanban (if visible)
+	if m.height > 20 && m.kanban.HasTasks() {
+		return FocusPanelKanban
+	}
+
+	// Default to current focus if no clear match
+	return m.focusPanel
+}
+
+// switchFocusTo switches focus to the specified panel.
+func (m *TaskInput) switchFocusTo(panel FocusPanel) {
+	// Blur current panel
+	switch m.focusPanel {
+	case FocusPanelLeft:
+		m.textarea.Blur()
+	case FocusPanelKanban:
+		m.kanban.SetFocused(false)
+	}
+
+	m.focusPanel = panel
+
+	// Focus new panel
+	switch panel {
+	case FocusPanelLeft:
+		m.textarea.Focus()
+	case FocusPanelKanban:
+		m.kanban.SetFocused(true)
+	}
+}
+
+// updateKanbanPanel handles key events when the kanban panel is focused.
+func (m *TaskInput) updateKanbanPanel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	keyStr := msg.String()
+
+	switch keyStr {
+	case "up", "k":
+		m.kanban.ScrollUp(1)
+		return m, nil
+	case "down", "j":
+		m.kanban.ScrollDown(1)
+		return m, nil
+	case "pgup", "ctrl+u":
+		m.kanban.ScrollUp(5)
+		return m, nil
+	case "pgdown", "ctrl+d":
+		m.kanban.ScrollDown(5)
+		return m, nil
+	}
+
+	return m, nil
+}
+
+// handleMouseScroll handles mouse wheel scroll events.
+func (m *TaskInput) handleMouseScroll(msg tea.MouseWheelMsg) {
+	// Scroll the panel under the mouse cursor
+	clickedPanel := m.detectClickedPanel(msg.X, msg.Y)
+
+	switch clickedPanel {
+	case FocusPanelLeft:
+		// Scroll the textarea by moving the cursor
+		switch msg.Button {
+		case tea.MouseWheelUp:
+			m.textarea.CursorUp()
+		case tea.MouseWheelDown:
+			m.textarea.CursorDown()
+		}
+	case FocusPanelKanban:
+		// Scroll the kanban view
+		switch msg.Button {
+		case tea.MouseWheelUp:
+			m.kanban.ScrollUp(1)
+		case tea.MouseWheelDown:
+			m.kanban.ScrollDown(1)
+		}
+	}
+}
+
+// renderVerticalScrollbar renders a vertical scrollbar indicator.
+// Returns a string with one character per line representing the scrollbar.
+func renderVerticalScrollbar(contentHeight, visibleHeight, scrollOffset int, isDark bool) string {
+	if contentHeight <= visibleHeight || visibleHeight <= 0 {
+		return "" // No scrollbar needed
+	}
+
+	lightDark := lipgloss.LightDark(isDark)
+	trackColor := lightDark(lipgloss.Color("250"), lipgloss.Color("238"))
+	thumbColor := lightDark(lipgloss.Color("245"), lipgloss.Color("245"))
+
+	trackStyle := lipgloss.NewStyle().Foreground(trackColor)
+	thumbStyle := lipgloss.NewStyle().Foreground(thumbColor)
+
+	// Calculate thumb position and size
+	thumbSize := max(1, visibleHeight*visibleHeight/contentHeight)
+	maxOffset := contentHeight - visibleHeight
+	thumbPosition := 0
+	if maxOffset > 0 {
+		thumbPosition = scrollOffset * (visibleHeight - thumbSize) / maxOffset
+	}
+	thumbPosition = max(0, min(thumbPosition, visibleHeight-thumbSize))
+
+	var sb strings.Builder
+	for i := 0; i < visibleHeight; i++ {
+		if i >= thumbPosition && i < thumbPosition+thumbSize {
+			sb.WriteString(thumbStyle.Render("┃"))
+		} else {
+			sb.WriteString(trackStyle.Render("│"))
+		}
+		if i < visibleHeight-1 {
+			sb.WriteString("\n")
+		}
+	}
+	return sb.String()
 }
 
 // Result returns the task input result.

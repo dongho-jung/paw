@@ -23,6 +23,10 @@ type KanbanView struct {
 	waiting  []*service.DiscoveredTask
 	done     []*service.DiscoveredTask
 	warning  []*service.DiscoveredTask
+
+	// Scroll state
+	scrollOffset int
+	focused      bool
 }
 
 // NewKanbanView creates a new Kanban view.
@@ -72,6 +76,9 @@ func (k *KanbanView) Render() string {
 		Italic(true)
 
 	borderColor := dimColor
+	if k.focused {
+		borderColor = lipgloss.Color("39")
+	}
 	panelStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
@@ -114,9 +121,10 @@ func (k *KanbanView) Render() string {
 		content.WriteString(strings.Repeat("─", columnWidth-4))
 		content.WriteString("\n")
 
-		// Tasks (limited by height)
+		// Tasks (limited by height, with scroll offset applied)
 		// Each task shows: project/name (line 1), current action if any (line 2)
-		linesUsed := 2 // header + separator
+		linesUsed := 2     // header + separator
+		linesSkipped := 0  // Track lines skipped for scroll
 		for _, task := range col.tasks {
 			if linesUsed >= maxHeight {
 				break
@@ -128,6 +136,17 @@ func (k *KanbanView) Render() string {
 			if len(displayName) > columnWidth-6 {
 				displayName = displayName[:columnWidth-7] + "…"
 			}
+
+			// Apply scroll offset - skip lines until we've scrolled past them
+			if linesSkipped < k.scrollOffset {
+				linesSkipped++
+				// Also skip the action line if present
+				if task.CurrentAction != "" {
+					linesSkipped++
+				}
+				continue
+			}
+
 			content.WriteString(taskNameStyle.Render(displayName))
 			content.WriteString("\n")
 			linesUsed++
@@ -161,6 +180,12 @@ func (k *KanbanView) Render() string {
 	// Combine columns horizontally
 	board := lipgloss.JoinHorizontal(lipgloss.Top, columnViews...)
 
+	// Add scrollbar if content overflows
+	if k.NeedsScrollbar() {
+		scrollbar := k.renderScrollbar(maxHeight - 2) // -2 for header lines
+		board = lipgloss.JoinHorizontal(lipgloss.Top, board, " ", scrollbar)
+	}
+
 	// Add title
 	var result strings.Builder
 	result.WriteString(titleStyle.Render("Tasks"))
@@ -178,4 +203,121 @@ func (k *KanbanView) HasTasks() bool {
 // TaskCount returns the total number of cached tasks.
 func (k *KanbanView) TaskCount() int {
 	return len(k.working) + len(k.waiting) + len(k.done) + len(k.warning)
+}
+
+// SetFocused sets the focus state of the kanban view.
+func (k *KanbanView) SetFocused(focused bool) {
+	k.focused = focused
+}
+
+// IsFocused returns whether the kanban view is focused.
+func (k *KanbanView) IsFocused() bool {
+	return k.focused
+}
+
+// ScrollUp scrolls the kanban view up by n lines.
+func (k *KanbanView) ScrollUp(n int) {
+	k.scrollOffset -= n
+	if k.scrollOffset < 0 {
+		k.scrollOffset = 0
+	}
+}
+
+// ScrollDown scrolls the kanban view down by n lines.
+func (k *KanbanView) ScrollDown(n int) {
+	maxOffset := k.maxScrollOffset()
+	k.scrollOffset += n
+	if k.scrollOffset > maxOffset {
+		k.scrollOffset = maxOffset
+	}
+}
+
+// ScrollOffset returns the current scroll offset.
+func (k *KanbanView) ScrollOffset() int {
+	return k.scrollOffset
+}
+
+// maxScrollOffset returns the maximum scroll offset.
+func (k *KanbanView) maxScrollOffset() int {
+	contentHeight := k.maxTaskLinesInAnyColumn()
+	visibleHeight := k.height - 4 // Reserve for title and borders
+	if contentHeight <= visibleHeight {
+		return 0
+	}
+	return contentHeight - visibleHeight
+}
+
+// maxTaskLinesInAnyColumn returns the max number of lines needed across all columns.
+func (k *KanbanView) maxTaskLinesInAnyColumn() int {
+	columns := [][]*service.DiscoveredTask{k.working, k.waiting, k.done, k.warning}
+	maxLines := 0
+	for _, tasks := range columns {
+		lines := 0
+		for _, task := range tasks {
+			lines++ // Task name
+			if task.CurrentAction != "" {
+				lines++ // Current action
+			}
+		}
+		if lines > maxLines {
+			maxLines = lines
+		}
+	}
+	return maxLines
+}
+
+// NeedsScrollbar returns true if the kanban view needs a scrollbar.
+func (k *KanbanView) NeedsScrollbar() bool {
+	return k.maxScrollOffset() > 0
+}
+
+// VisibleHeight returns the visible height of the kanban content area.
+func (k *KanbanView) VisibleHeight() int {
+	return k.height - 4
+}
+
+// ContentHeight returns the total content height (max lines across columns).
+func (k *KanbanView) ContentHeight() int {
+	return k.maxTaskLinesInAnyColumn()
+}
+
+// renderScrollbar renders a vertical scrollbar for the kanban view.
+func (k *KanbanView) renderScrollbar(visibleHeight int) string {
+	if visibleHeight <= 0 {
+		return ""
+	}
+
+	contentHeight := k.ContentHeight()
+	if contentHeight <= visibleHeight {
+		return ""
+	}
+
+	lightDark := lipgloss.LightDark(k.isDark)
+	trackColor := lightDark(lipgloss.Color("250"), lipgloss.Color("238"))
+	thumbColor := lightDark(lipgloss.Color("245"), lipgloss.Color("245"))
+
+	trackStyle := lipgloss.NewStyle().Foreground(trackColor)
+	thumbStyle := lipgloss.NewStyle().Foreground(thumbColor)
+
+	// Calculate thumb position and size
+	thumbSize := max(1, visibleHeight*visibleHeight/contentHeight)
+	maxOffset := contentHeight - visibleHeight
+	thumbPosition := 0
+	if maxOffset > 0 {
+		thumbPosition = k.scrollOffset * (visibleHeight - thumbSize) / maxOffset
+	}
+	thumbPosition = max(0, min(thumbPosition, visibleHeight-thumbSize))
+
+	var sb strings.Builder
+	for i := 0; i < visibleHeight; i++ {
+		if i >= thumbPosition && i < thumbPosition+thumbSize {
+			sb.WriteString(thumbStyle.Render("┃"))
+		} else {
+			sb.WriteString(trackStyle.Render("│"))
+		}
+		if i < visibleHeight-1 {
+			sb.WriteString("\n")
+		}
+	}
+	return sb.String()
 }
