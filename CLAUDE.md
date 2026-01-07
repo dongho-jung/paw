@@ -66,19 +66,20 @@ go tool cover -html=coverage.out -o coverage.html
 | Package | Coverage | Notes |
 |---------|----------|-------|
 | internal/constants | 100.0% | Name/window helpers fully covered |
+| internal/tui/textarea/internal/* | 100.0% | Memoization and runeutil fully covered |
 | internal/logging | 92.6% | Core logging behavior covered |
 | internal/config | 85.4% | Config parsing/saving and hook formatting |
 | internal/app | 79.7% | App context and environment handling |
-| internal/service | 79.7% | History service with mocks |
-| internal/embed | 78.1% | Embedded asset loading |
-| internal/claude | 35.8% | CLI client command construction tested |
+| internal/embed | 75.0% | Embedded asset loading |
+| internal/service | 55.0% | History and task discovery services |
+| internal/claude | 35.0% | CLI client command construction tested |
 | internal/notify | 32.1% | Slack/ntfy helpers covered; macOS paths limited |
-| internal/task | 26.1% | Manager logic partially covered |
+| internal/task | 28.9% | Manager logic partially covered |
 | internal/git | 6.1% | Git CLI wrappers minimally covered |
 | internal/github | 6.1% | gh CLI command construction only |
+| cmd/paw | 3.8% | Cobra command handlers |
 | internal/tmux | 3.1% | Struct defaults and constants only |
 | internal/tui | 0% | Interactive UI components |
-| cmd/paw | 3.1% | Cobra command handlers |
 | cmd/paw-notify | 0% | macOS-only CGO binary |
 
 ## Directory structure
@@ -92,12 +93,16 @@ paw/                           # This repository
 │   ├── internal_create.go     # Task creation commands (toggleNew, newTask, spawnTask, handleTask)
 │   ├── internal_lifecycle.go  # Task lifecycle commands (endTask, cancelTask, doneTask)
 │   ├── internal_popup.go      # Popup/UI commands (toggleLog, toggleHelp, taskList)
+│   ├── internal_sync.go       # Sync commands (syncWithMain, syncTask, toggleBranch)
+│   ├── internal_stop_hook.go  # Claude stop hook handling (task status classification)
+│   ├── internal_user_prompt_hook.go # User prompt submission hook
 │   ├── internal_utils.go      # Utility commands and helpers (ctrlC, renameWindow)
 │   ├── keybindings.go         # Tmux keybinding definitions
 │   └── wait.go                # Wait detection for user input prompts
 ├── cmd/paw-notify/            # Notification helper (macOS app bundle)
 │   ├── main.go                # CGO code for UserNotifications (darwin only)
 │   ├── doc.go                 # Stub for non-darwin platforms
+│   ├── icon.png               # App bundle icon
 │   └── Info.plist             # App bundle configuration
 ├── internal/                  # Go internal packages
 │   ├── app/                   # Application context
@@ -118,7 +123,8 @@ paw/                           # This repository
 │   ├── service/               # Business logic services (history, etc.)
 │   ├── task/                  # Task management
 │   ├── tmux/                  # Tmux client
-│   └── tui/                   # Terminal UI (log viewer)
+│   └── tui/                   # Terminal UI components
+│       └── textarea/          # Custom textarea component (fork of bubbles)
 ├── Makefile                   # Build script
 └── go.mod                     # Go module file
 
