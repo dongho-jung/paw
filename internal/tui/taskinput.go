@@ -59,13 +59,6 @@ type TaskInput struct {
 
 	// Kanban view for tasks across all sessions
 	kanban *KanbanView
-
-	// Box position tracking for mouse focus (calculated during View)
-	// These track the Y coordinate where each section starts
-	textareaStartY   int
-	textareaEndY     int
-	optionsPanelEndX int
-	kanbanStartY     int
 }
 
 // tickMsg is used for periodic Kanban refresh.

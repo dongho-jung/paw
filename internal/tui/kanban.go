@@ -13,16 +13,16 @@ import (
 
 // KanbanView renders a Kanban-style task board.
 type KanbanView struct {
-	width    int
-	height   int
-	isDark   bool
-	service  *service.TaskDiscoveryService
+	width   int
+	height  int
+	isDark  bool
+	service *service.TaskDiscoveryService
 
 	// Cached task data (refreshed on tick, not on every render)
-	working  []*service.DiscoveredTask
-	waiting  []*service.DiscoveredTask
-	done     []*service.DiscoveredTask
-	warning  []*service.DiscoveredTask
+	working []*service.DiscoveredTask
+	waiting []*service.DiscoveredTask
+	done    []*service.DiscoveredTask
+	warning []*service.DiscoveredTask
 
 	// Scroll state
 	scrollOffset int
@@ -96,15 +96,15 @@ func (k *KanbanView) Render() string {
 
 	// Build each column
 	columns := []struct {
-		emoji  string
-		title  string
-		tasks  []*service.DiscoveredTask
-		color  string
+		emoji string
+		title string
+		tasks []*service.DiscoveredTask
+		color string
 	}{
-		{constants.EmojiWorking, "Working", working, "40"},   // Green
-		{constants.EmojiWaiting, "Waiting", waiting, "220"},  // Yellow
-		{constants.EmojiDone, "Done", done, "245"},           // Gray
-		{constants.EmojiWarning, "Warning", warning, "203"},  // Red
+		{constants.EmojiWorking, "Working", working, "40"},  // Green
+		{constants.EmojiWaiting, "Waiting", waiting, "220"}, // Yellow
+		{constants.EmojiDone, "Done", done, "245"},          // Gray
+		{constants.EmojiWarning, "Warning", warning, "203"}, // Red
 	}
 
 	var columnViews []string
@@ -123,8 +123,8 @@ func (k *KanbanView) Render() string {
 
 		// Tasks (limited by height, with scroll offset applied)
 		// Each task shows: project/name (line 1), current action if any (line 2)
-		linesUsed := 2     // header + separator
-		linesSkipped := 0  // Track lines skipped for scroll
+		linesUsed := 2    // header + separator
+		linesSkipped := 0 // Track lines skipped for scroll
 		for _, task := range col.tasks {
 			if linesUsed >= maxHeight {
 				break

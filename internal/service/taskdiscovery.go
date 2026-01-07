@@ -16,13 +16,13 @@ import (
 
 // DiscoveredTask represents a task discovered from any PAW session.
 type DiscoveredTask struct {
-	Name          string         // Task name (without emoji)
-	Session       string         // Session name (project name)
+	Name          string // Task name (without emoji)
+	Session       string // Session name (project name)
 	Status        DiscoveredStatus
-	WindowID      string         // Tmux window ID
-	Preview       string         // Last 3 lines from agent pane
-	CurrentAction string         // Agent's current action (extracted from ⏺ spinner line)
-	CreatedAt     time.Time      // Estimated creation time
+	WindowID      string    // Tmux window ID
+	Preview       string    // Last 3 lines from agent pane
+	CurrentAction string    // Agent's current action (extracted from ⏺ spinner line)
+	CreatedAt     time.Time // Estimated creation time
 }
 
 // DiscoveredStatus represents the status of a discovered task.

@@ -68,6 +68,5 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 		{Key: "C-b", Command: cmdToggleBottom, NoPrefix: true},
 		{Key: "C-_", Command: cmdToggleHelp, NoPrefix: true}, // Ctrl+/ sends C-_
 		{Key: "C-y", Command: cmdToggleIdea, NoPrefix: true},
-
 	}
 }

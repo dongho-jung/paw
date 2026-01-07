@@ -190,10 +190,10 @@ func TestAppSetters(t *testing.T) {
 
 func TestAppUpdateSessionNameForGitRepo(t *testing.T) {
 	tests := []struct {
-		name           string
-		projectDir     string
-		repoRoot       string
-		wantSession    string
+		name        string
+		projectDir  string
+		repoRoot    string
+		wantSession string
 	}{
 		{
 			name:        "project at repo root",

@@ -48,20 +48,20 @@ func TruncateForWindowName(name string) string {
 
 // Display limits
 const (
-	MaxDisplayNameLen   = 32
-	MaxTaskNameLen      = 32
-	MinTaskNameLen      = 8
-	MaxWindowNameLen    = 12 // Max task name length in tmux window names
+	MaxDisplayNameLen = 32
+	MaxTaskNameLen    = 32
+	MinTaskNameLen    = 8
+	MaxWindowNameLen  = 12 // Max task name length in tmux window names
 )
 
 // Claude interaction timeouts
 const (
 	ClaudeReadyMaxAttempts  = 60
 	ClaudeReadyPollInterval = 500 * time.Millisecond
-	ClaudeNameGenTimeout1   = 1 * time.Minute  // haiku
-	ClaudeNameGenTimeout2   = 2 * time.Minute  // sonnet
-	ClaudeNameGenTimeout3   = 3 * time.Minute  // opus
-	ClaudeNameGenTimeout4   = 4 * time.Minute  // opus with thinking
+	ClaudeNameGenTimeout1   = 1 * time.Minute // haiku
+	ClaudeNameGenTimeout2   = 2 * time.Minute // sonnet
+	ClaudeNameGenTimeout3   = 3 * time.Minute // opus
+	ClaudeNameGenTimeout4   = 4 * time.Minute // opus with thinking
 )
 
 // Git/Worktree timeouts
@@ -77,9 +77,9 @@ const (
 
 // Default configuration values
 const (
-	DefaultMainBranch  = "main"
-	DefaultWorkMode    = "worktree"
-	DefaultOnComplete  = "confirm"
+	DefaultMainBranch = "main"
+	DefaultWorkMode   = "worktree"
+	DefaultOnComplete = "confirm"
 )
 
 // Directory and file names
@@ -115,8 +115,8 @@ const (
 
 // Merge lock settings
 const (
-	MergeLockMaxRetries    = 30                    // Maximum retries to acquire merge lock
-	MergeLockRetryInterval = 1 * time.Second       // Interval between lock retries
+	MergeLockMaxRetries    = 30              // Maximum retries to acquire merge lock
+	MergeLockRetryInterval = 1 * time.Second // Interval between lock retries
 )
 
 // Double-press detection
@@ -126,6 +126,6 @@ const (
 
 // Task window handling
 const (
-	WindowIDWaitMaxAttempts = 60                      // Max attempts to wait for window ID file
-	WindowIDWaitInterval    = 500 * time.Millisecond  // Interval between checks
+	WindowIDWaitMaxAttempts = 60                     // Max attempts to wait for window ID file
+	WindowIDWaitInterval    = 500 * time.Millisecond // Interval between checks
 )

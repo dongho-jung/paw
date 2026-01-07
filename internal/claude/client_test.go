@@ -106,15 +106,15 @@ func TestTaskNamePattern(t *testing.T) {
 	}
 
 	invalidNames := []string{
-		"short",        // too short
-		"-start-dash",  // starts with dash
-		"end-dash-",    // ends with dash
-		"has space",    // contains space
-		"HAS_UPPER",    // contains uppercase
-		"a",            // too short
-		"ab",           // too short
-		"abc",          // too short
-		"",             // empty
+		"short",       // too short
+		"-start-dash", // starts with dash
+		"end-dash-",   // ends with dash
+		"has space",   // contains space
+		"HAS_UPPER",   // contains uppercase
+		"a",           // too short
+		"ab",          // too short
+		"abc",         // too short
+		"",            // empty
 	}
 
 	for _, name := range validNames {
@@ -320,23 +320,23 @@ func (m *mockTmuxClient) GetPaneCommand(target string) (string, error) {
 }
 
 // Implement remaining interface methods as no-ops
-func (m *mockTmuxClient) HasSession(name string) bool                                    { return false }
-func (m *mockTmuxClient) NewSession(opts tmux.SessionOpts) error                         { return nil }
-func (m *mockTmuxClient) AttachSession(name string) error                                { return nil }
-func (m *mockTmuxClient) KillSession(name string) error                                  { return nil }
-func (m *mockTmuxClient) KillServer() error                                              { return nil }
-func (m *mockTmuxClient) NewWindow(opts tmux.WindowOpts) (string, error)                 { return "", nil }
-func (m *mockTmuxClient) KillWindow(target string) error                                 { return nil }
-func (m *mockTmuxClient) RenameWindow(target, name string) error                         { return nil }
-func (m *mockTmuxClient) ListWindows() ([]tmux.Window, error)                            { return nil, nil }
-func (m *mockTmuxClient) SelectWindow(target string) error                               { return nil }
-func (m *mockTmuxClient) MoveWindow(source, target string) error                         { return nil }
-func (m *mockTmuxClient) SplitWindow(target string, h bool, d, c string) error           { return nil }
-func (m *mockTmuxClient) SplitWindowPane(opts tmux.SplitOpts) (string, error)            { return "", nil }
-func (m *mockTmuxClient) SelectPane(target string) error                                 { return nil }
-func (m *mockTmuxClient) KillPane(target string) error                                   { return nil }
-func (m *mockTmuxClient) ClearHistory(target string) error                               { return nil }
-func (m *mockTmuxClient) RespawnPane(target, startDir, command string) error             { return nil }
+func (m *mockTmuxClient) HasSession(name string) bool                          { return false }
+func (m *mockTmuxClient) NewSession(opts tmux.SessionOpts) error               { return nil }
+func (m *mockTmuxClient) AttachSession(name string) error                      { return nil }
+func (m *mockTmuxClient) KillSession(name string) error                        { return nil }
+func (m *mockTmuxClient) KillServer() error                                    { return nil }
+func (m *mockTmuxClient) NewWindow(opts tmux.WindowOpts) (string, error)       { return "", nil }
+func (m *mockTmuxClient) KillWindow(target string) error                       { return nil }
+func (m *mockTmuxClient) RenameWindow(target, name string) error               { return nil }
+func (m *mockTmuxClient) ListWindows() ([]tmux.Window, error)                  { return nil, nil }
+func (m *mockTmuxClient) SelectWindow(target string) error                     { return nil }
+func (m *mockTmuxClient) MoveWindow(source, target string) error               { return nil }
+func (m *mockTmuxClient) SplitWindow(target string, h bool, d, c string) error { return nil }
+func (m *mockTmuxClient) SplitWindowPane(opts tmux.SplitOpts) (string, error)  { return "", nil }
+func (m *mockTmuxClient) SelectPane(target string) error                       { return nil }
+func (m *mockTmuxClient) KillPane(target string) error                         { return nil }
+func (m *mockTmuxClient) ClearHistory(target string) error                     { return nil }
+func (m *mockTmuxClient) RespawnPane(target, startDir, command string) error   { return nil }
 func (m *mockTmuxClient) WaitForPane(target string, maxWait time.Duration, minLen int) error {
 	return nil
 }

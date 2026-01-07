@@ -12,8 +12,8 @@ type BranchAction int
 
 const (
 	BranchActionCancel BranchAction = iota
-	BranchActionMerge  // ↑ Merge to main (default ← task)
-	BranchActionSync   // ↓ Sync from main (default → task)
+	BranchActionMerge               // ↑ Merge to main (default ← task)
+	BranchActionSync                // ↓ Sync from main (default → task)
 )
 
 // BranchMenu is a simple menu for branch operations.

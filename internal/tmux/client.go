@@ -115,7 +115,7 @@ type PopupOpts struct {
 	Height      string
 	Title       string
 	Style       string
-	Close       bool              // -E flag: close on exit
+	Close       bool // -E flag: close on exit
 	BorderStyle string
 	Directory   string            // -d flag: working directory
 	Env         map[string]string // -e flag: environment variables
@@ -161,7 +161,6 @@ func New(sessionName string) Client {
 		sessionName: sessionName,
 	}
 }
-
 
 func (c *tmuxClient) cmd(args ...string) *exec.Cmd {
 	allArgs := append([]string{"-f", configPath, "-L", c.socket}, args...)
@@ -570,4 +569,3 @@ func (c *tmuxClient) DisplayMessage(message string, durationMs int) error {
 	logging.Trace("tmux.DisplayMessage: message=%s durationMs=%d", message, durationMs)
 	return c.Run("display-message", "-d", fmt.Sprintf("%d", durationMs), message)
 }
-

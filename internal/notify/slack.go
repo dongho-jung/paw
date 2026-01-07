@@ -19,16 +19,16 @@ const (
 
 // slackMessage represents a Slack webhook message payload.
 type slackMessage struct {
-	Text        string             `json:"text,omitempty"`
-	Attachments []slackAttachment  `json:"attachments,omitempty"`
+	Text        string            `json:"text,omitempty"`
+	Attachments []slackAttachment `json:"attachments,omitempty"`
 }
 
 // slackAttachment represents a Slack message attachment for rich formatting.
 type slackAttachment struct {
-	Color    string `json:"color,omitempty"`
-	Title    string `json:"title,omitempty"`
-	Text     string `json:"text,omitempty"`
-	Footer   string `json:"footer,omitempty"`
+	Color  string `json:"color,omitempty"`
+	Title  string `json:"title,omitempty"`
+	Text   string `json:"text,omitempty"`
+	Footer string `json:"footer,omitempty"`
 }
 
 // SendSlack sends a notification to Slack via webhook.

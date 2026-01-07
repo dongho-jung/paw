@@ -32,7 +32,7 @@ type Client interface {
 // PRStatus represents the status of a pull request.
 type PRStatus struct {
 	Number int    `json:"number"`
-	State  string `json:"state"`  // "open", "closed", "merged"
+	State  string `json:"state"` // "open", "closed", "merged"
 	Merged bool   `json:"merged"`
 	URL    string `json:"url"`
 }

@@ -258,4 +258,3 @@ func getShell() string {
 	}
 	return shell
 }
-

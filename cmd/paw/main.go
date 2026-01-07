@@ -476,7 +476,6 @@ func setupTmuxConfig(app *app.App, tm tmux.Client) error {
 	return nil
 }
 
-
 // setTerminalTitle sets the terminal (iTerm) tab title using OSC escape sequences.
 // This works with iTerm2 and other terminals that support OSC 0/1/2.
 func setTerminalTitle(title string) {

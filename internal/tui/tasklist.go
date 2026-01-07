@@ -29,15 +29,15 @@ const (
 
 // TaskItem represents a task in the list view.
 type TaskItem struct {
-	Name       string
-	Status     TaskItemStatus
-	Content    string         // Task content (from task file)
-	Summary    string         // Work summary (for done/history tasks)
-	UpdatedAt  time.Time      // Last state change time
-	WindowID   string         // Tmux window ID (for active tasks)
-	AgentDir   string         // Agent directory path
-	HistoryFile string        // History file path (for history tasks)
-	Task       *task.Task     // Original task (nil for history items)
+	Name        string
+	Status      TaskItemStatus
+	Content     string     // Task content (from task file)
+	Summary     string     // Work summary (for done/history tasks)
+	UpdatedAt   time.Time  // Last state change time
+	WindowID    string     // Tmux window ID (for active tasks)
+	AgentDir    string     // Agent directory path
+	HistoryFile string     // History file path (for history tasks)
+	Task        *task.Task // Original task (nil for history items)
 }
 
 // TaskListAction represents the action to take on a task.
@@ -395,7 +395,7 @@ func (m *TaskListUI) View() tea.View {
 		Foreground(lipgloss.Color("250"))
 
 	// Layout: left panel (task list) + right panel (preview)
-	listWidth := m.width * 35 / 100 // 35% for task list
+	listWidth := m.width * 35 / 100         // 35% for task list
 	previewWidth := m.width - listWidth - 3 // Rest for preview (minus border)
 
 	var listBuilder strings.Builder
