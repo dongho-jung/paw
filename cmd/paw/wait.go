@@ -20,6 +20,7 @@ const (
 	waitPollInterval       = 2 * time.Second
 	waitMarkerMaxDistance  = 8
 	waitAskUserMaxDistance = 32
+	doneMarkerMaxDistance  = 50 // Allow more distance since agent may continue talking after PAW_DONE
 	waitPopupWidth         = "70%"
 	waitPopupHeight        = "50%"
 	// Maximum number of options for notification action buttons
@@ -115,6 +116,18 @@ var watchWaitCmd = &cobra.Command{
 			contentChanged := content != lastContent
 			if contentChanged {
 				lastContent = content
+
+				// Check for done marker first (takes priority over wait detection)
+				doneDetected := detectDoneInContent(content)
+				if doneDetected && !isFinal {
+					logging.Debug("Done marker detected in pane content")
+					if err := ensureDoneWindow(tm, windowID, taskName); err != nil {
+						logging.Trace("Failed to rename window to done: %v", err)
+					}
+					// Skip wait detection since task is done
+					time.Sleep(waitPollInterval)
+					continue
+				}
 
 				waitDetected, reason := detectWaitInContent(content)
 
@@ -215,6 +228,70 @@ func ensureWaitingWindow(tm tmux.Client, windowID, taskName string) error {
 
 func waitingWindowName(taskName string) string {
 	return constants.EmojiWaiting + constants.TruncateForWindowName(taskName)
+}
+
+func doneWindowName(taskName string) string {
+	return constants.EmojiDone + constants.TruncateForWindowName(taskName)
+}
+
+// detectDoneInContent checks if the content contains the PAW_DONE marker.
+// Returns true if the marker is found within doneMarkerMaxDistance lines from the end.
+func detectDoneInContent(content string) bool {
+	lines := strings.Split(content, "\n")
+	lines = trimTrailingEmpty(lines)
+	if len(lines) == 0 {
+		return false
+	}
+
+	// Check the last N lines for the marker
+	start := len(lines) - doneMarkerMaxDistance
+	if start < 0 {
+		start = 0
+	}
+	for _, line := range lines[start:] {
+		if strings.TrimSpace(line) == doneMarker {
+			return true
+		}
+	}
+	return false
+}
+
+// ensureDoneWindow renames the window to done status if it belongs to the task.
+func ensureDoneWindow(tm tmux.Client, windowID, taskName string) error {
+	logging.Trace("ensureDoneWindow: start windowID=%s task=%s", windowID, taskName)
+	defer logging.Trace("ensureDoneWindow: end")
+
+	windowName, err := getWindowName(tm, windowID)
+	if err != nil {
+		// Window doesn't exist, nothing to do
+		return nil
+	}
+
+	// Check if this window belongs to this task (prevents cross-task renaming)
+	extractedName, isTask := constants.ExtractTaskName(windowName)
+	if !isTask {
+		// Not a task window, don't rename
+		return nil
+	}
+
+	// Verify task name matches (accounting for truncation to 12 chars)
+	expectedName := taskName
+	if len(expectedName) > 12 {
+		expectedName = expectedName[:12]
+	}
+	if extractedName != expectedName {
+		// Wrong task window, don't rename (prevents race condition)
+		return nil
+	}
+
+	// Already in final state, don't change
+	if isFinalWindow(windowName) {
+		return nil
+	}
+
+	newName := doneWindowName(taskName)
+	logging.Trace("ensureDoneWindow: renaming window from=%s to=%s", windowName, newName)
+	return tm.RenameWindow(windowID, newName)
 }
 
 func detectWaitInContent(content string) (bool, string) {
