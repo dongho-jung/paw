@@ -96,7 +96,7 @@ var endTaskCmd = &cobra.Command{
 				}
 				diffStat, _ := gitClient.GetDiffStat(workDir)
 				logging.Trace("Changes: %s", strings.ReplaceAll(diffStat, "\n", ", "))
-				message := fmt.Sprintf("chore: auto-commit on task end\n\n%s", diffStat)
+				message := fmt.Sprintf(constants.CommitMessageAutoCommit, diffStat)
 				if err := gitClient.Commit(workDir, message); err != nil {
 					commitTimer.StopWithResult(false, err.Error())
 					spinner.Stop(false, err.Error())
@@ -261,7 +261,7 @@ var endTaskCmd = &cobra.Command{
 							mergeSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Merging %s into %s", targetTask.Name, mainBranch))
 							mergeSpinner.Start()
 							logging.Debug("Squash merging branch %s into %s...", targetTask.Name, mainBranch)
-							mergeMsg := fmt.Sprintf("feat: %s", targetTask.Name)
+							mergeMsg := fmt.Sprintf(constants.CommitMessageMerge, targetTask.Name)
 							mergeConflictOccurred := false // Track if we had to resolve conflicts
 							if err := gitClient.MergeSquash(app.ProjectDir, targetTask.Name, mergeMsg); err != nil {
 								logging.Warn("Merge failed: %v - checking for conflicts", err)
@@ -894,7 +894,7 @@ var mergeTaskCmd = &cobra.Command{
 				logging.Warn("Failed to add changes: %v", err)
 			}
 			diffStat, _ := gitClient.GetDiffStat(workDir)
-			message := fmt.Sprintf("chore: auto-commit before merge\n\n%s", diffStat)
+			message := fmt.Sprintf(constants.CommitMessageAutoCommitMerge, diffStat)
 			if err := gitClient.Commit(workDir, message); err != nil {
 				commitSpinner.Stop(false, err.Error())
 			} else {
@@ -1007,7 +1007,7 @@ var mergeTaskCmd = &cobra.Command{
 			// Squash merge
 			mergeSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Merging %s", targetTask.Name))
 			mergeSpinner.Start()
-			mergeMsg := fmt.Sprintf("feat: %s", targetTask.Name)
+			mergeMsg := fmt.Sprintf(constants.CommitMessageMerge, targetTask.Name)
 			mergeConflictOccurred := false
 			if err := gitClient.MergeSquash(app.ProjectDir, targetTask.Name, mergeMsg); err != nil {
 				mergeSpinner.Stop(false, "conflict")

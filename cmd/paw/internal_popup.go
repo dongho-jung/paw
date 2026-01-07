@@ -473,7 +473,7 @@ var taskListViewerCmd = &cobra.Command{
 					// Commit any changes first
 					if gitClient.HasChanges(worktreeDir) {
 						_ = gitClient.AddAll(worktreeDir)
-						_ = gitClient.Commit(worktreeDir, "chore: auto-commit before push")
+						_ = gitClient.Commit(worktreeDir, constants.CommitMessageAutoCommitPush)
 					}
 					return gitClient.Push(worktreeDir, "origin", item.Name, true)
 				}

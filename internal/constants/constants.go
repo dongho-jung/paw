@@ -129,6 +129,14 @@ const (
 	MergeLockRetryInterval = 1 * time.Second // Interval between lock retries
 )
 
+// Commit message templates
+const (
+	CommitMessageMerge             = "feat: %s"                      // Format string for merge commits
+	CommitMessageAutoCommit        = "chore: auto-commit on task end\n\n%s"
+	CommitMessageAutoCommitMerge   = "chore: auto-commit before merge\n\n%s"
+	CommitMessageAutoCommitPush    = "chore: auto-commit before push"
+)
+
 // Double-press detection
 const (
 	DoublePressIntervalSec = 2 // Seconds to wait for second keypress
