@@ -20,7 +20,7 @@ const (
 	waitPollInterval       = 2 * time.Second
 	waitMarkerMaxDistance  = 8
 	waitAskUserMaxDistance = 32
-	doneMarkerMaxDistance  = 50 // Allow more distance since agent may continue talking after PAW_DONE
+	doneMarkerMaxDistance  = 500 // Allow more distance since agent may continue talking after PAW_DONE
 	waitPopupWidth         = "70%"
 	waitPopupHeight        = "50%"
 	// Maximum number of options for notification action buttons
@@ -240,9 +240,24 @@ func detectDoneInContent(content string) bool {
 		start = 0
 	}
 	for _, line := range lines[start:] {
-		if strings.TrimSpace(line) == doneMarker {
+		if matchesDoneMarker(line) {
 			return true
 		}
+	}
+	return false
+}
+
+// matchesDoneMarker checks if a line contains the PAW_DONE marker.
+// Allows prefix (like "⏺ " from Claude Code) but requires marker at end of line.
+func matchesDoneMarker(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	// Exact match
+	if trimmed == doneMarker {
+		return true
+	}
+	// Allow prefix (e.g., "⏺ PAW_DONE") but marker must be at end
+	if strings.HasSuffix(trimmed, " "+doneMarker) {
+		return true
 	}
 	return false
 }

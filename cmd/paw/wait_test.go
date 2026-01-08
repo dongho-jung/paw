@@ -73,6 +73,15 @@ func TestDetectDoneInContent(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "done marker with Claude Code prefix",
+			content: strings.Join([]string{
+				"Task completed.",
+				"⏺ PAW_DONE",
+				"Ready for review.",
+			}, "\n"),
+			expected: true,
+		},
+		{
 			name: "no done marker",
 			content: strings.Join([]string{
 				"Still working on it...",

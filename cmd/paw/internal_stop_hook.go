@@ -253,6 +253,12 @@ func tailString(value string, maxLen int) string {
 // The marker must appear on its own line (possibly with whitespace).
 func hasDoneMarker(content string) bool {
 	lines := strings.Split(content, "\n")
+	// Trim trailing empty lines to ensure we check the actual content,
+	// not empty lines from terminal scroll regions (consistent with detectDoneInContent in wait.go)
+	lines = trimTrailingEmptyLines(lines)
+	if len(lines) == 0 {
+		return false
+	}
 	// Check the last N lines for the marker (agent may output text after PAW_DONE)
 	// Uses doneMarkerMaxDistance from wait.go for consistency
 	start := len(lines) - doneMarkerMaxDistance
@@ -260,9 +266,36 @@ func hasDoneMarker(content string) bool {
 		start = 0
 	}
 	for _, line := range lines[start:] {
-		if strings.TrimSpace(line) == doneMarker {
+		if matchesDoneMarkerStopHook(line) {
 			return true
 		}
 	}
 	return false
+}
+
+// matchesDoneMarkerStopHook checks if a line contains the PAW_DONE marker.
+// Allows prefix (like "⏺ " from Claude Code) but requires marker at end of line.
+func matchesDoneMarkerStopHook(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	// Exact match
+	if trimmed == doneMarker {
+		return true
+	}
+	// Allow prefix (e.g., "⏺ PAW_DONE") but marker must be at end
+	if strings.HasSuffix(trimmed, " "+doneMarker) {
+		return true
+	}
+	return false
+}
+
+// trimTrailingEmptyLines removes empty/whitespace-only lines from the end of the slice.
+func trimTrailingEmptyLines(lines []string) []string {
+	end := len(lines)
+	for end > 0 {
+		if strings.TrimSpace(lines[end-1]) != "" {
+			break
+		}
+		end--
+	}
+	return lines[:end]
 }

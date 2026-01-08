@@ -59,6 +59,11 @@ func TestHasDoneMarker(t *testing.T) {
 			want:    true,
 		},
 		{
+			name:    "marker with Claude Code prefix",
+			content: "Some output\n⏺ PAW_DONE\nReady for review\n",
+			want:    true,
+		},
+		{
 			name:    "no marker",
 			content: "Some output\nReady for review\n",
 			want:    false,
