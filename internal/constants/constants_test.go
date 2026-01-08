@@ -168,30 +168,148 @@ func TestConstants(t *testing.T) {
 	}
 }
 
+func TestToCamelCase(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "kebab-case to camelCase",
+			input:    "cancel-task-twice",
+			expected: "cancelTaskTwice",
+		},
+		{
+			name:     "snake_case to camelCase",
+			input:    "my_task_name",
+			expected: "myTaskName",
+		},
+		{
+			name:     "mixed separators",
+			input:    "my-task_name",
+			expected: "myTaskName",
+		},
+		{
+			name:     "single word unchanged",
+			input:    "task",
+			expected: "task",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "already camelCase",
+			input:    "myTaskName",
+			expected: "myTaskName",
+		},
+		{
+			name:     "consecutive separators",
+			input:    "my--task",
+			expected: "myTask",
+		},
+		{
+			name:     "separator at start",
+			input:    "-my-task",
+			expected: "myTask",
+		},
+		{
+			name:     "separator at end",
+			input:    "my-task-",
+			expected: "myTask",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ToCamelCase(tt.input)
+			if result != tt.expected {
+				t.Errorf("ToCamelCase(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTruncateWithWidth(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxLen   int
+		expected string
+	}{
+		{
+			name:     "short name fits",
+			input:    "my-task",
+			maxLen:   20,
+			expected: "myTask", // camelCase conversion
+		},
+		{
+			name:     "long name truncated",
+			input:    "cancel-task-twice",
+			maxLen:   10,
+			expected: "cancelTas…",
+		},
+		{
+			name:     "exact fit",
+			input:    "my-task",
+			maxLen:   6,
+			expected: "myTask",
+		},
+		{
+			name:     "very short width",
+			input:    "cancel-task-twice",
+			maxLen:   1,
+			expected: "…",
+		},
+		{
+			name:     "zero width",
+			input:    "cancel-task-twice",
+			maxLen:   0,
+			expected: "",
+		},
+		{
+			name:     "empty input",
+			input:    "",
+			maxLen:   10,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := TruncateWithWidth(tt.input, tt.maxLen)
+			if result != tt.expected {
+				t.Errorf("TruncateWithWidth(%q, %d) = %q, want %q", tt.input, tt.maxLen, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestTruncateForWindowName(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
 	}{
 		{
-			name:     "short name unchanged",
-			input:    "my-task",
+			name:  "short name unchanged",
+			input: "my-task",
 		},
 		{
-			name:     "exact length unchanged",
-			input:    "exactly12chr",
+			name:  "exact length unchanged",
+			input: "exactly12chr",
 		},
 		{
-			name:     "long name truncated",
-			input:    "this-is-a-very-long-task-name",
+			name:  "long name truncated",
+			input: "this-is-a-very-long-task-name",
 		},
 		{
-			name:     "empty string unchanged",
-			input:    "",
+			name:  "empty string unchanged",
+			input: "",
 		},
 		{
-			name:     "unicode name truncated by bytes",
-			input:    "한글태스크",
+			name:  "unicode name truncated by bytes",
+			input: "한글태스크",
 		},
 	}
 
@@ -209,6 +327,20 @@ func TestTruncateForWindowName(t *testing.T) {
 				t.Errorf("TruncateForWindowName(%q) = %q, want suffix %q", tt.input, result, suffix)
 			}
 		})
+	}
+}
+
+func TestTruncateForWindowNameUsesCamelCase(t *testing.T) {
+	// Verify that TruncateForWindowName converts to camelCase
+	input := "cancel-task-twice"
+	result := TruncateForWindowName(input)
+
+	// The result should contain camelCase base (cancelTaskTwice or truncated)
+	// Since MaxWindowNameLen is 20 and suffix is 5 chars (~xxxx), base can be 15 chars
+	// "cancelTaskTwice" is 15 chars, so it fits exactly
+
+	if !strings.HasPrefix(result, "cancelTaskTwice~") {
+		t.Errorf("TruncateForWindowName(%q) = %q, expected camelCase prefix 'cancelTaskTwice~'", input, result)
 	}
 }
 

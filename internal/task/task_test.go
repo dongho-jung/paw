@@ -300,9 +300,9 @@ func TestTaskGetWindowName(t *testing.T) {
 				t.Errorf("GetWindowName() prefix = %q, want %q", windowName[:len(tt.wantPrefix)], tt.wantPrefix)
 			}
 
-			// Check truncation
-			if len(tt.taskName) > 12 {
-				if len(windowName) > len(tt.wantPrefix)+12 {
+			// Check truncation (uses constants.MaxWindowNameLen)
+			if len(tt.taskName) > constants.MaxWindowNameLen {
+				if len(windowName) > len(tt.wantPrefix)+constants.MaxWindowNameLen {
 					t.Errorf("GetWindowName() = %q, should be truncated", windowName)
 				}
 			}
