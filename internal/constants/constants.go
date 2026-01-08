@@ -2,6 +2,8 @@
 package constants
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"strings"
 	"time"
 )
@@ -13,7 +15,6 @@ const (
 	EmojiDone    = "✅"
 	EmojiWarning = "⚠️"
 	EmojiNew     = "⭐️"
-	EmojiIdea    = "💡"
 )
 
 // TaskEmojis contains all emojis used for task windows.
@@ -34,9 +35,8 @@ func IsTaskWindow(windowName string) bool {
 	return false
 }
 
-// ExtractTaskName extracts the task name from a window name by removing the emoji prefix.
-// Returns the task name and true if a task emoji was found, or empty string and false otherwise.
-// Note: The returned name may be truncated to MaxWindowNameLen characters.
+// ExtractTaskName extracts the window token from a window name by removing the emoji prefix.
+// Returns the token and true if a task emoji was found, or empty string and false otherwise.
 func ExtractTaskName(windowName string) (string, bool) {
 	for _, emoji := range TaskEmojis {
 		if strings.HasPrefix(windowName, emoji) {
@@ -46,14 +46,50 @@ func ExtractTaskName(windowName string) (string, bool) {
 	return "", false
 }
 
-// TruncateForWindowName truncates a task name to fit in window name display.
-// This should be used when comparing task names to window names since window
-// names are truncated to MaxWindowNameLen characters.
+const (
+	WindowTokenSep = "~"
+	WindowIDLen    = 4
+)
+
+// TruncateForWindowName returns a stable window token for a task name.
+// The token includes a short ID suffix to avoid collisions.
 func TruncateForWindowName(name string) string {
+	return WindowToken(name)
+}
+
+// LegacyTruncateForWindowName truncates a task name without an ID suffix.
+// This preserves backward compatibility with older window names.
+func LegacyTruncateForWindowName(name string) string {
 	if len(name) > MaxWindowNameLen {
 		return name[:MaxWindowNameLen]
 	}
 	return name
+}
+
+// WindowToken builds a window-safe token with a short stable ID suffix.
+func WindowToken(name string) string {
+	id := ShortTaskID(name)
+	suffix := WindowTokenSep + id
+	maxBase := MaxWindowNameLen - len(suffix)
+	if maxBase < 1 {
+		maxBase = 1
+	}
+	base := name
+	if len(base) > maxBase {
+		base = base[:maxBase]
+	}
+	return base + suffix
+}
+
+// ShortTaskID returns a stable short ID for a task name.
+func ShortTaskID(name string) string {
+	sum := sha1.Sum([]byte(name))
+	return hex.EncodeToString(sum[:])[:WindowIDLen]
+}
+
+// MatchesWindowToken returns true if the extracted window token matches the task name.
+func MatchesWindowToken(extracted, taskName string) bool {
+	return extracted == TruncateForWindowName(taskName) || extracted == LegacyTruncateForWindowName(taskName)
 }
 
 // Display limits
@@ -97,6 +133,7 @@ const (
 	PawDirName       = ".paw"
 	AgentsDirName    = "agents"
 	HistoryDirName   = "history"
+	WindowMapFileName = "window-map.json"
 	ConfigFileName   = "config"
 	LogFileName      = "log"
 	MemoryFileName   = "memory"
@@ -114,7 +151,6 @@ const (
 const (
 	TmuxSocketPrefix = "paw-"
 	NewWindowName    = EmojiNew + "main"
-	IdeaWindowName   = EmojiIdea + "idea"
 )
 
 // Pane capture settings
@@ -131,10 +167,10 @@ const (
 
 // Commit message templates
 const (
-	CommitMessageMerge             = "feat: %s"                      // Format string for merge commits
-	CommitMessageAutoCommit        = "chore: auto-commit on task end\n\n%s"
-	CommitMessageAutoCommitMerge   = "chore: auto-commit before merge\n\n%s"
-	CommitMessageAutoCommitPush    = "chore: auto-commit before push"
+	CommitMessageMerge           = "feat: %s" // Format string for merge commits
+	CommitMessageAutoCommit      = "chore: auto-commit on task end\n\n%s"
+	CommitMessageAutoCommitMerge = "chore: auto-commit before merge\n\n%s"
+	CommitMessageAutoCommitPush  = "chore: auto-commit before push"
 )
 
 // Double-press detection
