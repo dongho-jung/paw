@@ -92,13 +92,13 @@ func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
 	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
 
 	ta := textarea.New()
-	ta.Placeholder = "Describe your task here...\n\nExamples:\n- Add user authentication\n- Fix bug in login form\n- Refactor API handlers"
+	ta.Placeholder = "Describe your task here...\n\nExamples:\n- Add user authentication\n- Fix bug in login form"
 	ta.Focus()
 	ta.CharLimit = 0 // No limit
 	ta.ShowLineNumbers = false
 	ta.Prompt = "" // Clear prompt to avoid extra characters on the left
 	ta.SetWidth(80)
-	ta.SetHeight(7)
+	ta.SetHeight(6) // Match options panel height
 
 	// Enable real cursor for proper IME support (Korean input)
 	ta.VirtualCursor = false
@@ -189,18 +189,26 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		// Input box is fixed at 7 rows, calculate Kanban height from remaining space
-		// Reserve: input box (7) + borders (4) + options panel overhead (2) + help text (2) = ~15 lines
-		kanbanHeight := max(8, msg.Height-15)
+		// Options panel content: title(1) + margin(1) + 4 fields(4) = 6 lines
+		// With border: 6 + 2 = 8 total rendered height
+		// Textarea should match: 8 - 2 (border) = 6 internal height
+		const optionsPanelHeight = 8   // Total rendered height of options panel
+		const optionsContentHeight = 6 // Internal content height (excluding border)
+
+		// Calculate Kanban height from remaining space
+		// Reserve: options panel height + help text (1) + gap (1)
+		kanbanHeight := max(8, msg.Height-optionsPanelHeight-2)
 		m.kanban.SetSize(msg.Width, kanbanHeight)
 
-		// Adjust textarea width only (height is fixed at 7)
-		newWidth := min(msg.Width-50, 80) // Leave room for options panel
-		if newWidth > 40 {
+		// Options panel needs ~43 chars width (content + border + padding)
+		const optionsPanelWidth = 45
+		// Textarea gets remaining width with minimal gap (1 char)
+		newWidth := msg.Width - optionsPanelWidth - 1
+		if newWidth > 30 {
 			m.textarea.SetWidth(newWidth)
 		}
-		// Keep textarea height fixed at 7 rows
-		m.textarea.SetHeight(7)
+		// Set textarea height to match options panel (subtract 2 for border)
+		m.textarea.SetHeight(optionsContentHeight)
 
 	case tea.KeyMsg:
 		keyStr := msg.String()
@@ -468,8 +476,8 @@ func (m *TaskInput) View() tea.View {
 	// Build right panel (options)
 	rightPanel := m.renderOptionsPanel()
 
-	// Join panels horizontally with gap
-	gapStyle := lipgloss.NewStyle().Width(4)
+	// Join panels horizontally with minimal gap
+	gapStyle := lipgloss.NewStyle().Width(1)
 	topSection := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		textareaView,
@@ -519,11 +527,10 @@ func (m *TaskInput) View() tea.View {
 	sb.WriteString(topSection)
 	sb.WriteString("\n")
 
-	// Add Kanban view if there's enough space
+	// Add Kanban view if there's enough space (no extra gap)
 	if m.height > 20 {
 		kanbanContent := m.kanban.Render()
 		if kanbanContent != "" {
-			sb.WriteString("\n")
 			sb.WriteString(kanbanContent)
 		}
 	}
@@ -835,20 +842,25 @@ func (m *TaskInput) moveCursorToVisualColumn(targetCol int) {
 // detectClickedPanel determines which panel was clicked based on mouse position.
 func (m *TaskInput) detectClickedPanel(x, y int) FocusPanel {
 	// Calculate approximate box boundaries
-	// Textarea: starts at Y=0, ends at textareaEndY (around 9 rows including border)
+	// Textarea: starts at Y=1 (after help text), height = 6 + 2 (border) = 8
 	// Options panel: same Y range as textarea, but to the right
-	// Kanban: starts after textarea, takes remaining space
+	// Kanban: starts after top section, takes remaining space
 
-	textareaHeight := 9 // 7 rows + 2 for border
-	textareaWidth := min(m.width-50, 80)
-	if textareaWidth < 40 {
-		textareaWidth = 40
+	const optionsPanelWidth = 45
+	textareaHeight := 8 // 6 rows + 2 for border
+	textareaWidth := m.width - optionsPanelWidth - 1
+	if textareaWidth < 30 {
+		textareaWidth = 30
 	}
 
+	// Account for help text line at Y=0
+	topSectionStart := 1
+	topSectionEnd := topSectionStart + textareaHeight
+
 	// Check if click is in the top section (textarea or options)
-	if y < textareaHeight {
+	if y >= topSectionStart && y < topSectionEnd {
 		// Left side = textarea, right side = options
-		if x < textareaWidth+2 { // +2 for padding
+		if x < textareaWidth+2 { // +2 for border
 			return FocusPanelLeft
 		}
 		return FocusPanelRight
