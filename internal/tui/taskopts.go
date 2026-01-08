@@ -2,6 +2,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -197,21 +198,28 @@ func (m *TaskOptsUI) View() tea.View {
 		sb.WriteString(label)
 
 		models := config.ValidModels()
+		// Calculate max model name length for consistent padding
+		maxLen := 0
+		for _, model := range models {
+			if len(model) > maxLen {
+				maxLen = len(model)
+			}
+		}
 		var modelParts []string
 		for i, model := range models {
-			text := string(model)
+			// Pad model name to max length for alignment
+			paddedName := fmt.Sprintf("%-*s", maxLen, string(model))
 			if i == m.modelIdx {
 				if m.field == TaskOptsFieldModel {
-					text = selectedValueStyle.Render("[" + text + "]")
+					modelParts = append(modelParts, selectedValueStyle.Render("["+paddedName+"]"))
 				} else {
-					text = valueStyle.Render("[" + text + "]")
+					modelParts = append(modelParts, valueStyle.Render("["+paddedName+"]"))
 				}
 			} else {
-				text = dimStyle.Render(" " + text + " ")
+				modelParts = append(modelParts, dimStyle.Render(" "+paddedName+" "))
 			}
-			modelParts = append(modelParts, text)
 		}
-		sb.WriteString(strings.Join(modelParts, " "))
+		sb.WriteString(strings.Join(modelParts, ""))
 		sb.WriteString("\n")
 	}
 

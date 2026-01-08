@@ -2,6 +2,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -9,10 +10,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/dongho-jung/paw/internal/tui/textarea"
 	"github.com/mattn/go-runewidth"
 
 	"github.com/dongho-jung/paw/internal/config"
+	"github.com/dongho-jung/paw/internal/tui/textarea"
 )
 
 // FocusPanel represents which panel is currently focused.
@@ -69,6 +70,10 @@ type TaskInput struct {
 
 	// History search request
 	historyRequested bool
+
+	// Tip caching - only changes every minute
+	currentTip     string
+	lastTipRefresh time.Time
 }
 
 // tickMsg is used for periodic Kanban refresh.
@@ -140,16 +145,18 @@ func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
 	}
 
 	return &TaskInput{
-		textarea:    ta,
-		width:       80,
-		height:      15,
-		options:     opts,
-		activeTasks: activeTasks,
-		isDark:      isDark,
-		focusPanel:  FocusPanelLeft,
-		optField:    OptFieldModel,
-		modelIdx:    modelIdx,
-		kanban:      NewKanbanView(isDark),
+		textarea:       ta,
+		width:          80,
+		height:         15,
+		options:        opts,
+		activeTasks:    activeTasks,
+		isDark:         isDark,
+		focusPanel:     FocusPanelLeft,
+		optField:       OptFieldModel,
+		modelIdx:       modelIdx,
+		kanban:         NewKanbanView(isDark),
+		currentTip:     GetTip(),
+		lastTipRefresh: time.Now(),
 	}
 }
 
@@ -180,6 +187,11 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		// Refresh Kanban data on tick (expensive I/O is done here, not in View)
 		m.kanban.Refresh()
+		// Refresh tip every minute
+		if time.Since(m.lastTipRefresh) >= time.Minute {
+			m.currentTip = GetTip()
+			m.lastTipRefresh = time.Now()
+		}
 		// Schedule next tick
 		return m, m.tickCmd()
 
@@ -491,7 +503,7 @@ func (m *TaskInput) View() tea.View {
 
 	// Left side: PAW {version} Tip: {tip}
 	versionText := versionStyle.Render("PAW " + Version)
-	tipText := tipStyle.Render(" Tip: " + GetTip())
+	tipText := tipStyle.Render(" Tip: " + m.currentTip)
 	leftContent := versionText + tipText
 	leftWidth := lipgloss.Width(leftContent)
 
@@ -633,19 +645,26 @@ func (m *TaskInput) renderOptionsPanel() string {
 		content.WriteString(label)
 
 		models := config.ValidModels()
+		// Calculate max model name length for consistent padding
+		maxLen := 0
+		for _, model := range models {
+			if len(model) > maxLen {
+				maxLen = len(model)
+			}
+		}
 		var parts []string
 		for i, model := range models {
-			text := string(model)
+			// Pad model name to max length for alignment
+			paddedName := fmt.Sprintf("%-*s", maxLen, string(model))
 			if i == m.modelIdx {
 				if isSelected {
-					text = selectedValueStyle.Render("[" + text + "]")
+					parts = append(parts, selectedValueStyle.Render("["+paddedName+"]"))
 				} else {
-					text = valueStyle.Render("[" + text + "]")
+					parts = append(parts, valueStyle.Render("["+paddedName+"]"))
 				}
 			} else {
-				text = dimStyle.Render(" " + text + " ")
+				parts = append(parts, dimStyle.Render(" "+paddedName+" "))
 			}
-			parts = append(parts, text)
 		}
 		content.WriteString(strings.Join(parts, ""))
 		content.WriteString("\n")
