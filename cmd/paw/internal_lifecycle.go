@@ -1543,8 +1543,10 @@ Start resolving the conflicts now.`, filesStr, taskName, taskContent)
 	defer cancel()
 
 	// Run claude with opus model and ultrathink-enabled prompt
-	cmd := exec.CommandContext(ctx, "claude", "--model", "opus", "--dangerously-skip-permissions", prompt)
+	// Use -p (print mode) to avoid raw mode requirement on stdin
+	cmd := exec.CommandContext(ctx, "claude", "-p", "--model", "opus", "--dangerously-skip-permissions")
 	cmd.Dir = projectDir
+	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -1608,8 +1610,10 @@ Start analyzing and resolving the merge issue now.`, projectDir, branchToMerge, 
 	defer cancel()
 
 	// Run claude with opus model and ultrathink-enabled prompt
-	cmd := exec.CommandContext(ctx, "claude", "--model", "opus", "--dangerously-skip-permissions", prompt)
+	// Use -p (print mode) to avoid raw mode requirement on stdin
+	cmd := exec.CommandContext(ctx, "claude", "-p", "--model", "opus", "--dangerously-skip-permissions")
 	cmd.Dir = projectDir
+	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
