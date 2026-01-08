@@ -36,6 +36,9 @@ const (
 
 const optFieldCount = 4
 
+// cancelDoublePressTimeout is the time window for double-press cancel detection.
+const cancelDoublePressTimeout = 2 * time.Second
+
 // TaskInput provides an inline text input for task content.
 type TaskInput struct {
 	textarea    textarea.Model
@@ -67,6 +70,9 @@ type TaskInput struct {
 
 // tickMsg is used for periodic Kanban refresh.
 type tickMsg time.Time
+
+// cancelClearMsg is used to clear the cancel pending state after timeout.
+type cancelClearMsg struct{}
 
 // TaskInputResult contains the result of the task input.
 type TaskInputResult struct {
@@ -174,6 +180,11 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Schedule next tick
 		return m, m.tickCmd()
 
+	case cancelClearMsg:
+		// Clear the cancel pending state after timeout
+		m.cancelPressTime = time.Time{}
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -202,16 +213,19 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Global keys (work in both panels)
 		switch keyStr {
 		case "esc", "ctrl+c":
-			// Double-press detection: require pressing twice within 2 seconds
+			// Double-press detection: require pressing twice within cancelDoublePressTimeout
 			now := time.Now()
-			if !m.cancelPressTime.IsZero() && now.Sub(m.cancelPressTime) <= 2*time.Second {
-				// Second press within 2 seconds - cancel
+			if !m.cancelPressTime.IsZero() && now.Sub(m.cancelPressTime) <= cancelDoublePressTimeout {
+				// Second press within timeout - cancel
 				m.cancelled = true
 				return m, tea.Quit
 			}
 			// First press or timeout - record time and wait for second press
+			// Return a tick command to clear the pending state after timeout
 			m.cancelPressTime = now
-			return m, nil
+			return m, tea.Tick(cancelDoublePressTimeout, func(t time.Time) tea.Msg {
+				return cancelClearMsg{}
+			})
 
 		// Submit: Alt+Enter or F5
 		case "alt+enter", "f5":
@@ -426,6 +440,11 @@ func (m *TaskInput) applyOptionInputValues() {
 	m.updateDependsOn()
 }
 
+// isCancelPending returns true if we're waiting for the second ESC/Ctrl+C press.
+func (m *TaskInput) isCancelPending() bool {
+	return !m.cancelPressTime.IsZero()
+}
+
 // View renders the task input.
 func (m *TaskInput) View() tea.View {
 	// Adaptive color for help text (use cached isDark value)
@@ -458,28 +477,43 @@ func (m *TaskInput) View() tea.View {
 		rightPanel,
 	)
 
-	// Determine help text based on focus panel
-	var helpText string
-	switch m.focusPanel {
-	case FocusPanelLeft:
-		helpText = "Alt+Enter/F5: Submit  |  ⌥Tab: Options  |  Esc×2: Cancel"
-	case FocusPanelRight:
-		helpText = "↑/↓: Navigate  |  ←/→: Change  |  ⌥Tab: Tasks  |  Alt+Enter: Submit"
-	case FocusPanelKanban:
-		helpText = "↑/↓: Scroll  |  ⌥Tab: Input  |  Alt+Enter: Submit  |  Esc×2: Cancel"
-	}
-
 	// Build content with help text at top-right
 	var sb strings.Builder
 
-	// Add help text at top-right (right-aligned)
-	helpRendered := helpStyle.Render(helpText)
-	helpWidth := lipgloss.Width(helpRendered)
-	if m.width > helpWidth {
-		padding := strings.Repeat(" ", max(0, m.width-helpWidth))
-		sb.WriteString(padding)
+	// Show cancel pending hint if waiting for second press, otherwise show normal help text
+	if m.isCancelPending() {
+		// Cancel pending state - show prominent hint
+		cancelHintStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("214")). // Orange/yellow for visibility
+			Bold(true)
+		cancelHint := cancelHintStyle.Render("Press Esc again to cancel")
+		hintWidth := lipgloss.Width(cancelHint)
+		if m.width > hintWidth {
+			padding := strings.Repeat(" ", max(0, m.width-hintWidth))
+			sb.WriteString(padding)
+		}
+		sb.WriteString(cancelHint)
+	} else {
+		// Determine help text based on focus panel
+		var helpText string
+		switch m.focusPanel {
+		case FocusPanelLeft:
+			helpText = "Alt+Enter/F5: Submit  |  ⌥Tab: Options  |  Esc×2: Cancel"
+		case FocusPanelRight:
+			helpText = "↑/↓: Navigate  |  ←/→: Change  |  ⌥Tab: Tasks  |  Alt+Enter: Submit"
+		case FocusPanelKanban:
+			helpText = "↑/↓: Scroll  |  ⌥Tab: Input  |  Alt+Enter: Submit  |  Esc×2: Cancel"
+		}
+
+		// Add help text at top-right (right-aligned)
+		helpRendered := helpStyle.Render(helpText)
+		helpWidth := lipgloss.Width(helpRendered)
+		if m.width > helpWidth {
+			padding := strings.Repeat(" ", max(0, m.width-helpWidth))
+			sb.WriteString(padding)
+		}
+		sb.WriteString(helpRendered)
 	}
-	sb.WriteString(helpRendered)
 	sb.WriteString("\n")
 
 	sb.WriteString(topSection)
