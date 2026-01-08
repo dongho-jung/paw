@@ -12,12 +12,14 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dongho-jung/paw/internal/app"
 	"github.com/dongho-jung/paw/internal/claude"
 	"github.com/dongho-jung/paw/internal/config"
 	"github.com/dongho-jung/paw/internal/constants"
 	"github.com/dongho-jung/paw/internal/embed"
 	"github.com/dongho-jung/paw/internal/logging"
 	"github.com/dongho-jung/paw/internal/notify"
+	"github.com/dongho-jung/paw/internal/service"
 	"github.com/dongho-jung/paw/internal/task"
 	"github.com/dongho-jung/paw/internal/tmux"
 	"github.com/dongho-jung/paw/internal/tui"
@@ -116,6 +118,10 @@ var newTaskCmd = &cobra.Command{
 
 		// Get active task names for dependency selection
 		activeTasks := getActiveTaskNames(app.AgentsDir)
+		if !app.IsGitRepo && app.Config != nil && app.Config.NonGitWorkspace != string(config.NonGitWorkspaceCopy) && len(activeTasks) > 0 {
+			logging.Warn("Non-git shared workspace: parallel tasks may conflict")
+			fmt.Println("  ⚠️  Non-git shared workspace: parallel tasks may conflict")
+		}
 
 		// Loop continuously for task creation
 		for {
@@ -426,6 +432,24 @@ var handleTaskCmd = &cobra.Command{
 					logging.Log("Session resume: detected previous session for task %s", taskName)
 				}
 			}
+		} else if !app.IsGitRepo && app.Config != nil && app.Config.NonGitWorkspace == string(config.NonGitWorkspaceCopy) {
+			workspaceDir := t.GetWorktreeDir()
+			if _, err := os.Stat(workspaceDir); os.IsNotExist(err) {
+				timer := logging.StartTimer("workspace setup")
+				if err := mgr.SetupWorkspace(t); err != nil {
+					timer.StopWithResult(false, err.Error())
+					_ = t.RemoveTabLock()
+					return fmt.Errorf("failed to setup workspace: %w", err)
+				}
+				timer.StopWithResult(true, fmt.Sprintf("path=%s", t.WorktreeDir))
+			} else {
+				logging.Debug("Workspace already exists, reusing: %s", workspaceDir)
+				t.WorktreeDir = workspaceDir
+				if t.HasSessionMarker() {
+					isReopen = true
+					logging.Log("Session resume: detected previous session for task %s", taskName)
+				}
+			}
 		} else {
 			// Non-worktree mode: check session marker for reopen
 			if t.HasSessionMarker() {
@@ -470,6 +494,41 @@ var handleTaskCmd = &cobra.Command{
 		if err := t.SaveWindowID(windowID); err != nil {
 			logging.Warn("Failed to save window ID: %v", err)
 		}
+		if _, err := service.UpdateWindowMap(app.PawDir, t.Name); err != nil {
+			logging.Trace("Failed to update window map: %v", err)
+		}
+
+		if !isReopen {
+			prevStatus, valid, err := t.TransitionStatus(task.StatusWorking)
+			if err != nil {
+				logging.Trace("Failed to persist working status: %v", err)
+			} else {
+				logging.Trace("Status set to working for new task")
+			}
+			if !valid {
+				logging.Warn("Invalid status transition: %s -> %s", prevStatus, task.StatusWorking)
+			}
+			historyService := service.NewHistoryService(app.GetHistoryDir())
+			if err := historyService.RecordStatusTransition(t.Name, prevStatus, task.StatusWorking, "handle-task", "task started", valid); err != nil {
+				logging.Trace("Failed to record status transition: %v", err)
+			}
+		}
+
+		if !isReopen && app.Config != nil && app.Config.PreTaskHook != "" {
+			hookEnv := app.GetEnvVars(taskName, workDir, windowID)
+			_, err := service.RunHook(
+				"pre-task",
+				app.Config.PreTaskHook,
+				workDir,
+				hookEnv,
+				t.GetHookOutputPath("pre-task"),
+				t.GetHookMetaPath("pre-task"),
+				time.Duration(app.Config.VerifyTimeout)*time.Second,
+			)
+			if err != nil {
+				logging.Warn("Pre-task hook failed: %v", err)
+			}
+		}
 
 		// Split window for user pane (error is non-fatal)
 		// Pass workDir so user pane starts in the worktree (if git mode) or project dir
@@ -495,6 +554,8 @@ var handleTaskCmd = &cobra.Command{
 		userPrompt.WriteString(fmt.Sprintf("# Task: %s\n\n", taskName))
 		if app.IsWorktreeMode() {
 			userPrompt.WriteString(fmt.Sprintf("**Worktree**: %s\n", workDir))
+		} else if app.Config != nil && !app.IsGitRepo && app.Config.NonGitWorkspace == string(config.NonGitWorkspaceCopy) {
+			userPrompt.WriteString(fmt.Sprintf("**Workspace**: %s\n", workDir))
 		}
 		userPrompt.WriteString(fmt.Sprintf("**Project**: %s\n\n", app.ProjectDir))
 
@@ -557,7 +618,7 @@ exec "%s" internal end-task "%s" "%s"
 		// The system prompt is base64 encoded to avoid issues with $, backticks, quotes, etc.
 		startAgentScriptPath := filepath.Join(t.AgentDir, "start-agent")
 		worktreeDirExport := ""
-		if app.IsWorktreeMode() {
+		if workDir != "" && workDir != app.ProjectDir {
 			worktreeDirExport = fmt.Sprintf("export WORKTREE_DIR='%s'\n", workDir)
 		}
 
@@ -618,6 +679,12 @@ __PROMPT_END__
 		}
 
 		agentPane := windowID + ".0"
+
+		if taskOpts.DependsOn != nil && taskOpts.DependsOn.TaskName != "" {
+			if proceed := waitForDependency(app, tm, windowID, t, taskOpts.DependsOn); !proceed {
+				return nil
+			}
+		}
 
 		// Start Claude using the start-agent script
 		if err := tm.RespawnPane(agentPane, workDir, startAgentScriptPath); err != nil {
@@ -729,4 +796,95 @@ __PROMPT_END__
 
 		return nil
 	},
+}
+
+func waitForDependency(app *app.App, tm tmux.Client, windowID string, t *task.Task, dep *config.TaskDependency) bool {
+	if dep == nil || dep.TaskName == "" || dep.Condition == config.DependsOnNone {
+		return true
+	}
+	if dep.TaskName == t.Name {
+		logging.Warn("Dependency points to same task: %s", dep.TaskName)
+		return true
+	}
+
+	firstWait := true
+	for {
+		status, found, terminal := resolveDependencyStatus(app, dep.TaskName)
+		if !found {
+			logging.Warn("Dependency task not found: %s", dep.TaskName)
+			return true
+		}
+
+		if dependencySatisfied(dep.Condition, status) {
+			if !firstWait {
+				workingName := windowNameForStatus(t.Name, task.StatusWorking)
+				_ = renameWindowWithStatus(tm, windowID, workingName, app.PawDir, t.Name, "depends-on")
+			}
+			return true
+		}
+
+		if terminal {
+			warningName := windowNameForStatus(t.Name, task.StatusCorrupted)
+			_ = renameWindowWithStatus(tm, windowID, warningName, app.PawDir, t.Name, "depends-on")
+			msg := fmt.Sprintf("⚠️ Dependency %s did not satisfy %s", dep.TaskName, dep.Condition)
+			_ = tm.DisplayMessage(msg, 3000)
+			logging.Warn("Dependency %s ended with %s; blocking task %s", dep.TaskName, status, t.Name)
+			return false
+		}
+
+		if firstWait {
+			waitName := windowNameForStatus(t.Name, task.StatusWaiting)
+			_ = renameWindowWithStatus(tm, windowID, waitName, app.PawDir, t.Name, "depends-on")
+			msg := fmt.Sprintf("⏳ Waiting for %s (%s)", dep.TaskName, dep.Condition)
+			_ = tm.DisplayMessage(msg, 3000)
+			firstWait = false
+		}
+
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func dependencySatisfied(condition config.DependsOnCondition, status task.Status) bool {
+	switch condition {
+	case config.DependsOnSuccess:
+		return status == task.StatusDone
+	case config.DependsOnFailure:
+		return status == task.StatusCorrupted
+	case config.DependsOnAlways:
+		return status == task.StatusDone || status == task.StatusCorrupted
+	default:
+		return true
+	}
+}
+
+func resolveDependencyStatus(app *app.App, taskName string) (task.Status, bool, bool) {
+	agentDir := app.GetAgentDir(taskName)
+	if _, err := os.Stat(agentDir); err == nil {
+		depTask := task.New(taskName, agentDir)
+		status, err := depTask.LoadStatus()
+		if err != nil {
+			logging.Trace("Dependency status read failed task=%s err=%v", taskName, err)
+			return task.StatusWorking, true, false
+		}
+		return status, true, status == task.StatusDone || status == task.StatusCorrupted
+	}
+
+	historyService := service.NewHistoryService(app.GetHistoryDir())
+	historyFiles, err := historyService.ListHistoryFiles()
+	if err != nil {
+		logging.Trace("Dependency history lookup failed task=%s err=%v", taskName, err)
+		return "", false, false
+	}
+
+	for _, file := range historyFiles {
+		if service.ExtractTaskName(file) != taskName {
+			continue
+		}
+		if service.IsCancelled(file) {
+			return task.StatusCorrupted, true, true
+		}
+		return task.StatusDone, true, true
+	}
+
+	return "", false, false
 }
