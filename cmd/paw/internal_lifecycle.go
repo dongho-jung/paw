@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dongho-jung/paw/internal/app"
 	"github.com/dongho-jung/paw/internal/config"
 	"github.com/dongho-jung/paw/internal/constants"
 	"github.com/dongho-jung/paw/internal/git"
@@ -108,6 +110,43 @@ var endTaskCmd = &cobra.Command{
 				fmt.Println("  ○ No changes to commit")
 			}
 
+			if app.Config != nil && app.Config.VerifyCommand != "" {
+				verifySpinner := tui.NewSimpleSpinner("Running verification")
+				verifySpinner.Start()
+
+				verifyEnv := app.GetEnvVars(targetTask.Name, workDir, windowID)
+				verifyResult, verifyErr := service.RunVerification(
+					app.Config.VerifyCommand,
+					workDir,
+					verifyEnv,
+					targetTask.GetVerifyOutputPath(),
+					targetTask.GetVerifyMetaPath(),
+					time.Duration(app.Config.VerifyTimeout)*time.Second,
+				)
+
+				if verifyErr != nil || verifyResult == nil || !verifyResult.Success {
+					verifySpinner.Stop(false, "failed")
+				} else {
+					verifySpinner.Stop(true, "")
+				}
+
+				if app.Config.OnComplete == config.OnCompleteAutoMerge && app.Config.VerifyRequired && verifyResult != nil && !verifyResult.Success {
+					logging.Warn("Verification failed; skipping auto-merge")
+					fmt.Println()
+					fmt.Println("  ✗ Verification failed - auto-merge blocked")
+					warningWindowName := windowNameForStatus(targetTask.Name, task.StatusCorrupted)
+					if err := renameWindowWithStatus(tm, windowID, warningWindowName, app.PawDir, targetTask.Name, "verify"); err != nil {
+						logging.Warn("Failed to rename window: %v", err)
+					}
+					notify.PlaySound(notify.SoundError)
+					notify.SendAll(app.Config.Notifications, "Verification failed", fmt.Sprintf("⚠️ %s - auto-merge blocked", targetTask.Name))
+					if err := tm.DisplayMessage(fmt.Sprintf("⚠️ Verification failed: %s", targetTask.Name), 3000); err != nil {
+						logging.Trace("Failed to display message: %v", err)
+					}
+					return nil
+				}
+			}
+
 			// Push changes
 			shouldPush := app.Config != nil && app.Config.OnComplete != config.OnCompleteConfirm
 			branchName := ""
@@ -158,6 +197,21 @@ var endTaskCmd = &cobra.Command{
 					// Get main branch name
 					mainBranch := gitClient.GetMainBranch(app.ProjectDir)
 					logging.Debug("Main branch: %s", mainBranch)
+
+					if app.Config != nil && app.Config.PreMergeHook != "" {
+						hookEnv := app.GetEnvVars(targetTask.Name, workDir, windowID)
+						if _, err := service.RunHook(
+							"pre-merge",
+							app.Config.PreMergeHook,
+							app.ProjectDir,
+							hookEnv,
+							targetTask.GetHookOutputPath("pre-merge"),
+							targetTask.GetHookMetaPath("pre-merge"),
+							time.Duration(app.Config.VerifyTimeout)*time.Second,
+						); err != nil {
+							logging.Warn("Pre-merge hook failed: %v", err)
+						}
+					}
 
 					mergeTimer := logging.StartTimer("auto-merge")
 
@@ -384,6 +438,21 @@ var endTaskCmd = &cobra.Command{
 									}
 								}
 
+								if mergeSuccess && app.Config != nil && app.Config.PostMergeHook != "" {
+									hookEnv := app.GetEnvVars(targetTask.Name, workDir, windowID)
+									if _, err := service.RunHook(
+										"post-merge",
+										app.Config.PostMergeHook,
+										app.ProjectDir,
+										hookEnv,
+										targetTask.GetHookOutputPath("post-merge"),
+										targetTask.GetHookMetaPath("post-merge"),
+										time.Duration(app.Config.VerifyTimeout)*time.Second,
+									); err != nil {
+										logging.Warn("Post-merge hook failed: %v", err)
+									}
+								}
+
 								// Restore original branch if different from main
 								if currentBranch != "" && currentBranch != mainBranch {
 									logging.Debug("Restoring branch %s...", currentBranch)
@@ -408,9 +477,9 @@ var endTaskCmd = &cobra.Command{
 						logging.Warn("Merge failed - keeping task for manual resolution")
 						fmt.Println()
 						fmt.Println("  ✗ Merge failed - manual resolution needed")
-						warningWindowName := constants.EmojiWarning + targetTask.Name
+						warningWindowName := windowNameForStatus(targetTask.Name, task.StatusCorrupted)
 						logging.Trace("endTaskCmd: renaming window to warning state name=%s", warningWindowName)
-						if err := tm.RenameWindow(windowID, warningWindowName); err != nil {
+						if err := renameWindowWithStatus(tm, windowID, warningWindowName, app.PawDir, targetTask.Name, "end-task"); err != nil {
 							logging.Warn("Failed to rename window: %v", err)
 						}
 						// Notify user of merge failure
@@ -428,6 +497,21 @@ var endTaskCmd = &cobra.Command{
 			}
 		}
 		fmt.Println()
+
+		if app.Config != nil && app.Config.PostTaskHook != "" {
+			hookEnv := app.GetEnvVars(targetTask.Name, workDir, windowID)
+			if _, err := service.RunHook(
+				"post-task",
+				app.Config.PostTaskHook,
+				workDir,
+				hookEnv,
+				targetTask.GetHookOutputPath("post-task"),
+				targetTask.GetHookMetaPath("post-task"),
+				time.Duration(app.Config.VerifyTimeout)*time.Second,
+			); err != nil {
+				logging.Warn("Post-task hook failed: %v", err)
+			}
+		}
 
 		// Save to history using service
 		historyService := service.NewHistoryService(app.GetHistoryDir())
@@ -459,7 +543,10 @@ var endTaskCmd = &cobra.Command{
 
 		// Save history
 		taskContent, _ := targetTask.LoadContent()
-		if err := historyService.SaveCompleted(targetTask.Name, taskContent, paneContent); err != nil {
+		taskOpts := loadTaskOptions(targetTask.AgentDir)
+		verifyMeta, hookMetas, hookOutputs := collectHistoryArtifacts(targetTask)
+		meta := buildHistoryMetadata(app, targetTask, taskOpts, gitClient, workDir, verifyMeta, hookMetas)
+		if err := historyService.SaveCompletedWithDetails(targetTask.Name, taskContent, paneContent, meta, hookOutputs); err != nil {
 			logging.Warn("Failed to save history: %v", err)
 		}
 
@@ -699,11 +786,8 @@ var cancelTaskCmd = &cobra.Command{
 							_ = abortCmd.Run()
 
 							// Rename window to warning state
-							warningName := constants.EmojiWarning + targetTask.Name
-							if len(warningName) > 14 {
-								warningName = warningName[:14]
-							}
-							_ = tm.RenameWindow(windowID, warningName)
+							warningName := windowNameForStatus(targetTask.Name, task.StatusCorrupted)
+							_ = renameWindowWithStatus(tm, windowID, warningName, app.PawDir, targetTask.Name, "cancel-task")
 							notify.PlaySound(notify.SoundError)
 							return nil // Don't cleanup - keep task for manual resolution
 						} else {
@@ -735,6 +819,21 @@ var cancelTaskCmd = &cobra.Command{
 
 		fmt.Println()
 
+		if app.Config != nil && app.Config.PostTaskHook != "" {
+			hookEnv := app.GetEnvVars(targetTask.Name, mgr.GetWorkingDirectory(targetTask), windowID)
+			if _, err := service.RunHook(
+				"post-task",
+				app.Config.PostTaskHook,
+				mgr.GetWorkingDirectory(targetTask),
+				hookEnv,
+				targetTask.GetHookOutputPath("post-task"),
+				targetTask.GetHookMetaPath("post-task"),
+				time.Duration(app.Config.VerifyTimeout)*time.Second,
+			); err != nil {
+				logging.Warn("Post-task hook failed: %v", err)
+			}
+		}
+
 		// Save to history using service
 		historyService := service.NewHistoryService(app.GetHistoryDir())
 
@@ -748,7 +847,10 @@ var cancelTaskCmd = &cobra.Command{
 			historySpinner.Stop(false, "capture failed")
 		} else if paneContent != "" {
 			taskContent, _ := targetTask.LoadContent()
-			if err := historyService.SaveCancelled(targetTask.Name, taskContent, paneContent); err != nil {
+			taskOpts := loadTaskOptions(targetTask.AgentDir)
+			verifyMeta, hookMetas, hookOutputs := collectHistoryArtifacts(targetTask)
+			meta := buildHistoryMetadata(app, targetTask, taskOpts, git.New(), mgr.GetWorkingDirectory(targetTask), verifyMeta, hookMetas)
+			if err := historyService.SaveCancelledWithDetails(targetTask.Name, taskContent, paneContent, meta, hookOutputs); err != nil {
 				logging.Warn("Failed to save history: %v", err)
 				historySpinner.Stop(false, "save failed")
 			} else {
@@ -914,6 +1016,21 @@ var mergeTaskCmd = &cobra.Command{
 		if gitClient.BranchMerged(app.ProjectDir, targetTask.Name, mainBranch) {
 			fmt.Printf("  ○ Already merged to %s\n", mainBranch)
 			return nil
+		}
+
+		if app.Config != nil && app.Config.PreMergeHook != "" {
+			hookEnv := app.GetEnvVars(targetTask.Name, workDir, windowID)
+			if _, err := service.RunHook(
+				"pre-merge",
+				app.Config.PreMergeHook,
+				app.ProjectDir,
+				hookEnv,
+				targetTask.GetHookOutputPath("pre-merge"),
+				targetTask.GetHookMetaPath("pre-merge"),
+				time.Duration(app.Config.VerifyTimeout)*time.Second,
+			); err != nil {
+				logging.Warn("Pre-merge hook failed: %v", err)
+			}
 		}
 
 		// Commit any uncommitted changes first
@@ -1132,6 +1249,21 @@ var mergeTaskCmd = &cobra.Command{
 			_ = gitClient.StashPop(app.ProjectDir)
 		}
 
+		if mergeSuccess && app.Config != nil && app.Config.PostMergeHook != "" {
+			hookEnv := app.GetEnvVars(targetTask.Name, workDir, windowID)
+			if _, err := service.RunHook(
+				"post-merge",
+				app.Config.PostMergeHook,
+				app.ProjectDir,
+				hookEnv,
+				targetTask.GetHookOutputPath("post-merge"),
+				targetTask.GetHookMetaPath("post-merge"),
+				time.Duration(app.Config.VerifyTimeout)*time.Second,
+			); err != nil {
+				logging.Warn("Post-merge hook failed: %v", err)
+			}
+		}
+
 		fmt.Println()
 		if mergeSuccess {
 			fmt.Printf("  ✅ Merged to %s (task window kept)\n", mainBranch)
@@ -1140,8 +1272,8 @@ var mergeTaskCmd = &cobra.Command{
 			_ = tm.DisplayMessage(fmt.Sprintf("✅ Merged: %s → %s", targetTask.Name, mainBranch), 2000)
 		} else {
 			fmt.Println("  ✗ Merge failed - manual resolution needed")
-			warningName := constants.EmojiWarning + targetTask.Name
-			_ = tm.RenameWindow(windowID, warningName)
+			warningName := windowNameForStatus(targetTask.Name, task.StatusCorrupted)
+			_ = renameWindowWithStatus(tm, windowID, warningName, app.PawDir, targetTask.Name, "merge-task")
 			notify.PlaySound(notify.SoundError)
 			_ = tm.DisplayMessage(fmt.Sprintf("⚠️ Merge failed: %s", targetTask.Name), 3000)
 		}
@@ -1319,6 +1451,15 @@ var recoverTaskCmd = &cobra.Command{
 			return err
 		}
 
+		// Setup logging
+		logger, _ := logging.New(app.GetLogPath(), app.Debug)
+		if logger != nil {
+			defer func() { _ = logger.Close() }()
+			logger.SetScript("recover-task")
+			logger.SetTask(taskName)
+			logging.SetGlobal(logger)
+		}
+
 		mgr := task.NewManager(app.AgentsDir, app.ProjectDir, app.PawDir, app.IsGitRepo, app.Config)
 		t, err := mgr.GetTask(taskName)
 		if err != nil {
@@ -1390,6 +1531,118 @@ Start resolving the conflicts now.`, filesStr, taskName, taskContent)
 
 	logging.Debug("resolveConflictsWithClaude: claude completed successfully")
 	return nil
+}
+
+func loadTaskOptions(agentDir string) *config.TaskOptions {
+	opts, err := config.LoadTaskOptions(agentDir)
+	if err != nil {
+		logging.Warn("Failed to load task options: %v", err)
+		return config.DefaultTaskOptions()
+	}
+	return opts
+}
+
+func buildHistoryMetadata(app *app.App, t *task.Task, opts *config.TaskOptions, gitClient git.Client, workDir string, verify *service.VerificationMetadata, hooks []service.HookMetadata) *service.HistoryMetadata {
+	meta := &service.HistoryMetadata{
+		TaskName:    t.Name,
+		SessionName: app.SessionName,
+		ProjectDir:  app.ProjectDir,
+		TaskOptions: opts,
+		Verification: verify,
+		Hooks:        hooks,
+	}
+
+	now := time.Now()
+	meta.FinishedAt = now.Format(time.RFC3339)
+	if startedAt, ok := readSessionStart(t); ok {
+		meta.StartedAt = startedAt.Format(time.RFC3339)
+		meta.DurationSeconds = int64(now.Sub(startedAt).Seconds())
+	}
+
+	if app.IsGitRepo && gitClient != nil && workDir != "" {
+		commitHash, err := gitClient.GetHeadCommit(workDir)
+		if err != nil {
+			logging.Trace("Failed to read HEAD commit: %v", err)
+		} else if commitHash != "" {
+			branch, _ := gitClient.GetCurrentBranch(workDir)
+			meta.Commit = &service.CommitMetadata{
+				Hash:   commitHash,
+				Branch: branch,
+			}
+		}
+	}
+
+	return meta
+}
+
+func readSessionStart(t *task.Task) (time.Time, bool) {
+	data, err := os.ReadFile(t.GetSessionMarkerPath())
+	if err != nil {
+		return time.Time{}, false
+	}
+	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(string(data)))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed, true
+}
+
+func collectHistoryArtifacts(t *task.Task) (*service.VerificationMetadata, []service.HookMetadata, map[string]string) {
+	var hooks []service.HookMetadata
+	outputs := make(map[string]string)
+
+	hookNames := []string{"pre-task", "post-task", "pre-merge", "post-merge"}
+	for _, name := range hookNames {
+		metaPath := t.GetHookMetaPath(name)
+		if meta := readHookMeta(metaPath); meta != nil {
+			hooks = append(hooks, *meta)
+		}
+		outputPath := t.GetHookOutputPath(name)
+		if output := readFileIfExists(outputPath); output != "" {
+			outputs[name] = output
+		}
+	}
+
+	verifyMeta := readVerificationMeta(t.GetVerifyMetaPath())
+	if output := readFileIfExists(t.GetVerifyOutputPath()); output != "" {
+		outputs["verify"] = output
+	}
+
+	return verifyMeta, hooks, outputs
+}
+
+func readHookMeta(path string) *service.HookMetadata {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var meta service.HookMetadata
+	if err := json.Unmarshal(data, &meta); err != nil {
+		logging.Trace("Failed to parse hook metadata %s: %v", path, err)
+		return nil
+	}
+	return &meta
+}
+
+func readVerificationMeta(path string) *service.VerificationMetadata {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var meta service.VerificationMetadata
+	if err := json.Unmarshal(data, &meta); err != nil {
+		logging.Trace("Failed to parse verification metadata %s: %v", path, err)
+		return nil
+	}
+	return &meta
+}
+
+func readFileIfExists(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 func resolvePushBranch(gitClient git.Client, workDir, fallback string) (string, bool) {

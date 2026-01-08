@@ -22,6 +22,36 @@ const (
 	StatusCorrupted Status = "corrupted" // Task has issues that need recovery
 )
 
+// statusTransitions defines allowed status transitions.
+var statusTransitions = map[Status]map[Status]bool{
+	StatusPending: {
+		StatusPending:   true,
+		StatusWorking:   true,
+		StatusWaiting:   true,
+		StatusDone:      true,
+		StatusCorrupted: true,
+	},
+	StatusWorking: {
+		StatusWorking:   true,
+		StatusWaiting:   true,
+		StatusDone:      true,
+		StatusCorrupted: true,
+	},
+	StatusWaiting: {
+		StatusWaiting:   true,
+		StatusWorking:   true,
+		StatusDone:      true,
+		StatusCorrupted: true,
+	},
+	StatusCorrupted: {
+		StatusCorrupted: true,
+		StatusWorking:   true,
+	},
+	StatusDone: {
+		StatusDone: true,
+	},
+}
+
 // CorruptedReason represents why a task is corrupted.
 type CorruptedReason string
 
@@ -100,6 +130,26 @@ func (t *Task) GetSessionMarkerPath() string {
 	return filepath.Join(t.AgentDir, ".session-started")
 }
 
+// GetHookOutputPath returns the output path for a named hook.
+func (t *Task) GetHookOutputPath(name string) string {
+	return filepath.Join(t.AgentDir, fmt.Sprintf(".hook-%s.log", name))
+}
+
+// GetHookMetaPath returns the metadata path for a named hook.
+func (t *Task) GetHookMetaPath(name string) string {
+	return filepath.Join(t.AgentDir, fmt.Sprintf(".hook-%s.json", name))
+}
+
+// GetVerifyOutputPath returns the output path for verification results.
+func (t *Task) GetVerifyOutputPath() string {
+	return filepath.Join(t.AgentDir, ".verify.log")
+}
+
+// GetVerifyMetaPath returns the metadata path for verification results.
+func (t *Task) GetVerifyMetaPath() string {
+	return filepath.Join(t.AgentDir, ".verify.json")
+}
+
 // GetStatusFilePath returns the path to the status file.
 func (t *Task) GetStatusFilePath() string {
 	return filepath.Join(t.AgentDir, ".status")
@@ -123,6 +173,37 @@ func (t *Task) LoadStatus() (Status, error) {
 	status := Status(strings.TrimSpace(string(data)))
 	t.Status = status
 	return status, nil
+}
+
+// TransitionStatus updates task status and validates the transition.
+// Returns previous status, whether the transition is valid, and any save error.
+func (t *Task) TransitionStatus(next Status) (Status, bool, error) {
+	if next == "" {
+		return t.Status, false, fmt.Errorf("empty status")
+	}
+
+	prev, err := t.LoadStatus()
+	if err != nil && !os.IsNotExist(err) {
+		return t.Status, false, err
+	}
+
+	valid := IsValidStatusTransition(prev, next)
+	if saveErr := t.SaveStatus(next); saveErr != nil {
+		return prev, valid, saveErr
+	}
+
+	return prev, valid, nil
+}
+
+// IsValidStatusTransition returns true if a transition is allowed.
+func IsValidStatusTransition(from, to Status) bool {
+	if from == "" || to == "" {
+		return false
+	}
+	if transitions, ok := statusTransitions[from]; ok {
+		return transitions[to]
+	}
+	return false
 }
 
 // HasSessionMarker returns true if the session marker file exists.
