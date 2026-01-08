@@ -709,7 +709,7 @@ func (m *TaskInput) handleTextareaMouse(x, y int) (int, int, bool) {
 
 	m.textarea.Focus()
 
-	textareaStartY := 1
+	textareaStartY := 2 // Account for help text line (1) + top border (1)
 	textareaStartX := 2
 
 	targetRow := y - textareaStartY
