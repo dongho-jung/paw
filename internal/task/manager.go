@@ -59,6 +59,11 @@ func (m *Manager) shouldUseWorktree() bool {
 	return m.isGitRepo && m.config != nil && m.config.WorkMode == config.WorkModeWorktree
 }
 
+// shouldUseWorkspace returns true if non-git workspace isolation is enabled.
+func (m *Manager) shouldUseWorkspace() bool {
+	return !m.isGitRepo && m.config != nil && m.config.NonGitWorkspace == string(config.NonGitWorkspaceCopy)
+}
+
 // CreateTask creates a new task with the given content.
 // It generates a task name using Claude and creates the task directory atomically.
 func (m *Manager) CreateTask(content string) (*Task, error) {
@@ -168,6 +173,7 @@ func (m *Manager) ListTasks() ([]*Task, error) {
 
 		task, err := m.GetTask(entry.Name())
 		if err != nil {
+			logging.Trace("ListTasks: failed to load task %s: %v", entry.Name(), err)
 			continue
 		}
 
@@ -204,7 +210,9 @@ func (m *Manager) FindTaskByWindowID(windowID string) (*Task, error) {
 // This includes tasks with tab-lock but no window, and tasks with worktree but no window.
 func (m *Manager) FindIncompleteTasks(sessionName string) ([]*Task, error) {
 	if m.tmuxClient == nil {
-		return nil, fmt.Errorf("tmux client not set")
+		err := fmt.Errorf("tmux client not set")
+		logging.Error("FindIncompleteTasks: %v", err)
+		return nil, err
 	}
 
 	tasks, err := m.ListTasks()
@@ -216,6 +224,7 @@ func (m *Manager) FindIncompleteTasks(sessionName string) ([]*Task, error) {
 	windows, err := m.tmuxClient.ListWindows()
 	if err != nil {
 		// Session might not exist yet
+		logging.Trace("FindIncompleteTasks: failed to list windows: %v", err)
 		windows = nil
 	}
 
@@ -238,9 +247,9 @@ func (m *Manager) FindIncompleteTasks(sessionName string) ([]*Task, error) {
 	var incomplete []*Task
 	for _, task := range tasks {
 		// Skip if task already has a window (by task name)
-		// Use truncated name since window names are limited to MaxWindowNameLen chars
-		truncatedName := constants.TruncateForWindowName(task.Name)
-		if activeTaskNames[truncatedName] {
+		tokenName := constants.TruncateForWindowName(task.Name)
+		legacyName := constants.LegacyTruncateForWindowName(task.Name)
+		if activeTaskNames[tokenName] || activeTaskNames[legacyName] {
 			continue
 		}
 
@@ -258,6 +267,9 @@ func (m *Manager) FindIncompleteTasks(sessionName string) ([]*Task, error) {
 		if task.HasTabLock() {
 			// Had a window before, check if it's still there
 			windowID, err := task.LoadWindowID()
+			if err != nil {
+				logging.Trace("FindIncompleteTasks: failed to load window ID task=%s err=%v", task.Name, err)
+			}
 			if err != nil || !activeWindowIDs[windowID] {
 				shouldReopen = true
 			}
@@ -266,6 +278,11 @@ func (m *Manager) FindIncompleteTasks(sessionName string) ([]*Task, error) {
 			worktreeDir := task.GetWorktreeDir()
 			if _, err := os.Stat(worktreeDir); err == nil {
 				// Worktree exists but no window - should reopen
+				shouldReopen = true
+			}
+		} else if m.shouldUseWorkspace() {
+			workspaceDir := task.GetWorktreeDir()
+			if _, err := os.Stat(workspaceDir); err == nil {
 				shouldReopen = true
 			}
 		}
@@ -330,6 +347,7 @@ func (m *Manager) checkWorktreeStatus(task *Task) CorruptedReason {
 	// Check if worktree is registered in git
 	worktrees, err := m.gitClient.WorktreeList(m.projectDir)
 	if err != nil {
+		logging.Warn("checkWorktreeStatus: worktree list failed task=%s err=%v", task.Name, err)
 		return CorruptNotInGit
 	}
 
@@ -382,9 +400,13 @@ func (m *Manager) isTaskMerged(task *Task, mainBranch string) bool {
 	// Check if PR is merged
 	if task.HasPR() {
 		prNumber, err := task.LoadPRNumber()
-		if err == nil && prNumber > 0 {
+		if err != nil {
+			logging.Trace("isTaskMerged: failed to load PR number task=%s err=%v", task.Name, err)
+		} else if prNumber > 0 {
 			merged, err := m.ghClient.IsPRMerged(m.projectDir, prNumber)
-			if err == nil && merged {
+			if err != nil {
+				logging.Trace("isTaskMerged: PR status check failed task=%s pr=%d err=%v", task.Name, prNumber, err)
+			} else if merged {
 				return true
 			}
 		}
@@ -468,10 +490,18 @@ func (m *Manager) SetupWorktree(task *Task) error {
 	task.WorktreeDir = worktreeDir
 
 	// Stash any uncommitted changes (error is non-fatal)
-	stashHash, _ := m.gitClient.StashCreate(m.projectDir)
+	stashHash, err := m.gitClient.StashCreate(m.projectDir)
+	if err != nil {
+		logging.Warn("SetupWorktree: stash create failed: %v", err)
+		stashHash = ""
+	}
 
 	// Get untracked files (error is non-fatal)
-	untrackedFiles, _ := m.gitClient.GetUntrackedFiles(m.projectDir)
+	untrackedFiles, err := m.gitClient.GetUntrackedFiles(m.projectDir)
+	if err != nil {
+		logging.Warn("SetupWorktree: failed to list untracked files: %v", err)
+		untrackedFiles = nil
+	}
 
 	// Create worktree with new branch
 	if err := m.gitClient.WorktreeAdd(m.projectDir, worktreeDir, task.Name, true); err != nil {
@@ -480,22 +510,56 @@ func (m *Manager) SetupWorktree(task *Task) error {
 
 	// Apply stash to worktree if there were changes (error is non-fatal)
 	if stashHash != "" {
-		_ = m.gitClient.StashApply(worktreeDir, stashHash)
+		if err := m.gitClient.StashApply(worktreeDir, stashHash); err != nil {
+			logging.Warn("SetupWorktree: stash apply failed: %v", err)
+		}
 	}
 
 	// Copy untracked files to worktree (error is non-fatal)
 	if len(untrackedFiles) > 0 {
-		_ = git.CopyUntrackedFiles(untrackedFiles, m.projectDir, worktreeDir)
+		if err := git.CopyUntrackedFiles(untrackedFiles, m.projectDir, worktreeDir); err != nil {
+			logging.Warn("SetupWorktree: failed to copy untracked files: %v", err)
+		}
 	}
 
 	// Create .claude symlink in worktree (error is non-fatal)
 	claudeLink := filepath.Join(worktreeDir, constants.ClaudeLink)
 	claudeTarget := filepath.Join(m.pawDir, constants.ClaudeLink)
-	_ = os.Symlink(claudeTarget, claudeLink)
+	if err := os.Symlink(claudeTarget, claudeLink); err != nil && !os.IsExist(err) {
+		logging.Warn("SetupWorktree: failed to create claude symlink: %v", err)
+	}
 
 	// Execute worktree hook if configured (error is non-fatal)
 	if m.config.WorktreeHook != "" {
 		m.executeWorktreeHook(worktreeDir)
+	}
+
+	return nil
+}
+
+// SetupWorkspace creates an isolated workspace copy for non-git tasks.
+func (m *Manager) SetupWorkspace(task *Task) error {
+	if !m.shouldUseWorkspace() {
+		return nil
+	}
+
+	workspaceDir := task.GetWorktreeDir()
+	task.WorktreeDir = workspaceDir
+
+	if _, err := os.Stat(workspaceDir); err == nil {
+		return nil
+	}
+
+	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
+		return fmt.Errorf("failed to create workspace directory: %w", err)
+	}
+
+	if err := copyWorkspace(m.projectDir, workspaceDir); err != nil {
+		return fmt.Errorf("failed to copy workspace: %w", err)
+	}
+
+	if m.config.WorktreeHook != "" {
+		m.executeWorktreeHook(workspaceDir)
 	}
 
 	return nil
@@ -527,6 +591,9 @@ func (m *Manager) GetWorkingDirectory(task *Task) string {
 	if m.shouldUseWorktree() {
 		return task.GetWorktreeDir()
 	}
+	if m.shouldUseWorkspace() {
+		return task.GetWorktreeDir()
+	}
 	return m.projectDir
 }
 
@@ -534,7 +601,9 @@ func (m *Manager) GetWorkingDirectory(task *Task) string {
 // These are windows left behind after cleanup.
 func (m *Manager) FindOrphanedWindows() ([]string, error) {
 	if m.tmuxClient == nil {
-		return nil, fmt.Errorf("tmux client not set")
+		err := fmt.Errorf("tmux client not set")
+		logging.Error("FindOrphanedWindows: %v", err)
+		return nil, err
 	}
 
 	windows, err := m.tmuxClient.ListWindows()
@@ -572,7 +641,9 @@ type StoppedTaskInfo struct {
 // These are tasks where the window exists but the agent pane shows a shell prompt.
 func (m *Manager) FindStoppedTasks() ([]*StoppedTaskInfo, error) {
 	if m.tmuxClient == nil {
-		return nil, fmt.Errorf("tmux client not set")
+		err := fmt.Errorf("tmux client not set")
+		logging.Error("FindStoppedTasks: %v", err)
+		return nil, err
 	}
 
 	windows, err := m.tmuxClient.ListWindows()
@@ -629,6 +700,7 @@ func (m *Manager) FindTaskByTruncatedName(truncatedName string) (*Task, error) {
 func (m *Manager) findTaskByTruncatedName(truncatedName string) (*Task, string) {
 	entries, err := os.ReadDir(m.agentsDir)
 	if err != nil {
+		logging.Trace("findTaskByTruncatedName: failed to read agents dir %s: %v", m.agentsDir, err)
 		return nil, ""
 	}
 
@@ -639,9 +711,10 @@ func (m *Manager) findTaskByTruncatedName(truncatedName string) (*Task, string) 
 
 		fullName := entry.Name()
 		// Check if this task name matches the truncated name
-		if constants.TruncateForWindowName(fullName) == truncatedName {
+		if constants.MatchesWindowToken(truncatedName, fullName) {
 			task, err := m.GetTask(fullName)
 			if err != nil {
+				logging.Trace("findTaskByTruncatedName: failed to load task %s: %v", fullName, err)
 				continue
 			}
 			return task, fullName
