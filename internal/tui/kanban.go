@@ -127,8 +127,9 @@ func (k *KanbanView) Render() string {
 				break
 			}
 
-			// Full task display name: session/taskName
-			fullName := task.Session + "/" + task.Name
+			// Full task display name: session/taskName (using camelCase for task name)
+			camelTaskName := constants.ToCamelCase(task.Name)
+			fullName := task.Session + "/" + camelTaskName
 			displayName := fullName
 			if len(displayName) > columnWidth-6 {
 				displayName = displayName[:columnWidth-7] + "…"

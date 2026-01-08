@@ -511,19 +511,12 @@ func (m *TaskListUI) View() tea.View {
 			statusStyle = statusCancelledStyle
 		}
 
-		// Truncate name if needed
-		name := item.Name
+		// Truncate name if needed (using camelCase for display)
 		maxNameLen := listWidth - 6 // Account for cursor and emoji
 		if maxNameLen < 1 {
 			maxNameLen = 1
 		}
-		if len(name) > maxNameLen {
-			if maxNameLen > 1 {
-				name = name[:maxNameLen-1] + "…"
-			} else {
-				name = "…"
-			}
-		}
+		name := constants.TruncateWithWidth(item.Name, maxNameLen)
 
 		line := fmt.Sprintf("%s%s %s", cursor, statusEmoji, style.Render(name))
 		listBuilder.WriteString(line)

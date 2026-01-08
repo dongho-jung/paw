@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // Window status emojis
@@ -51,10 +52,60 @@ const (
 	WindowIDLen    = 4
 )
 
+// ToCamelCase converts kebab-case or snake_case to camelCase.
+// Examples: "cancel-task-twice" → "cancelTaskTwice", "my_task_name" → "myTaskName"
+func ToCamelCase(name string) string {
+	if name == "" {
+		return ""
+	}
+
+	var result strings.Builder
+	result.Grow(len(name))
+
+	capitalizeNext := false
+	firstWritten := false
+	for _, r := range name {
+		if r == '-' || r == '_' {
+			// Only capitalize next if we've already written something
+			if firstWritten {
+				capitalizeNext = true
+			}
+			continue
+		}
+		if capitalizeNext {
+			result.WriteRune(unicode.ToUpper(r))
+			capitalizeNext = false
+		} else {
+			result.WriteRune(r)
+		}
+		firstWritten = true
+	}
+
+	return result.String()
+}
+
 // TruncateForWindowName returns a stable window token for a task name.
 // The token includes a short ID suffix to avoid collisions.
+// The name is converted to camelCase for display.
 func TruncateForWindowName(name string) string {
 	return WindowToken(name)
+}
+
+// TruncateWithWidth returns a truncated display name for a given width.
+// Uses camelCase for display and adds ellipsis if truncated.
+// Does NOT include ID suffix - use for display-only purposes.
+func TruncateWithWidth(name string, maxLen int) string {
+	if maxLen < 1 {
+		return ""
+	}
+	camel := ToCamelCase(name)
+	if len(camel) <= maxLen {
+		return camel
+	}
+	if maxLen <= 1 {
+		return "…"
+	}
+	return camel[:maxLen-1] + "…"
 }
 
 // LegacyTruncateForWindowName truncates a task name without an ID suffix.
@@ -67,6 +118,7 @@ func LegacyTruncateForWindowName(name string) string {
 }
 
 // WindowToken builds a window-safe token with a short stable ID suffix.
+// The base name is converted to camelCase for display.
 func WindowToken(name string) string {
 	id := ShortTaskID(name)
 	suffix := WindowTokenSep + id
@@ -74,7 +126,8 @@ func WindowToken(name string) string {
 	if maxBase < 1 {
 		maxBase = 1
 	}
-	base := name
+	// Convert to camelCase for display
+	base := ToCamelCase(name)
 	if len(base) > maxBase {
 		base = base[:maxBase]
 	}
@@ -97,7 +150,7 @@ const (
 	MaxDisplayNameLen = 32
 	MaxTaskNameLen    = 32
 	MinTaskNameLen    = 8
-	MaxWindowNameLen  = 12 // Max task name length in tmux window names
+	MaxWindowNameLen  = 20 // Max task name length in tmux window names (increased for better readability)
 )
 
 // Claude interaction timeouts
