@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dongho-jung/paw/internal/config"
+	"github.com/dongho-jung/paw/internal/constants"
 )
 
 func TestFindMergedTasks_ExternallyCleanedUp(t *testing.T) {
@@ -85,8 +86,7 @@ func TestFindTaskByTruncatedName(t *testing.T) {
 	}
 
 	t.Run("find by full name", func(t *testing.T) {
-		// Truncate to MaxWindowNameLen (12 chars): "fix-restore-"
-		task, err := mgr.FindTaskByTruncatedName(longTaskName[:12])
+		task, err := mgr.FindTaskByTruncatedName(constants.TruncateForWindowName(longTaskName))
 		if err != nil {
 			t.Fatalf("FindTaskByTruncatedName returned error: %v", err)
 		}
@@ -96,8 +96,17 @@ func TestFindTaskByTruncatedName(t *testing.T) {
 	})
 
 	t.Run("find by exact truncated name", func(t *testing.T) {
-		// The truncated window name would be "fix-restore-"
-		task, err := mgr.FindTaskByTruncatedName("fix-restore-")
+		task, err := mgr.FindTaskByTruncatedName(constants.TruncateForWindowName(longTaskName))
+		if err != nil {
+			t.Fatalf("FindTaskByTruncatedName returned error: %v", err)
+		}
+		if task.Name != longTaskName {
+			t.Fatalf("Expected task name %s, got %s", longTaskName, task.Name)
+		}
+	})
+
+	t.Run("find by legacy truncated name", func(t *testing.T) {
+		task, err := mgr.FindTaskByTruncatedName(constants.LegacyTruncateForWindowName(longTaskName))
 		if err != nil {
 			t.Fatalf("FindTaskByTruncatedName returned error: %v", err)
 		}

@@ -1,6 +1,9 @@
 package constants
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestExtractTaskName(t *testing.T) {
 	tests := []struct {
@@ -11,26 +14,26 @@ func TestExtractTaskName(t *testing.T) {
 	}{
 		{
 			name:         "working emoji prefix",
-			windowName:   "🤖my-task",
-			wantTaskName: "my-task",
+			windowName:   "🤖" + WindowToken("my-task"),
+			wantTaskName: WindowToken("my-task"),
 			wantFound:    true,
 		},
 		{
 			name:         "waiting emoji prefix",
-			windowName:   "💬my-task",
-			wantTaskName: "my-task",
+			windowName:   "💬" + WindowToken("my-task"),
+			wantTaskName: WindowToken("my-task"),
 			wantFound:    true,
 		},
 		{
 			name:         "done emoji prefix",
-			windowName:   "✅my-task",
-			wantTaskName: "my-task",
+			windowName:   "✅" + WindowToken("my-task"),
+			wantTaskName: WindowToken("my-task"),
 			wantFound:    true,
 		},
 		{
 			name:         "warning emoji prefix",
-			windowName:   "⚠️my-task",
-			wantTaskName: "my-task",
+			windowName:   "⚠️" + WindowToken("my-task"),
+			wantTaskName: WindowToken("my-task"),
 			wantFound:    true,
 		},
 		{
@@ -115,11 +118,6 @@ func TestIsTaskWindow(t *testing.T) {
 			want:       false, // EmojiNew is not a task emoji
 		},
 		{
-			name:       "idea window emoji",
-			windowName: "💡idea",
-			want:       false, // EmojiIdea is not a task emoji
-		},
-		{
 			name:       "empty string",
 			windowName: "",
 			want:       false,
@@ -174,43 +172,41 @@ func TestTruncateForWindowName(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected string
 	}{
 		{
 			name:     "short name unchanged",
 			input:    "my-task",
-			expected: "my-task",
 		},
 		{
 			name:     "exact length unchanged",
 			input:    "exactly12chr",
-			expected: "exactly12chr",
 		},
 		{
 			name:     "long name truncated",
 			input:    "this-is-a-very-long-task-name",
-			expected: "this-is-a-ve",
 		},
 		{
 			name:     "empty string unchanged",
 			input:    "",
-			expected: "",
 		},
 		{
 			name:     "unicode name truncated by bytes",
 			input:    "한글태스크",
-			expected: "한글태스", // 4 chars * 3 bytes = 12 bytes
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := TruncateForWindowName(tt.input)
-			if result != tt.expected {
-				t.Errorf("TruncateForWindowName(%q) = %q, want %q", tt.input, result, tt.expected)
-			}
 			if len(result) > MaxWindowNameLen {
 				t.Errorf("TruncateForWindowName(%q) length = %d, want <= %d", tt.input, len(result), MaxWindowNameLen)
+			}
+			if !strings.Contains(result, WindowTokenSep) {
+				t.Errorf("TruncateForWindowName(%q) missing token separator", tt.input)
+			}
+			suffix := WindowTokenSep + ShortTaskID(tt.input)
+			if !strings.HasSuffix(result, suffix) {
+				t.Errorf("TruncateForWindowName(%q) = %q, want suffix %q", tt.input, result, suffix)
 			}
 		})
 	}

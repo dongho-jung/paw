@@ -469,6 +469,49 @@ func TestTaskStatus(t *testing.T) {
 	}
 }
 
+func TestTransitionStatus(t *testing.T) {
+	tempDir := t.TempDir()
+	taskDir := filepath.Join(tempDir, "task")
+	if err := os.MkdirAll(taskDir, 0755); err != nil {
+		t.Fatalf("Failed to create task dir: %v", err)
+	}
+
+	task := New("test-task", taskDir)
+
+	prev, valid, err := task.TransitionStatus(StatusWorking)
+	if err != nil {
+		t.Fatalf("TransitionStatus working failed: %v", err)
+	}
+	if prev != StatusPending {
+		t.Fatalf("Expected previous status pending, got %s", prev)
+	}
+	if !valid {
+		t.Fatalf("Expected valid transition pending->working")
+	}
+
+	prev, valid, err = task.TransitionStatus(StatusDone)
+	if err != nil {
+		t.Fatalf("TransitionStatus done failed: %v", err)
+	}
+	if prev != StatusWorking {
+		t.Fatalf("Expected previous status working, got %s", prev)
+	}
+	if !valid {
+		t.Fatalf("Expected valid transition working->done")
+	}
+
+	prev, valid, err = task.TransitionStatus(StatusWorking)
+	if err != nil {
+		t.Fatalf("TransitionStatus done->working failed: %v", err)
+	}
+	if prev != StatusDone {
+		t.Fatalf("Expected previous status done, got %s", prev)
+	}
+	if valid {
+		t.Fatalf("Expected invalid transition done->working")
+	}
+}
+
 func TestTaskGetSystemPromptPath(t *testing.T) {
 	agentDir := "/path/to/agents/test-task"
 	task := New("test-task", agentDir)
