@@ -527,6 +527,22 @@ func (m *Manager) SetupWorktree(task *Task) error {
 	claudeTarget := filepath.Join(m.pawDir, constants.ClaudeLink)
 	if err := os.Symlink(claudeTarget, claudeLink); err != nil && !os.IsExist(err) {
 		logging.Warn("SetupWorktree: failed to create claude symlink: %v", err)
+	} else {
+		// Protect .claude symlink from being committed (multi-layered defense)
+
+		// Layer 1: Add to .git/info/exclude (worktree-specific exclusion)
+		if err := git.AddToExcludeFile(worktreeDir, constants.ClaudeLink); err != nil {
+			logging.Warn("SetupWorktree: failed to add .claude to exclude file: %v", err)
+		} else {
+			logging.Debug("SetupWorktree: added .claude to .git/info/exclude")
+		}
+
+		// Layer 2: Mark as assume-unchanged (git index protection)
+		if err := m.gitClient.UpdateIndexAssumeUnchanged(worktreeDir, constants.ClaudeLink); err != nil {
+			logging.Warn("SetupWorktree: failed to mark .claude as assume-unchanged: %v", err)
+		} else {
+			logging.Debug("SetupWorktree: marked .claude as assume-unchanged")
+		}
 	}
 
 	// Execute worktree hook if configured (error is non-fatal)

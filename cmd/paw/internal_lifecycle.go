@@ -96,6 +96,21 @@ var endTaskCmd = &cobra.Command{
 				if err := gitClient.AddAll(workDir); err != nil {
 					logging.Warn("Failed to add changes: %v", err)
 				}
+
+				// Layer 3: Prevent .claude symlink from being committed (final safety check)
+				// Check if .claude is staged and unstage it if found
+				claudeStaged, err := gitClient.IsFileStaged(workDir, constants.ClaudeLink)
+				if err != nil {
+					logging.Warn("Failed to check if .claude is staged: %v", err)
+				} else if claudeStaged {
+					logging.Warn("Detected .claude in staging area, unstaging it to prevent commit")
+					if err := gitClient.ResetPath(workDir, constants.ClaudeLink); err != nil {
+						logging.Warn("Failed to unstage .claude: %v", err)
+					} else {
+						logging.Debug("Successfully unstaged .claude")
+					}
+				}
+
 				diffStat, _ := gitClient.GetDiffStat(workDir)
 				logging.Trace("Changes: %s", strings.ReplaceAll(diffStat, "\n", ", "))
 				message := fmt.Sprintf(constants.CommitMessageAutoCommit, diffStat)
@@ -1049,6 +1064,20 @@ var mergeTaskCmd = &cobra.Command{
 			if err := gitClient.AddAll(workDir); err != nil {
 				logging.Warn("Failed to add changes: %v", err)
 			}
+
+			// Layer 3: Prevent .claude symlink from being committed (final safety check)
+			claudeStaged, err := gitClient.IsFileStaged(workDir, constants.ClaudeLink)
+			if err != nil {
+				logging.Warn("Failed to check if .claude is staged: %v", err)
+			} else if claudeStaged {
+				logging.Warn("Detected .claude in staging area, unstaging it to prevent commit")
+				if err := gitClient.ResetPath(workDir, constants.ClaudeLink); err != nil {
+					logging.Warn("Failed to unstage .claude: %v", err)
+				} else {
+					logging.Debug("Successfully unstaged .claude")
+				}
+			}
+
 			diffStat, _ := gitClient.GetDiffStat(workDir)
 			message := fmt.Sprintf(constants.CommitMessageAutoCommitMerge, diffStat)
 			if err := gitClient.Commit(workDir, message); err != nil {

@@ -78,6 +78,11 @@ type Client interface {
 
 	// Log
 	GetBranchCommits(dir, branch, baseBranch string, maxCount int) ([]CommitInfo, error)
+
+	// Index
+	UpdateIndexAssumeUnchanged(dir, path string) error
+	IsFileStaged(dir, path string) (bool, error)
+	ResetPath(dir, path string) error
 }
 
 // CommitInfo represents basic information about a git commit.
@@ -625,5 +630,83 @@ func CopyUntrackedFiles(files []string, srcDir, dstDir string) error {
 			return fmt.Errorf("failed to write %s: %w", file, err)
 		}
 	}
+	return nil
+}
+
+// Index operations
+
+// UpdateIndexAssumeUnchanged marks a file as assume-unchanged in the git index.
+// This tells git to ignore changes to the file even if explicitly staged.
+func (c *gitClient) UpdateIndexAssumeUnchanged(dir, path string) error {
+	return c.run(dir, "update-index", "--assume-unchanged", path)
+}
+
+// IsFileStaged checks if a file is currently staged in the git index.
+func (c *gitClient) IsFileStaged(dir, path string) (bool, error) {
+	// Use git diff --cached --name-only to list staged files
+	output, err := c.runOutput(dir, "diff", "--cached", "--name-only", path)
+	if err != nil {
+		return false, err
+	}
+	// If output is not empty, the file is staged
+	return strings.TrimSpace(output) != "", nil
+}
+
+// ResetPath unstages a file from the git index.
+func (c *gitClient) ResetPath(dir, path string) error {
+	return c.run(dir, "reset", "HEAD", "--", path)
+}
+
+// AddToExcludeFile adds a pattern to the worktree's .git/info/exclude file.
+// This provides worktree-specific exclusion without modifying .gitignore.
+func AddToExcludeFile(worktreeDir, pattern string) error {
+	// In a worktree, .git is a file (not a directory), so we need to resolve the actual git directory
+	cmd := exec.Command("git", "-C", worktreeDir, "rev-parse", "--git-dir")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get git directory: %w", err)
+	}
+
+	gitDir := strings.TrimSpace(string(output))
+	// Make gitDir absolute if it's relative
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(worktreeDir, gitDir)
+	}
+
+	excludePath := filepath.Join(gitDir, "info", "exclude")
+
+	// Create info directory if it doesn't exist
+	if err := os.MkdirAll(filepath.Dir(excludePath), 0755); err != nil {
+		return fmt.Errorf("failed to create info directory: %w", err)
+	}
+
+	// Read existing content
+	content, err := os.ReadFile(excludePath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read exclude file: %w", err)
+	}
+
+	existingContent := string(content)
+
+	// Check if pattern already exists
+	for _, line := range strings.Split(existingContent, "\n") {
+		if strings.TrimSpace(line) == pattern {
+			// Pattern already exists, no need to add
+			return nil
+		}
+	}
+
+	// Append pattern
+	newContent := existingContent
+	if len(newContent) > 0 && !strings.HasSuffix(newContent, "\n") {
+		newContent += "\n"
+	}
+	newContent += pattern + "\n"
+
+	// Write back
+	if err := os.WriteFile(excludePath, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("failed to write exclude file: %w", err)
+	}
+
 	return nil
 }
