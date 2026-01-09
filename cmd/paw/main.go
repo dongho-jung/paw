@@ -610,6 +610,12 @@ func setupTmuxConfig(app *app.App, tm tmux.Client) error {
 	// Enable mouse mode
 	_ = tm.SetOption("mouse", "on", true)
 
+	// Disable tmux copy-mode activation on mouse drag
+	// By default, tmux intercepts MouseDrag1Pane to enter copy-mode and do line-level selection.
+	// We unbind this so drag events pass through to TUI apps (bubbletea) for cell-level selection.
+	// Without this, dragging in the task input box triggers tmux copy-mode instead of TUI selection.
+	_ = tm.Run("unbind-key", "-T", "root", "MouseDrag1Pane")
+
 	// Enable vi-style copy mode and clipboard integration
 	_ = tm.SetOption("mode-keys", "vi", true)
 	_ = tm.SetOption("set-clipboard", "on", true)
