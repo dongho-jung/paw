@@ -627,11 +627,14 @@ func (m *TaskInput) renderOptionsPanel() string {
 	// Dark theme: use lighter colors for visibility on dark background
 	lightDark := lipgloss.LightDark(m.isDark)
 	normalColor := lightDark(lipgloss.Color("236"), lipgloss.Color("252"))
-	dimColor := lightDark(lipgloss.Color("245"), lipgloss.Color("240"))
+	// Dim color: lighter on light bg (fades into background), darker on dark bg
+	dimColor := lightDark(lipgloss.Color("250"), lipgloss.Color("238"))
+	// Accent color: darker blue for light bg (good contrast), bright cyan for dark bg
+	accentColor := lightDark(lipgloss.Color("25"), lipgloss.Color("39"))
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("39"))
+		Foreground(accentColor)
 
 	titleDimStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -641,14 +644,14 @@ func (m *TaskInput) renderOptionsPanel() string {
 		Foreground(normalColor)
 
 	selectedLabelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
+		Foreground(accentColor).
 		Bold(true)
 
 	valueStyle := lipgloss.NewStyle().
 		Foreground(normalColor)
 
 	selectedValueStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
+		Foreground(accentColor).
 		Bold(true)
 
 	dimStyle := lipgloss.NewStyle().
@@ -656,7 +659,7 @@ func (m *TaskInput) renderOptionsPanel() string {
 
 	borderColor := dimColor
 	if isFocused {
-		borderColor = lipgloss.Color("39")
+		borderColor = accentColor
 	}
 
 	// Build content lines with consistent visible width
