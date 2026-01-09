@@ -223,9 +223,33 @@ Install tmux/gh via Homebrew: `brew install tmux gh`. Install the Claude Code CL
 |--------|----------|
 | Toggle templates | `⌃T` |
 | Toggle logs | `⌃O` |
-| Toggle git status | `⌃G` |
+| Toggle git viewer | `⌃G` |
 | Toggle bottom (shell) | `⌃B` |
 | Toggle help | `⌃/` |
+
+## Git viewer
+
+Press `⌃G` to open the interactive git viewer. Press `⌃G` again to close it.
+
+The viewer starts in status mode and allows you to switch between different git views.
+
+<details>
+<summary>Controls</summary>
+
+| Key | Description |
+|----|-------------|
+| `s` | Switch to status mode (`git status`) |
+| `L` | Switch to log mode (`git log`) |
+| `a` | Switch to all mode (`git log --all --decorate --oneline --graph`) |
+| `w` | Toggle word wrap |
+| `↑` / `↓` / `j` / `k` | Scroll vertically |
+| `←` / `→` / `h` / `l` | Scroll horizontally (when word wrap is off) |
+| `g` or `gg` | Jump to top |
+| `G` | Jump to bottom |
+| `PgUp` / `PgDn` | Page scroll |
+| `Ctrl+U` / `Ctrl+D` | Half-page scroll |
+| `q` / `Esc` / `⌃G` | Close the git viewer |
+</details>
 
 ## Log viewer
 

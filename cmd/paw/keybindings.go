@@ -17,7 +17,7 @@ import (
 //   - Ctrl+Q: Quit paw
 //   - Ctrl+T: Toggle templates
 //   - Ctrl+O: Toggle logs
-//   - Ctrl+G: Toggle git status
+//   - Ctrl+G: Toggle git viewer (status/log/graph modes)
 //   - Ctrl+B: Toggle bottom (shell)
 //   - Ctrl+/: Toggle help
 //   - Alt+Left/Right: Move window

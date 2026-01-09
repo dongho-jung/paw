@@ -124,6 +124,9 @@ paw/                           # This repository
 │   ├── task/                  # Task management
 │   ├── tmux/                  # Tmux client
 │   └── tui/                   # Terminal UI components
+│       ├── gitviewer.go       # Git viewer (status, log, graph modes)
+│       ├── helpviewer.go      # Help viewer
+│       ├── logviewer.go       # Log viewer with filtering
 │       └── textarea/          # Custom textarea component (fork of bubbles)
 ├── Makefile                   # Build script
 └── go.mod                     # Go module file

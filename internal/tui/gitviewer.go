@@ -1,0 +1,367 @@
+// Package tui provides terminal user interface components for PAW.
+package tui
+
+import (
+	"fmt"
+	"os/exec"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea/v2"
+	"github.com/charmbracelet/lipgloss/v2"
+)
+
+// gitMode represents different git command modes
+type gitMode int
+
+const (
+	gitModeStatus gitMode = iota
+	gitModeLog
+	gitModeAll
+)
+
+// GitViewer provides an interactive git viewer with mode switching and vim-like navigation.
+type GitViewer struct {
+	workDir       string
+	mode          gitMode
+	lines         []string
+	scrollPos     int
+	horizontalPos int
+	wordWrap      bool
+	width         int
+	height        int
+	err           error
+}
+
+// NewGitViewer creates a new git viewer for the given working directory.
+func NewGitViewer(workDir string) *GitViewer {
+	return &GitViewer{
+		workDir: workDir,
+		mode:    gitModeStatus, // Start in status mode by default
+	}
+}
+
+// Init initializes the git viewer.
+func (m *GitViewer) Init() tea.Cmd {
+	return m.loadGitOutput()
+}
+
+// Update handles messages and updates the model.
+func (m *GitViewer) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		return m.handleKey(msg)
+
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+
+	case gitOutputMsg:
+		m.lines = msg.lines
+		m.scrollPos = 0
+		m.horizontalPos = 0
+		return m, nil
+
+	case error:
+		m.err = msg
+		return m, nil
+	}
+
+	return m, nil
+}
+
+// gitOutputMsg is sent when git output is loaded.
+type gitOutputMsg struct {
+	lines []string
+}
+
+// handleKey handles keyboard input.
+func (m *GitViewer) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	// Close on q, Esc, or Ctrl+G
+	case "q", "esc", "ctrl+g", "ctrl+shift+g":
+		return m, tea.Quit
+
+	case "down", "j":
+		m.scrollDown(1)
+
+	case "up", "k":
+		m.scrollUp(1)
+
+	case "left", "h":
+		if !m.wordWrap && m.horizontalPos > 0 {
+			m.horizontalPos -= 10
+			if m.horizontalPos < 0 {
+				m.horizontalPos = 0
+			}
+		}
+
+	case "right", "l":
+		if !m.wordWrap {
+			m.horizontalPos += 10
+		}
+
+	case "g":
+		// Go to top
+		m.scrollPos = 0
+		m.horizontalPos = 0
+
+	case "G":
+		// Go to bottom
+		m.scrollToEnd()
+		m.horizontalPos = 0
+
+	case "s":
+		// Switch to status mode
+		if m.mode != gitModeStatus {
+			m.mode = gitModeStatus
+			return m, m.loadGitOutput()
+		}
+
+	case "L":
+		// Switch to log mode (use uppercase L to avoid conflict with right navigation)
+		if m.mode != gitModeLog {
+			m.mode = gitModeLog
+			return m, m.loadGitOutput()
+		}
+
+	case "a":
+		// Switch to all mode (log with --all --decorate --oneline --graph)
+		if m.mode != gitModeAll {
+			m.mode = gitModeAll
+			return m, m.loadGitOutput()
+		}
+
+	case "w":
+		// Toggle word wrap
+		m.wordWrap = !m.wordWrap
+		if m.wordWrap {
+			m.horizontalPos = 0
+		}
+
+	case "pgup", "ctrl+b":
+		m.scrollUp(m.contentHeight())
+
+	case "pgdown", "ctrl+f":
+		m.scrollDown(m.contentHeight())
+
+	case "ctrl+u":
+		m.scrollUp(m.contentHeight() / 2)
+
+	case "ctrl+d":
+		m.scrollDown(m.contentHeight() / 2)
+	}
+
+	return m, nil
+}
+
+// scrollUp scrolls up by n lines.
+func (m *GitViewer) scrollUp(n int) {
+	m.scrollPos -= n
+	if m.scrollPos < 0 {
+		m.scrollPos = 0
+	}
+}
+
+// scrollDown scrolls down by n lines.
+func (m *GitViewer) scrollDown(n int) {
+	displayLines := m.getDisplayLines()
+	max := len(displayLines) - m.contentHeight()
+	if max < 0 {
+		max = 0
+	}
+	m.scrollPos += n
+	if m.scrollPos > max {
+		m.scrollPos = max
+	}
+}
+
+// scrollToEnd scrolls to the end of the content.
+func (m *GitViewer) scrollToEnd() {
+	displayLines := m.getDisplayLines()
+	max := len(displayLines) - m.contentHeight()
+	if max < 0 {
+		max = 0
+	}
+	m.scrollPos = max
+}
+
+// getDisplayLines returns lines to display, handling word wrap if enabled.
+func (m *GitViewer) getDisplayLines() []string {
+	if !m.wordWrap || m.width <= 0 {
+		return m.lines
+	}
+
+	// Word wrap mode: wrap long lines
+	var wrapped []string
+	for _, line := range m.lines {
+		if len(line) <= m.width {
+			wrapped = append(wrapped, line)
+		} else {
+			// Wrap the line
+			for len(line) > 0 {
+				end := m.width
+				if end > len(line) {
+					end = len(line)
+				}
+				wrapped = append(wrapped, line[:end])
+				line = line[end:]
+			}
+		}
+	}
+	return wrapped
+}
+
+// View renders the git viewer.
+func (m *GitViewer) View() tea.View {
+	if m.err != nil {
+		return tea.NewView(fmt.Sprintf("Error: %v\n\nPress q, Esc, or ⌃G to close.", m.err))
+	}
+
+	if m.width == 0 || m.height == 0 {
+		return tea.NewView("Loading...")
+	}
+
+	var sb strings.Builder
+
+	displayLines := m.getDisplayLines()
+
+	// Calculate visible lines
+	contentHeight := m.contentHeight()
+	endPos := m.scrollPos + contentHeight
+	if endPos > len(displayLines) {
+		endPos = len(displayLines)
+	}
+
+	// Render visible lines
+	for i := m.scrollPos; i < endPos; i++ {
+		line := displayLines[i]
+
+		if !m.wordWrap {
+			// Apply horizontal scroll
+			if m.horizontalPos < len(line) {
+				line = line[m.horizontalPos:]
+			} else {
+				line = ""
+			}
+		}
+
+		// Truncate to screen width
+		if len(line) > m.width {
+			line = line[:m.width]
+		}
+
+		// Pad to full width
+		line = fmt.Sprintf("%-*s", m.width, line)
+		sb.WriteString(line)
+		sb.WriteString("\n")
+	}
+
+	// Pad remaining lines
+	for i := endPos - m.scrollPos; i < contentHeight; i++ {
+		sb.WriteString(strings.Repeat(" ", m.width))
+		sb.WriteString("\n")
+	}
+
+	// Status bar
+	statusStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("240")).
+		Foreground(lipgloss.Color("252"))
+
+	// Mode indicator
+	var modeStr string
+	switch m.mode {
+	case gitModeStatus:
+		modeStr = "[STATUS]"
+	case gitModeLog:
+		modeStr = "[LOG]"
+	case gitModeAll:
+		modeStr = "[LOG --all]"
+	}
+
+	var status string
+	status = " " + modeStr
+	if m.wordWrap {
+		status += " [WRAP]"
+	}
+	status += " "
+
+	if len(displayLines) > 0 {
+		status += fmt.Sprintf("Lines %d-%d of %d ", m.scrollPos+1, endPos, len(displayLines))
+	} else {
+		status += "(empty) "
+	}
+
+	// Keybindings hint
+	hint := "s:status L:log a:all w:wrap g/G:top/end ⌃G/q:close"
+	padding := m.width - len(status) - len(hint)
+	if padding < 0 {
+		hint = "⌃G/q:close"
+		padding = m.width - len(status) - len(hint)
+		if padding < 0 {
+			padding = 0
+		}
+	}
+
+	statusLine := statusStyle.Render(
+		status + strings.Repeat(" ", padding) + hint,
+	)
+
+	sb.WriteString(statusLine)
+
+	v := tea.NewView(sb.String())
+	v.AltScreen = true
+	return v
+}
+
+// contentHeight returns the height available for content.
+func (m *GitViewer) contentHeight() int {
+	// Reserve 1 line for status bar
+	h := m.height - 1
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
+// loadGitOutput loads git output based on the current mode.
+func (m *GitViewer) loadGitOutput() tea.Cmd {
+	return func() tea.Msg {
+		var cmd *exec.Cmd
+
+		switch m.mode {
+		case gitModeStatus:
+			// git status with color
+			cmd = exec.Command("git", "-c", "color.status=always", "status")
+		case gitModeLog:
+			// git log with color
+			cmd = exec.Command("git", "-c", "color.log=always", "log")
+		case gitModeAll:
+			// git log --all --decorate --oneline --graph with color
+			cmd = exec.Command("git", "-c", "color.log=always", "log", "--all", "--decorate", "--oneline", "--graph")
+		}
+
+		cmd.Dir = m.workDir
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git command failed: %w\nOutput: %s", err, string(output))
+		}
+
+		// Split output into lines
+		lines := strings.Split(string(output), "\n")
+		// Remove last empty line if present
+		if len(lines) > 0 && lines[len(lines)-1] == "" {
+			lines = lines[:len(lines)-1]
+		}
+
+		return gitOutputMsg{lines: lines}
+	}
+}
+
+// RunGitViewer runs the git viewer for the given working directory.
+func RunGitViewer(workDir string) error {
+	m := NewGitViewer(workDir)
+	p := tea.NewProgram(m)
+	_, err := p.Run()
+	return err
+}

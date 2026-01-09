@@ -156,9 +156,20 @@ var helpViewerCmd = &cobra.Command{
 	},
 }
 
+var gitViewerCmd = &cobra.Command{
+	Use:    "git-viewer [work-dir]",
+	Short:  "Run the git viewer",
+	Args:   cobra.ExactArgs(1),
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		workDir := args[0]
+		return tui.RunGitViewer(workDir)
+	},
+}
+
 var toggleGitStatusCmd = &cobra.Command{
 	Use:   "toggle-git-status [session]",
-	Short: "Show git status popup",
+	Short: "Show git viewer popup",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sessionName := args[0]
@@ -182,18 +193,22 @@ var toggleGitStatusCmd = &cobra.Command{
 		}
 		panePath = strings.TrimSpace(panePath)
 
-		// Build command to show git status with color
-		// Uses less -R to preserve colors and allow scrolling, closes with q
-		popupCmd := fmt.Sprintf("cd '%s' && git -c color.status=always status | less -R", panePath)
+		pawBin, err := os.Executable()
+		if err != nil {
+			pawBin = "paw"
+		}
+
+		// Run git viewer in popup (closes with q/Esc/Ctrl+G)
+		gitCmd := fmt.Sprintf("%s internal git-viewer %s", pawBin, panePath)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:     "80%",
+			Width:     "90%",
 			Height:    "80%",
-			Title:     " Git Status ",
+			Title:     " Git ",
 			Close:     true,
 			Style:     "fg=terminal,bg=terminal",
 			Directory: panePath,
-		}, popupCmd)
+		}, gitCmd)
 		return nil
 	},
 }
