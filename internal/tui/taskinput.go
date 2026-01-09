@@ -620,13 +620,31 @@ func (m *TaskInput) View() tea.View {
 		Bold(true)
 	tipStyle := helpStyle
 
-	// Left side: PAW {version} - {projectName}  Tip: {tip}
+	// Detect narrow terminal using same logic as WindowSizeMsg handler
+	const kanbanColumnGap = 8
+	const minOptionsPanelWidth = 43
+	kanbanColWidth := (m.width - kanbanColumnGap) / 4
+	kanbanColDisplayWidth := kanbanColWidth + 2
+	isNarrow := kanbanColDisplayWidth < minOptionsPanelWidth
+
+	// Left side: PAW {version} - {projectName}  Tip: {tip} or Warning
 	versionText := versionStyle.Render("PAW " + Version)
 	projectText := ""
 	if ProjectName != "" {
 		projectText = versionStyle.Render(" - " + ProjectName)
 	}
-	tipText := tipStyle.Render("  Tip: " + m.currentTip)
+
+	// Show warning in bright red if terminal is too small, otherwise show tip
+	var tipText string
+	if isNarrow {
+		warningStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")). // Bright red
+			Bold(true)
+		tipText = warningStyle.Render("  ⚠️  Terminal too small - content may be truncated")
+	} else {
+		tipText = tipStyle.Render("  Tip: " + m.currentTip)
+	}
+
 	leftContent := versionText + projectText + tipText
 	leftWidth := lipgloss.Width(leftContent)
 
