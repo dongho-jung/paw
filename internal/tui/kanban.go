@@ -40,9 +40,8 @@ type KanbanView struct {
 	selectStartY   int    // Start row (relative to kanban top)
 	selectEndX     int    // End X position (relative to column)
 	selectEndY     int    // End row (relative to kanban top)
-	selectedText   string
-	renderedLines  []string // Cache of rendered text lines for selection
-	columnContents [][]string // Per-column content lines (for column-aware copy)
+	selectedText  string
+	renderedLines []string // Cache of rendered text lines for selection
 }
 
 // NewKanbanView creates a new Kanban view.
