@@ -211,7 +211,7 @@ const (
 	GitRepoMarker     = ".is-git-repo"
 	GlobalPromptLink  = ".global-prompt"
 	ClaudeLink        = ".claude"
-	BinSymlinkName    = "bin"     // Symlink to current paw binary (updated on attach)
+	BinSymlinkName    = "bin"      // Symlink to current paw binary (updated on attach)
 	VersionFileName   = ".version" // Stores PAW version for upgrade detection
 )
 
