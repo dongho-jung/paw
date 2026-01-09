@@ -240,51 +240,56 @@ const (
 	CommitMessageAutoCommitPush  = "chore: auto-commit before push"
 )
 
+// commitTypeMapping defines the mapping from task name patterns to commit types.
+type commitTypeMapping struct {
+	prefix     string
+	commitType string
+}
+
+// commitTypePrefixes defines all recognized commit type prefixes.
+// Order matters: more specific prefixes should come first.
+var commitTypePrefixes = []commitTypeMapping{
+	{"fix-", "fix"},
+	{"fix/", "fix"},
+	{"bugfix-", "fix"},
+	{"bugfix/", "fix"},
+	{"hotfix-", "fix"},
+	{"hotfix/", "fix"},
+	{"feat-", "feat"},
+	{"feat/", "feat"},
+	{"feature-", "feat"},
+	{"feature/", "feat"},
+	{"add-", "feat"},
+	{"add/", "feat"},
+	{"refactor-", "refactor"},
+	{"refactor/", "refactor"},
+	{"docs-", "docs"},
+	{"docs/", "docs"},
+	{"doc-", "docs"},
+	{"doc/", "docs"},
+	{"test-", "test"},
+	{"test/", "test"},
+	{"tests-", "test"},
+	{"tests/", "test"},
+	{"chore-", "chore"},
+	{"chore/", "chore"},
+	{"perf-", "perf"},
+	{"perf/", "perf"},
+	{"style-", "style"},
+	{"style/", "style"},
+	{"ci-", "ci"},
+	{"ci/", "ci"},
+	{"build-", "build"},
+	{"build/", "build"},
+}
+
 // InferCommitType determines the conventional commit type from a task name.
 // It looks for common prefixes/keywords to classify the change.
 func InferCommitType(taskName string) string {
 	lower := strings.ToLower(taskName)
 
 	// Check prefixes first (most specific)
-	prefixes := []struct {
-		prefix     string
-		commitType string
-	}{
-		{"fix-", "fix"},
-		{"fix/", "fix"},
-		{"bugfix-", "fix"},
-		{"bugfix/", "fix"},
-		{"hotfix-", "fix"},
-		{"hotfix/", "fix"},
-		{"feat-", "feat"},
-		{"feat/", "feat"},
-		{"feature-", "feat"},
-		{"feature/", "feat"},
-		{"add-", "feat"},
-		{"add/", "feat"},
-		{"refactor-", "refactor"},
-		{"refactor/", "refactor"},
-		{"docs-", "docs"},
-		{"docs/", "docs"},
-		{"doc-", "docs"},
-		{"doc/", "docs"},
-		{"test-", "test"},
-		{"test/", "test"},
-		{"tests-", "test"},
-		{"tests/", "test"},
-		{"chore-", "chore"},
-		{"chore/", "chore"},
-		{"perf-", "perf"},
-		{"perf/", "perf"},
-		{"style-", "style"},
-		{"style/", "style"},
-		{"ci-", "ci"},
-		{"ci/", "ci"},
-		{"build-", "build"},
-		{"build/", "build"},
-	}
-
-	for _, p := range prefixes {
+	for _, p := range commitTypePrefixes {
 		if strings.HasPrefix(lower, p.prefix) {
 			return p.commitType
 		}
@@ -347,25 +352,11 @@ func InferCommitType(taskName string) string {
 func FormatTaskNameForCommit(taskName string) string {
 	lower := strings.ToLower(taskName)
 
-	// Remove common prefixes
-	prefixesToRemove := []string{
-		"fix-", "fix/", "bugfix-", "bugfix/", "hotfix-", "hotfix/",
-		"feat-", "feat/", "feature-", "feature/",
-		"add-", "add/",
-		"refactor-", "refactor/",
-		"docs-", "docs/", "doc-", "doc/",
-		"test-", "test/", "tests-", "tests/",
-		"chore-", "chore/",
-		"perf-", "perf/",
-		"style-", "style/",
-		"ci-", "ci/",
-		"build-", "build/",
-	}
-
+	// Remove common prefixes using the shared mapping
 	result := taskName
-	for _, prefix := range prefixesToRemove {
-		if strings.HasPrefix(lower, prefix) {
-			result = taskName[len(prefix):]
+	for _, p := range commitTypePrefixes {
+		if strings.HasPrefix(lower, p.prefix) {
+			result = taskName[len(p.prefix):]
 			break
 		}
 	}
