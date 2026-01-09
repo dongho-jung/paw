@@ -221,7 +221,7 @@ Install tmux/gh via Homebrew: `brew install tmux gh`. Install the Claude Code CL
 ### Toggle Panels
 | Action | Shortcut |
 |--------|----------|
-| Toggle tasks | `⌃T` |
+| Toggle templates | `⌃T` |
 | Toggle logs | `⌃O` |
 | Toggle git status | `⌃G` |
 | Toggle bottom (shell) | `⌃B` |
