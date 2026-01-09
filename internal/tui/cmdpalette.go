@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/textinput"
@@ -39,7 +38,8 @@ type CommandPalette struct {
 // NewCommandPalette creates a new command palette.
 func NewCommandPalette(commands []Command) *CommandPalette {
 	// Detect dark mode BEFORE bubbletea starts
-	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+	// Uses config theme setting if available, otherwise auto-detects
+	isDark := DetectDarkMode()
 
 	ti := textinput.New()
 	ti.Placeholder = "Type to search..."

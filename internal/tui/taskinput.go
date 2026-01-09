@@ -3,7 +3,6 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -110,8 +109,9 @@ func NewTaskInput() *TaskInput {
 
 // NewTaskInputWithTasks creates a new task input model with active task list.
 func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
-	// Detect dark mode BEFORE bubbletea starts (HasDarkBackground reads from stdin)
-	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+	// Detect dark mode BEFORE bubbletea starts
+	// Uses config theme setting if available, otherwise auto-detects
+	isDark := DetectDarkMode()
 
 	ta := textarea.New()
 	ta.Placeholder = "Describe your task here... and press Alt+Enter\n\nExamples:\n- Add user authentication\n- Fix bug in login form"
@@ -266,8 +266,8 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		kanbanHeight := max(8, msg.Height-topSectionHeight-3) // -3 for help text + gap + statusline
 		m.kanban.SetSize(msg.Width, kanbanHeight)
 
-		// Options panel needs ~47 chars width (content 43 + padding 4 + border ~2)
-		const optionsPanelWidth = 47
+		// Options panel width: innerWidth(37) + padding(4) + border(2) = 43
+		const optionsPanelWidth = 43
 		// Textarea gets remaining width with minimal gap (1 char)
 		newWidth := msg.Width - optionsPanelWidth - 1
 		if newWidth > 30 {
@@ -872,7 +872,7 @@ func (m *TaskInput) detectClickedPanel(x, y int) FocusPanel {
 	// Options panel: same Y range as textarea, but to the right
 	// Kanban: starts after top section, takes remaining space
 
-	const optionsPanelWidth = 47
+	const optionsPanelWidth = 43 // innerWidth(37) + padding(4) + border(2)
 	textareaHeightWithBorder := m.textareaHeight + 2 // Dynamic height + border
 	textareaWidth := m.width - optionsPanelWidth - 1
 	if textareaWidth < 30 {

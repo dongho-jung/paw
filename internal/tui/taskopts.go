@@ -2,7 +2,6 @@
 package tui
 
 import (
-	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
@@ -41,8 +40,9 @@ type TaskOptsResult struct {
 
 // NewTaskOptsUI creates a new task options UI.
 func NewTaskOptsUI(currentOpts *config.TaskOptions, activeTasks []string) *TaskOptsUI {
-	// Detect dark mode BEFORE bubbletea starts (HasDarkBackground reads from stdin)
-	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+	// Detect dark mode BEFORE bubbletea starts
+	// Uses config theme setting if available, otherwise auto-detects
+	isDark := DetectDarkMode()
 
 	opts := config.DefaultTaskOptions()
 	if currentOpts != nil {

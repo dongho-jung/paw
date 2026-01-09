@@ -2,7 +2,6 @@
 package tui
 
 import (
-	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
@@ -53,8 +52,9 @@ type TemplateEditor struct {
 
 // NewTemplateEditor creates a new template editor.
 func NewTemplateEditor(mode TemplateEditorMode, name, content string) *TemplateEditor {
-	// Detect dark mode before bubbletea starts
-	isDark := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+	// Detect dark mode BEFORE bubbletea starts
+	// Uses config theme setting if available, otherwise auto-detects
+	isDark := DetectDarkMode()
 
 	ta := textarea.New()
 	ta.Placeholder = "Enter template content..."
