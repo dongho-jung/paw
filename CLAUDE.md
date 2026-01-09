@@ -88,17 +88,25 @@ go tool cover -html=coverage.out -o coverage.html
 paw/                           # This repository
 ├── cmd/paw/                   # Go main package
 │   ├── main.go                # Entry point and root command
+│   ├── session.go             # Session management (attach, create)
+│   ├── setup.go               # Setup wizard and initialization
+│   ├── tmux_config.go         # Tmux configuration generation
 │   ├── check.go               # Dependency check command (paw check)
+│   ├── check_project.go       # Project-level checks
+│   ├── attach.go              # Attach command (paw attach)
+│   ├── history.go             # History command (paw history)
+│   ├── logs.go                # Logs command (paw logs)
 │   ├── internal.go            # Internal command registration
-│   ├── internal_create.go     # Task creation commands (toggleNew, newTask, spawnTask, handleTask)
-│   ├── internal_lifecycle.go  # Task lifecycle commands (endTask, cancelTask, doneTask)
-│   ├── internal_popup.go      # Popup/UI commands (toggleLog, toggleHelp, toggleTemplate)
+│   ├── internal_create*.go    # Task creation (toggleNew, newTask, spawnTask, handleTask)
+│   ├── internal_lifecycle*.go # Task lifecycle (endTask, cancelTask, merge, helpers)
+│   ├── internal_popup*.go     # Popup/UI (toggleLog, toggleHelp, toggleTemplate, shell)
 │   ├── internal_sync.go       # Sync commands (syncWithMain, syncTask, toggleBranch)
 │   ├── internal_stop_hook.go  # Claude stop hook handling (task status classification)
 │   ├── internal_user_prompt_hook.go # User prompt submission hook
 │   ├── internal_utils.go      # Utility commands and helpers (ctrlC, renameWindow)
 │   ├── keybindings.go         # Tmux keybinding definitions
-│   └── wait.go                # Wait detection for user input prompts
+│   ├── wait*.go               # Wait detection for user input prompts
+│   └── window_map.go          # Window ID to task name mapping
 ├── cmd/paw-notify/            # Notification helper (macOS app bundle)
 │   ├── main.go                # CGO code for UserNotifications (darwin only)
 │   ├── doc.go                 # Stub for non-darwin platforms
@@ -122,11 +130,19 @@ paw/                           # This repository
 │   ├── notify/                # Desktop/audio/statusline notifications
 │   ├── service/               # Business logic services (history, etc.)
 │   ├── task/                  # Task management
+│   │   ├── manager*.go        # Task manager (core, find, worktree operations)
+│   │   ├── task.go            # Task struct and basic operations
+│   │   ├── workspace.go       # Workspace management
+│   │   └── recovery.go        # Task recovery logic
 │   ├── tmux/                  # Tmux client
 │   └── tui/                   # Terminal UI components
+│       ├── taskinput*.go      # Task input UI (main, helpers, mouse, options)
+│       ├── taskopts.go        # Task options panel
+│       ├── template*.go       # Template selector and editor
 │       ├── gitviewer.go       # Git viewer (status, log, graph modes)
 │       ├── helpviewer.go      # Help viewer
 │       ├── logviewer.go       # Log viewer with filtering
+│       ├── cmdpalette.go      # Command palette (⌃P)
 │       └── textarea/          # Custom textarea component (fork of bubbles)
 ├── Makefile                   # Build script
 └── go.mod                     # Go module file

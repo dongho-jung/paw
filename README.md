@@ -3,7 +3,47 @@
 [![CI](https://github.com/dongho-jung/paw/actions/workflows/ci.yml/badge.svg)](https://github.com/dongho-jung/paw/actions/workflows/ci.yml)
 [![Release](https://github.com/dongho-jung/paw/actions/workflows/release.yml/badge.svg)](https://github.com/dongho-jung/paw/actions/workflows/release.yml)
 
-A project management system built on Claude Code.
+A lightweight orchestration layer for running multiple Claude Code agents in parallel.
+
+## Why PAW?
+
+### Works Anywhere
+
+Run PAW on a remote server via SSH or mosh. Disconnect anytime—your agents keep working. Reconnect from any device and pick up where you left off.
+
+```
+laptop (start) → wifi dies → phone (check status) → desktop (continue)
+```
+
+No browser to keep open. No Electron app eating RAM. Just a persistent terminal session.
+
+### Zero Overhead
+
+| | Browser-based tools | PAW |
+|---|---------------------|-----|
+| Runtime | Electron/Chrome | Native binary |
+| Memory | 500MB+ | ~10MB |
+| Connection lost | Session gone | Session persists |
+| Remote server | Port forwarding | SSH |
+
+### Full Automation
+
+Each task gets its own git worktree. When done, PAW commits, pushes, and creates a PR (or merges directly)—automatically.
+
+```
+⌃N (new task) → agent works → ⌃F (finish) → committed & merged
+```
+
+### Stay in the Loop
+
+- Desktop notifications when agents need input
+- Action buttons to respond directly from notifications
+- Slack/ntfy integration for mobile alerts
+- Visual status: 🤖 working · 💬 waiting · ✅ done
+
+### No Lock-in
+
+PAW orchestrates Claude Code—it doesn't replace it. Your `.claude/` settings, MCP servers, and workflows work unchanged. Stop using PAW anytime; your git history stays clean.
 
 ## Installation
 
@@ -199,7 +239,7 @@ Use `paw check` to verify prerequisites.
 
 Install tmux/gh via Homebrew: `brew install tmux gh`. Install the Claude Code CLI from https://claude.ai/claude-code.
 
-## tmux shortcuts
+## Keyboard Shortcuts
 
 ### Navigation
 | Action | Shortcut |
