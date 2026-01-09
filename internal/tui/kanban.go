@@ -85,11 +85,11 @@ func (k *KanbanView) Render() string {
 	// Calculate column width (4 columns with gaps)
 	// Minimum width per column
 	const minColumnWidth = 15
-	const columnGap = 6
+	const columnGap = 10 // 8 for borders (4 columns * 2 chars each) + 2 for scrollbar
 	if k.width < minColumnWidth*4+columnGap {
 		return ""
 	}
-	columnWidth := (k.width - columnGap) / 4 // -6 for borders and gaps
+	columnWidth := (k.width - columnGap) / 4
 
 	// Build each column
 	columns := []struct {
@@ -244,7 +244,7 @@ func (k *KanbanView) ColumnWidth() int {
 	if k.width < 40 {
 		return 0
 	}
-	columnWidth := (k.width - 6) / 4
+	columnWidth := (k.width - 10) / 4 // 8 for borders + 2 for scrollbar
 	if columnWidth < 15 {
 		columnWidth = 15
 	}
