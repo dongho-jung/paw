@@ -85,81 +85,12 @@ var endTaskCmd = &cobra.Command{
 
 		// Commit changes if git mode
 		if app.IsGitRepo {
-			hasChanges := gitClient.HasChanges(workDir)
-			logging.Trace("Git status: hasChanges=%v", hasChanges)
+			commitChangesIfNeeded(gitClient, workDir)
 
-			if hasChanges {
-				spinner := tui.NewSimpleSpinner("Committing changes")
-				spinner.Start()
-
-				commitTimer := logging.StartTimer("git commit")
-				if err := gitClient.AddAll(workDir); err != nil {
-					logging.Warn("Failed to add changes: %v", err)
-				}
-
-				// Layer 3: Prevent .claude symlink from being committed (final safety check)
-				// Check if .claude is staged and unstage it if found
-				claudeStaged, err := gitClient.IsFileStaged(workDir, constants.ClaudeLink)
-				if err != nil {
-					logging.Warn("Failed to check if .claude is staged: %v", err)
-				} else if claudeStaged {
-					logging.Warn("Detected .claude in staging area, unstaging it to prevent commit")
-					if err := gitClient.ResetPath(workDir, constants.ClaudeLink); err != nil {
-						logging.Warn("Failed to unstage .claude: %v", err)
-					} else {
-						logging.Debug("Successfully unstaged .claude")
-					}
-				}
-
-				diffStat, _ := gitClient.GetDiffStat(workDir)
-				logging.Trace("Changes: %s", strings.ReplaceAll(diffStat, "\n", ", "))
-				message := fmt.Sprintf(constants.CommitMessageAutoCommit, diffStat)
-				if err := gitClient.Commit(workDir, message); err != nil {
-					commitTimer.StopWithResult(false, err.Error())
-					spinner.Stop(false, err.Error())
-				} else {
-					commitTimer.StopWithResult(true, "")
-					spinner.Stop(true, "")
-				}
-			} else {
-				fmt.Println("  ○ No changes to commit")
-			}
-
-			if app.Config != nil && app.Config.VerifyCommand != "" {
-				verifySpinner := tui.NewSimpleSpinner("Running verification")
-				verifySpinner.Start()
-
-				verifyEnv := app.GetEnvVars(targetTask.Name, workDir, windowID)
-				verifyResult, verifyErr := service.RunVerification(
-					app.Config.VerifyCommand,
-					workDir,
-					verifyEnv,
-					targetTask.GetVerifyOutputPath(),
-					targetTask.GetVerifyMetaPath(),
-					time.Duration(app.Config.VerifyTimeout)*time.Second,
-				)
-
-				if verifyErr != nil || verifyResult == nil || !verifyResult.Success {
-					verifySpinner.Stop(false, "failed")
-				} else {
-					verifySpinner.Stop(true, "")
-				}
-
-				if app.Config.OnComplete == config.OnCompleteAutoMerge && app.Config.VerifyRequired && verifyResult != nil && !verifyResult.Success {
-					logging.Warn("Verification failed; skipping auto-merge")
-					fmt.Println()
-					fmt.Println("  ✗ Verification failed - auto-merge blocked")
-					warningWindowName := windowNameForStatus(targetTask.Name, task.StatusCorrupted)
-					if err := renameWindowWithStatus(tm, windowID, warningWindowName, app.PawDir, targetTask.Name, "verify"); err != nil {
-						logging.Warn("Failed to rename window: %v", err)
-					}
-					notify.PlaySound(notify.SoundError)
-					notify.SendAll(app.Config.Notifications, "Verification failed", fmt.Sprintf("⚠️ %s - auto-merge blocked", targetTask.Name))
-					if err := tm.DisplayMessage(fmt.Sprintf("⚠️ Verification failed: %s", targetTask.Name), 3000); err != nil {
-						logging.Trace("Failed to display message: %v", err)
-					}
-					return nil
-				}
+			// Run verification if configured
+			_, blocked := runVerificationIfConfigured(app, targetTask, windowID, workDir, tm)
+			if blocked {
+				return nil
 			}
 
 			// Push changes (only for auto-pr mode; auto-merge handles merge locally without push)
@@ -1679,6 +1610,115 @@ func loadTaskOptions(agentDir string) *config.TaskOptions {
 		return config.DefaultTaskOptions()
 	}
 	return opts
+}
+
+// verificationResult represents the outcome of running verification.
+type verificationResult struct {
+	metadata *service.VerificationMetadata
+	error    error
+	success  bool
+}
+
+// runVerificationIfConfigured runs the verification command if configured.
+// Returns verification result and whether auto-merge should be blocked.
+func runVerificationIfConfigured(app *app.App, targetTask *task.Task, windowID, workDir string, tm tmux.Client) (*verificationResult, bool) {
+	if app.Config == nil || app.Config.VerifyCommand == "" {
+		return nil, false
+	}
+
+	verifySpinner := tui.NewSimpleSpinner("Running verification")
+	verifySpinner.Start()
+
+	verifyEnv := app.GetEnvVars(targetTask.Name, workDir, windowID)
+	verifyMeta, verifyErr := service.RunVerification(
+		app.Config.VerifyCommand,
+		workDir,
+		verifyEnv,
+		targetTask.GetVerifyOutputPath(),
+		targetTask.GetVerifyMetaPath(),
+		time.Duration(app.Config.VerifyTimeout)*time.Second,
+	)
+
+	result := &verificationResult{
+		metadata: verifyMeta,
+		error:    verifyErr,
+		success:  verifyMeta != nil && verifyMeta.Success,
+	}
+
+	if !result.success {
+		verifySpinner.Stop(false, "failed")
+	} else {
+		verifySpinner.Stop(true, "")
+	}
+
+	// Check if auto-merge should be blocked
+	shouldBlock := app.Config.OnComplete == config.OnCompleteAutoMerge &&
+		app.Config.VerifyRequired &&
+		!result.success
+
+	if shouldBlock {
+		logging.Warn("Verification failed; skipping auto-merge")
+		fmt.Println()
+		fmt.Println("  ✗ Verification failed - auto-merge blocked")
+		warningWindowName := windowNameForStatus(targetTask.Name, task.StatusCorrupted)
+		if err := renameWindowWithStatus(tm, windowID, warningWindowName, app.PawDir, targetTask.Name, "verify"); err != nil {
+			logging.Warn("Failed to rename window: %v", err)
+		}
+		notify.PlaySound(notify.SoundError)
+		notify.SendAll(app.Config.Notifications, "Verification failed", fmt.Sprintf("⚠️ %s - auto-merge blocked", targetTask.Name))
+		if err := tm.DisplayMessage(fmt.Sprintf("⚠️ Verification failed: %s", targetTask.Name), 3000); err != nil {
+			logging.Trace("Failed to display message: %v", err)
+		}
+	}
+
+	return result, shouldBlock
+}
+
+// commitChangesIfNeeded commits any pending changes in the working directory.
+// Returns true if changes were committed, false otherwise.
+func commitChangesIfNeeded(gitClient git.Client, workDir string) bool {
+	hasChanges := gitClient.HasChanges(workDir)
+	logging.Trace("Git status: hasChanges=%v", hasChanges)
+
+	if !hasChanges {
+		fmt.Println("  ○ No changes to commit")
+		return false
+	}
+
+	spinner := tui.NewSimpleSpinner("Committing changes")
+	spinner.Start()
+
+	commitTimer := logging.StartTimer("git commit")
+	if err := gitClient.AddAll(workDir); err != nil {
+		logging.Warn("Failed to add changes: %v", err)
+	}
+
+	// Layer 3: Prevent .claude symlink from being committed (final safety check)
+	// Check if .claude is staged and unstage it if found
+	claudeStaged, err := gitClient.IsFileStaged(workDir, constants.ClaudeLink)
+	if err != nil {
+		logging.Warn("Failed to check if .claude is staged: %v", err)
+	} else if claudeStaged {
+		logging.Warn("Detected .claude in staging area, unstaging it to prevent commit")
+		if err := gitClient.ResetPath(workDir, constants.ClaudeLink); err != nil {
+			logging.Warn("Failed to unstage .claude: %v", err)
+		} else {
+			logging.Debug("Successfully unstaged .claude")
+		}
+	}
+
+	diffStat, _ := gitClient.GetDiffStat(workDir)
+	logging.Trace("Changes: %s", strings.ReplaceAll(diffStat, "\n", ", "))
+	message := fmt.Sprintf(constants.CommitMessageAutoCommit, diffStat)
+	if err := gitClient.Commit(workDir, message); err != nil {
+		commitTimer.StopWithResult(false, err.Error())
+		spinner.Stop(false, err.Error())
+	} else {
+		commitTimer.StopWithResult(true, "")
+		spinner.Stop(true, "")
+	}
+
+	return true
 }
 
 func buildHistoryMetadata(app *app.App, t *task.Task, opts *config.TaskOptions, gitClient git.Client, workDir string, verify *service.VerificationMetadata, hooks []service.HookMetadata) *service.HistoryMetadata {
