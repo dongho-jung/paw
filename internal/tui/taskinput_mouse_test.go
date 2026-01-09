@@ -41,36 +41,36 @@ func TestHandleTextareaMouse_CoordinateCalculation(t *testing.T) {
 	}{
 		{
 			name:      "Click on first content line",
-			clickX:    5,  // Should be within content
-			clickY:    2,  // First content line (after help Y=0, border Y=1)
-			expectRow: 0,  // Logical row 0
+			clickX:    5, // Should be within content
+			clickY:    2, // First content line (after help Y=0, border Y=1)
+			expectRow: 0, // Logical row 0
 			expectOK:  true,
 		},
 		{
 			name:      "Click on second content line",
 			clickX:    5,
-			clickY:    3,  // Second content line
-			expectRow: 1,  // Logical row 1
+			clickY:    3, // Second content line
+			expectRow: 1, // Logical row 1
 			expectOK:  true,
 		},
 		{
 			name:      "Click on third content line",
 			clickX:    5,
-			clickY:    4,  // Third content line
-			expectRow: 2,  // Logical row 2
+			clickY:    4, // Third content line
+			expectRow: 2, // Logical row 2
 			expectOK:  true,
 		},
 		{
 			name:      "Click on border (should fail)",
 			clickX:    5,
-			clickY:    1,  // Border line
+			clickY:    1, // Border line
 			expectRow: 0,
 			expectOK:  false,
 		},
 		{
 			name:      "Click on help text (should fail via detectClickedPanel)",
 			clickX:    5,
-			clickY:    0,  // Help text line
+			clickY:    0, // Help text line
 			expectRow: 0,
 			expectOK:  false,
 		},

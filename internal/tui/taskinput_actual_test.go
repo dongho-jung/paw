@@ -12,7 +12,7 @@ func TestTaskInput_RenderOptionsPanel_Actual(t *testing.T) {
 	m := NewTaskInputWithTasks(nil)
 	m.textareaHeight = 5 // Set consistent height
 	m.isDark = true
-	
+
 	// Test with different focus states
 	testCases := []struct {
 		name       string
@@ -26,23 +26,23 @@ func TestTaskInput_RenderOptionsPanel_Actual(t *testing.T) {
 		{"Focused on Ultrathink", FocusPanelRight, OptFieldUltrathink, 0},
 		{"Not focused", FocusPanelLeft, OptFieldModel, 0},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			m.focusPanel = tc.focusPanel
 			m.optField = tc.optField
 			m.modelIdx = tc.modelIdx
-			
+
 			result := m.renderOptionsPanel()
-			
+
 			t.Logf("\n=== %s ===\n%s", tc.name, result)
-			
+
 			// Check all lines have same width
 			lines := strings.Split(result, "\n")
 			if len(lines) < 3 {
 				t.Fatal("Not enough lines")
 			}
-			
+
 			expectedWidth := lipgloss.Width(lines[0])
 			for i, line := range lines {
 				w := lipgloss.Width(line)
@@ -50,7 +50,7 @@ func TestTaskInput_RenderOptionsPanel_Actual(t *testing.T) {
 					t.Errorf("Line %d has different width: %d != %d", i, w, expectedWidth)
 				}
 			}
-			
+
 			// Check that Model line doesn't wrap (all models on same line)
 			modelLineFound := false
 			for _, line := range lines {

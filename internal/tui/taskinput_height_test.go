@@ -123,9 +123,9 @@ func TestTaskInput_MinHeight(t *testing.T) {
 // TestTaskInput_MaxHeightCalculation verifies the 50% screen calculation
 func TestTaskInput_MaxHeightCalculation(t *testing.T) {
 	testCases := []struct {
-		name               string
-		screenHeight       int
-		expectedMaxHeight  int
+		name              string
+		screenHeight      int
+		expectedMaxHeight int
 	}{
 		{"Small screen (20)", 20, 8},   // (20-4) * 50% = 8
 		{"Medium screen (40)", 40, 18}, // (40-4) * 50% = 18
