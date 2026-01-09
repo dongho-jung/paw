@@ -116,6 +116,9 @@ var newTaskCmd = &cobra.Command{
 			logging.SetGlobal(logger)
 		}
 
+		// Set project name for TUI display
+		tui.SetProjectName(sessionName)
+
 		// Initialize input history service
 		inputHistorySvc := service.NewInputHistoryService(app.PawDir)
 

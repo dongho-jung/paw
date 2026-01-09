@@ -550,10 +550,14 @@ func (m *TaskInput) View() tea.View {
 		Bold(true)
 	tipStyle := helpStyle
 
-	// Left side: PAW {version} Tip: {tip}
+	// Left side: PAW {version} - {projectName}  Tip: {tip}
 	versionText := versionStyle.Render("PAW " + Version)
-	tipText := tipStyle.Render(" Tip: " + m.currentTip)
-	leftContent := versionText + tipText
+	projectText := ""
+	if ProjectName != "" {
+		projectText = versionStyle.Render(" - " + ProjectName)
+	}
+	tipText := tipStyle.Render("  Tip: " + m.currentTip)
+	leftContent := versionText + projectText + tipText
 	leftWidth := lipgloss.Width(leftContent)
 
 	// Show cancel pending hint if waiting for second press, otherwise show normal help text

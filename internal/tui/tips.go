@@ -9,6 +9,9 @@ import (
 // Version is the PAW version string, set from main package.
 var Version = "dev"
 
+// ProjectName is the project name (tmux session name), set from main package.
+var ProjectName = ""
+
 // tips contains usage tips shown to users.
 var tips = []string{
 	"Press ⌃R to search task history",
@@ -47,4 +50,9 @@ func GetTip() string {
 // e.g., "v0.3.0-32-gabcdef" -> "v0.3.0-32"
 func SetVersion(v string) {
 	Version = versionHashRegex.ReplaceAllString(v, "")
+}
+
+// SetProjectName sets the project name (tmux session name).
+func SetProjectName(name string) {
+	ProjectName = name
 }

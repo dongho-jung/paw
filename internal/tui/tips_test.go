@@ -94,3 +94,36 @@ func TestGetTipRandomness(t *testing.T) {
 		t.Errorf("GetTip() returned the same tip all 50 times, expected randomness")
 	}
 }
+
+func TestSetProjectName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "simple project name",
+			input:    "my-project",
+			expected: "my-project",
+		},
+		{
+			name:     "project with colon (subdirectory)",
+			input:    "repo:subdir",
+			expected: "repo:subdir",
+		},
+		{
+			name:     "empty project name",
+			input:    "",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			SetProjectName(tt.input)
+			if ProjectName != tt.expected {
+				t.Errorf("SetProjectName(%q) = %q, want %q", tt.input, ProjectName, tt.expected)
+			}
+		})
+	}
+}
