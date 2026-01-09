@@ -59,6 +59,9 @@ type TaskInput struct {
 	textareaHeight    int // Current textarea height (visible lines)
 	textareaMaxHeight int // Maximum textarea height (50% of screen)
 
+	// Dynamic panel widths for alignment with Kanban columns
+	optionsPanelWidth int // Options panel display width (dynamic for alignment)
+
 	// Inline options editing
 	focusPanel FocusPanel
 	optField   OptField
@@ -173,6 +176,7 @@ func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
 		isDark:            isDark,
 		textareaHeight:    textareaDefaultHeight,
 		textareaMaxHeight: 15, // Will be updated on WindowSizeMsg
+		optionsPanelWidth: 43, // Default, will be updated on WindowSizeMsg for alignment
 		focusPanel:        FocusPanelLeft,
 		optField:          OptFieldModel,
 		modelIdx:          modelIdx,
@@ -266,12 +270,33 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		kanbanHeight := max(8, msg.Height-topSectionHeight-3) // -3 for help text + gap + statusline
 		m.kanban.SetSize(msg.Width, kanbanHeight)
 
-		// Options panel width: innerWidth(37) + padding(4) + border(2) = 43
-		const optionsPanelWidth = 43
-		// Textarea gets remaining width with minimal gap (1 char)
-		newWidth := msg.Width - optionsPanelWidth - 1
-		if newWidth > 30 {
-			m.textarea.SetWidth(newWidth)
+		// Calculate widths for alignment with Kanban columns:
+		// - Textarea right border aligns with Done column right border (3rd column)
+		// - Options right border aligns with Warning column right border (4th column = screen edge)
+		const kanbanColumnGap = 8 // Same as kanban.go: 4 columns × 2 chars border
+		const minOptionsInnerWidth = 37
+		const optionsPaddingBorder = 6 // padding(4) + border(2)
+		const minOptionsPanelWidth = minOptionsInnerWidth + optionsPaddingBorder // 43
+
+		// Calculate kanban column display width (must match kanban.go calculation)
+		kanbanColWidth := (msg.Width - kanbanColumnGap) / 4
+		kanbanColDisplayWidth := kanbanColWidth + 2 // +2 for border
+
+		// Target: textarea spans 3 columns, options spans 1 column
+		// Done right = 3 * kanbanColDisplayWidth
+		// Warning right = 4 * kanbanColDisplayWidth = screen width (approximately)
+		doneRight := 3 * kanbanColDisplayWidth
+
+		// Options width = 1 kanban column (to align with Warning)
+		// But ensure minimum width for content
+		m.optionsPanelWidth = max(minOptionsPanelWidth, kanbanColDisplayWidth)
+
+		// Textarea display width = Done right position
+		// SetWidth sets content+padding width, border adds 2 more
+		textareaDisplayWidth := doneRight
+		textareaContentWidth := textareaDisplayWidth - 2 // -2 for border
+		if textareaContentWidth > 30 {
+			m.textarea.SetWidth(textareaContentWidth)
 		}
 
 	case tea.KeyMsg:
@@ -539,12 +564,10 @@ func (m *TaskInput) View() tea.View {
 	// Build right panel (options)
 	rightPanel := m.renderOptionsPanel()
 
-	// Join panels horizontally with minimal gap
-	gapStyle := lipgloss.NewStyle().Width(1)
+	// Join panels horizontally (no gap for proper alignment with Kanban columns)
 	topSection := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		textareaView,
-		gapStyle.Render(""),
 		rightPanel,
 	)
 
@@ -638,7 +661,7 @@ func (m *TaskInput) View() tea.View {
 }
 
 // renderOptionsPanel renders the options panel for the right side.
-// The panel auto-sizes to fit its content.
+// The panel width is dynamic to align with Kanban Warning column.
 func (m *TaskInput) renderOptionsPanel() string {
 	isFocused := m.focusPanel == FocusPanelRight
 
@@ -684,7 +707,12 @@ func (m *TaskInput) renderOptionsPanel() string {
 
 	// Build content lines with consistent visible width
 	// Using explicit line-by-line approach to avoid Width() ANSI code issues
-	const innerWidth = 37 // Content width (excludes border and padding)
+	// Inner width = panel width - padding(4) - border(2)
+	const minInnerWidth = 37
+	innerWidth := m.optionsPanelWidth - 6 // -6 for padding(4) + border(2)
+	if innerWidth < minInnerWidth {
+		innerWidth = minInnerWidth
+	}
 	var lines []string
 
 	// Title line
@@ -872,9 +900,12 @@ func (m *TaskInput) detectClickedPanel(x, y int) FocusPanel {
 	// Options panel: same Y range as textarea, but to the right
 	// Kanban: starts after top section, takes remaining space
 
-	const optionsPanelWidth = 43 // innerWidth(37) + padding(4) + border(2)
+	// Calculate textarea width to match kanban columns alignment
+	const kanbanColumnGap = 8
+	kanbanColWidth := (m.width - kanbanColumnGap) / 4
+	kanbanColDisplayWidth := kanbanColWidth + 2
 	textareaHeightWithBorder := m.textareaHeight + 2 // Dynamic height + border
-	textareaWidth := m.width - optionsPanelWidth - 1
+	textareaWidth := 3 * kanbanColDisplayWidth       // Spans 3 kanban columns
 	if textareaWidth < 30 {
 		textareaWidth = 30
 	}
