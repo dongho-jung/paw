@@ -708,9 +708,8 @@ func (m *TaskInput) renderOptionsPanel() string {
 				parts = append(parts, dimStyle.Render(" "+paddedName+" "))
 			}
 		}
-		// Use JoinHorizontal to properly handle styled strings
-		modelRow := lipgloss.JoinHorizontal(lipgloss.Left, label, strings.Join(parts, ""))
-		content.WriteString(modelRow)
+		// Direct concatenation - JoinHorizontal causes layout issues with fixed-width panels
+		content.WriteString(label + strings.Join(parts, ""))
 		content.WriteString("\n")
 	}
 
@@ -740,9 +739,8 @@ func (m *TaskInput) renderOptionsPanel() string {
 				offText = valueStyle.Render("[off]")
 			}
 		}
-		// Use JoinHorizontal to properly handle styled strings
-		ultrathinkRow := lipgloss.JoinHorizontal(lipgloss.Left, label, onText, offText)
-		content.WriteString(ultrathinkRow)
+		// Direct concatenation - JoinHorizontal causes layout issues with fixed-width panels
+		content.WriteString(label + onText + " " + offText)
 		content.WriteString("\n")
 	}
 
