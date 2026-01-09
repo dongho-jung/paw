@@ -226,7 +226,9 @@ func doneWindowName(taskName string) string {
 }
 
 // detectDoneInContent checks if the content contains the PAW_DONE marker.
-// Returns true if the marker is found within doneMarkerMaxDistance lines from the end.
+// Returns true if the marker is found within doneMarkerMaxDistance lines from the end
+// AND in the last segment (after the last ⏺ marker, which indicates a new Claude response).
+// This prevents a previously completed task from staying "done" when given new work.
 func detectDoneInContent(content string) bool {
 	lines := strings.Split(content, "\n")
 	lines = trimTrailingEmpty(lines)
@@ -234,10 +236,14 @@ func detectDoneInContent(content string) bool {
 		return false
 	}
 
-	// Check the last N lines for the marker
+	// Find the last segment (after the last ⏺ marker)
+	// This ensures we only detect PAW_DONE in the most recent agent response
+	segmentStart := findLastSegmentStart(lines)
+
+	// Check the last N lines from the segment for the marker
 	start := len(lines) - doneMarkerMaxDistance
-	if start < 0 {
-		start = 0
+	if start < segmentStart {
+		start = segmentStart
 	}
 	for _, line := range lines[start:] {
 		if matchesDoneMarker(line) {
@@ -245,6 +251,18 @@ func detectDoneInContent(content string) bool {
 		}
 	}
 	return false
+}
+
+// findLastSegmentStart finds the index of the last line starting with ⏺.
+// Returns 0 if no segment marker is found (search entire content).
+func findLastSegmentStart(lines []string) int {
+	for i := len(lines) - 1; i >= 0; i-- {
+		trimmed := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(trimmed, "⏺") {
+			return i
+		}
+	}
+	return 0
 }
 
 // matchesDoneMarker checks if a line contains the PAW_DONE marker.

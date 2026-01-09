@@ -90,11 +90,7 @@ var stopHookCmd = &cobra.Command{
 		}
 
 		windowName, err := getWindowName(tm, windowID)
-		if err == nil && isFinalWindow(windowName) {
-			logging.Debug("stopHookCmd: window already final (%s), skipping", windowName)
-			stopHookTrace("Skipping: window already final (%s)", windowName)
-			return nil
-		}
+		isFinal := err == nil && isFinalWindow(windowName)
 
 		paneContent, err := tm.CapturePane(paneID, constants.PaneCaptureLines)
 		if err != nil {
@@ -107,6 +103,14 @@ var stopHookCmd = &cobra.Command{
 		if paneContent == "" {
 			logging.Warn("stopHookCmd: empty pane capture, skipping")
 			stopHookTrace("Skipping: empty pane capture")
+			return nil
+		}
+
+		// If window is already final and done marker is still valid in last segment, skip
+		// This allows re-classification when new work is requested after PAW_DONE
+		if isFinal && hasDoneMarker(paneContent) {
+			logging.Debug("stopHookCmd: window already final (%s) with valid done marker, skipping", windowName)
+			stopHookTrace("Skipping: window already final (%s) with valid done marker", windowName)
 			return nil
 		}
 
@@ -250,7 +254,9 @@ func tailString(value string, maxLen int) string {
 }
 
 // hasDoneMarker checks if the pane content contains the PAW_DONE marker.
-// The marker must appear on its own line (possibly with whitespace).
+// The marker must appear on its own line (possibly with whitespace)
+// AND in the last segment (after the last ⏺ marker, which indicates a new Claude response).
+// This prevents a previously completed task from staying "done" when given new work.
 func hasDoneMarker(content string) bool {
 	lines := strings.Split(content, "\n")
 	// Trim trailing empty lines to ensure we check the actual content,
@@ -259,11 +265,16 @@ func hasDoneMarker(content string) bool {
 	if len(lines) == 0 {
 		return false
 	}
-	// Check the last N lines for the marker (agent may output text after PAW_DONE)
+
+	// Find the last segment (after the last ⏺ marker)
+	// This ensures we only detect PAW_DONE in the most recent agent response
+	segmentStart := findLastSegmentStartStopHook(lines)
+
+	// Check the last N lines from the segment for the marker (agent may output text after PAW_DONE)
 	// Uses doneMarkerMaxDistance from wait.go for consistency
 	start := len(lines) - doneMarkerMaxDistance
-	if start < 0 {
-		start = 0
+	if start < segmentStart {
+		start = segmentStart
 	}
 	for _, line := range lines[start:] {
 		if matchesDoneMarkerStopHook(line) {
@@ -271,6 +282,18 @@ func hasDoneMarker(content string) bool {
 		}
 	}
 	return false
+}
+
+// findLastSegmentStartStopHook finds the index of the last line starting with ⏺.
+// Returns 0 if no segment marker is found (search entire content).
+func findLastSegmentStartStopHook(lines []string) int {
+	for i := len(lines) - 1; i >= 0; i-- {
+		trimmed := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(trimmed, "⏺") {
+			return i
+		}
+	}
+	return 0
 }
 
 // matchesDoneMarkerStopHook checks if a line contains the PAW_DONE marker.

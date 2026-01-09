@@ -114,6 +114,54 @@ func TestDetectDoneInContent(t *testing.T) {
 			}, "\n"),
 			expected: false,
 		},
+		{
+			name: "done marker in last segment",
+			content: strings.Join([]string{
+				"⏺ First response",
+				"PAW_DONE",
+				"Ready for review.",
+				"⏺ Second response after new task",
+				"Working on it...",
+				"PAW_DONE",
+				"Done again.",
+			}, "\n"),
+			expected: true,
+		},
+		{
+			name: "done marker only in previous segment (not last)",
+			content: strings.Join([]string{
+				"⏺ First response",
+				"All done!",
+				"PAW_DONE",
+				"Ready for review.",
+				"⏺ New task started",
+				"Working on the new task...",
+				"Still processing...",
+			}, "\n"),
+			expected: false,
+		},
+		{
+			name: "done marker with multiple segments",
+			content: strings.Join([]string{
+				"⏺ First response",
+				"PAW_DONE",
+				"⏺ Second response",
+				"PAW_DONE",
+				"⏺ Third response (new task)",
+				"Working on new task...",
+			}, "\n"),
+			expected: false,
+		},
+		{
+			name: "done marker without any segment markers (backward compat)",
+			content: strings.Join([]string{
+				"Some output without segment markers",
+				"Task completed.",
+				"PAW_DONE",
+				"Ready for review.",
+			}, "\n"),
+			expected: true,
+		},
 	}
 
 	for _, tt := range tests {

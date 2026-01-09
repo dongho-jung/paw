@@ -83,6 +83,26 @@ func TestHasDoneMarker(t *testing.T) {
 			content: "",
 			want:    false,
 		},
+		{
+			name:    "done marker in last segment",
+			content: "⏺ First response\nPAW_DONE\nReady.\n⏺ Second response\nWorking...\nPAW_DONE\nDone again.\n",
+			want:    true,
+		},
+		{
+			name:    "done marker only in previous segment (not last)",
+			content: "⏺ First response\nAll done!\nPAW_DONE\nReady.\n⏺ New task started\nWorking on the new task...\n",
+			want:    false,
+		},
+		{
+			name:    "done marker with multiple segments",
+			content: "⏺ First\nPAW_DONE\n⏺ Second\nPAW_DONE\n⏺ Third (new task)\nWorking...\n",
+			want:    false,
+		},
+		{
+			name:    "done marker without segment markers (backward compat)",
+			content: "Some output\nTask completed.\nPAW_DONE\nReady for review.\n",
+			want:    true,
+		},
 	}
 
 	for _, tt := range tests {
