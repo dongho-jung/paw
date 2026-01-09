@@ -414,15 +414,17 @@ func (k *KanbanView) GetSelectionXRange(row int) (int, int) {
 
 	// Multi-row selection
 	if forward {
-		if row == minY {
+		switch row {
+		case minY:
 			return k.selectStartX, 9999 // Start row: from startX to end
-		} else if row == maxY {
+		case maxY:
 			return 0, k.selectEndX // End row: from start to endX
 		}
 	} else {
-		if row == minY {
+		switch row {
+		case minY:
 			return 0, k.selectEndX // End row (in reverse): from start to endX
-		} else if row == maxY {
+		case maxY:
 			return k.selectStartX, 9999 // Start row (in reverse): from startX to end
 		}
 	}

@@ -40,7 +40,7 @@ func DetectDarkMode() bool {
 // unreliable if called too early or if there's buffered input.
 func detectDarkModeWithRetry() bool {
 	// Flush stdout to ensure terminal is in a clean state
-	os.Stdout.Sync()
+	_ = os.Stdout.Sync()
 
 	// Small delay to let terminal settle after any previous output
 	time.Sleep(5 * time.Millisecond)
