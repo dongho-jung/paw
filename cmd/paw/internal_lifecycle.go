@@ -342,7 +342,9 @@ var endTaskCmd = &cobra.Command{
 								mergeSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Merging %s into %s", targetTask.Name, mainBranch))
 								mergeSpinner.Start()
 								logging.Debug("Squash merging branch %s into %s...", targetTask.Name, mainBranch)
-								mergeMsg := fmt.Sprintf(constants.CommitMessageMerge, targetTask.Name)
+								// Get commits from the task branch for the merge message
+								branchCommits, _ := gitClient.GetBranchCommits(app.ProjectDir, targetTask.Name, mainBranch, 20)
+								mergeMsg := git.GenerateMergeCommitMessage(targetTask.Name, branchCommits)
 								mergeConflictOccurred := false // Track if we had to resolve conflicts
 								if err := gitClient.MergeSquash(app.ProjectDir, targetTask.Name, mergeMsg); err != nil {
 									logging.Warn("Merge failed: %v - checking for conflicts", err)
@@ -1166,7 +1168,9 @@ var mergeTaskCmd = &cobra.Command{
 			// Squash merge
 			mergeSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Merging %s", targetTask.Name))
 			mergeSpinner.Start()
-			mergeMsg := fmt.Sprintf(constants.CommitMessageMerge, targetTask.Name)
+			// Get commits from the task branch for the merge message
+			branchCommits, _ := gitClient.GetBranchCommits(app.ProjectDir, targetTask.Name, mainBranch, 20)
+			mergeMsg := git.GenerateMergeCommitMessage(targetTask.Name, branchCommits)
 			mergeConflictOccurred := false
 			if err := gitClient.MergeSquash(app.ProjectDir, targetTask.Name, mergeMsg); err != nil {
 				mergeSpinner.Stop(false, "conflict")

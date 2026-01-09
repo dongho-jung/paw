@@ -469,3 +469,246 @@ func TestEmojiConstants(t *testing.T) {
 		}
 	}
 }
+
+func TestInferCommitType(t *testing.T) {
+	tests := []struct {
+		name     string
+		taskName string
+		expected string
+	}{
+		// Prefix tests
+		{
+			name:     "fix- prefix",
+			taskName: "fix-kanban-drag-select",
+			expected: "fix",
+		},
+		{
+			name:     "fix/ prefix",
+			taskName: "fix/login-bug",
+			expected: "fix",
+		},
+		{
+			name:     "bugfix- prefix",
+			taskName: "bugfix-null-pointer",
+			expected: "fix",
+		},
+		{
+			name:     "hotfix- prefix",
+			taskName: "hotfix-critical-issue",
+			expected: "fix",
+		},
+		{
+			name:     "feat- prefix",
+			taskName: "feat-add-dark-mode",
+			expected: "feat",
+		},
+		{
+			name:     "feature- prefix",
+			taskName: "feature-user-settings",
+			expected: "feat",
+		},
+		{
+			name:     "add- prefix",
+			taskName: "add-search-functionality",
+			expected: "feat",
+		},
+		{
+			name:     "refactor- prefix",
+			taskName: "refactor-database-layer",
+			expected: "refactor",
+		},
+		{
+			name:     "docs- prefix",
+			taskName: "docs-update-readme",
+			expected: "docs",
+		},
+		{
+			name:     "test- prefix",
+			taskName: "test-user-service",
+			expected: "test",
+		},
+		{
+			name:     "chore- prefix",
+			taskName: "chore-update-deps",
+			expected: "chore",
+		},
+		{
+			name:     "perf- prefix",
+			taskName: "perf-optimize-queries",
+			expected: "perf",
+		},
+		{
+			name:     "style- prefix",
+			taskName: "style-format-code",
+			expected: "style",
+		},
+		{
+			name:     "ci- prefix",
+			taskName: "ci-add-github-actions",
+			expected: "ci",
+		},
+		{
+			name:     "build- prefix",
+			taskName: "build-update-dockerfile",
+			expected: "build",
+		},
+
+		// Keyword tests (when no prefix matches)
+		{
+			name:     "contains fix keyword",
+			taskName: "kanban-fix-drag",
+			expected: "fix",
+		},
+		{
+			name:     "contains bug keyword",
+			taskName: "resolve-bug-123",
+			expected: "fix",
+		},
+		{
+			name:     "contains refactor keyword",
+			taskName: "cleanup-old-code",
+			expected: "refactor",
+		},
+		{
+			name:     "contains improve keyword",
+			taskName: "improve-commit-messages",
+			expected: "refactor",
+		},
+		{
+			name:     "contains add keyword",
+			taskName: "new-add-feature",
+			expected: "feat",
+		},
+		{
+			name:     "contains implement keyword",
+			taskName: "implement-oauth",
+			expected: "feat",
+		},
+		{
+			name:     "contains test keyword",
+			taskName: "unit-test-coverage",
+			expected: "test",
+		},
+		{
+			name:     "contains perf keyword",
+			taskName: "optimize-performance",
+			expected: "perf",
+		},
+		{
+			name:     "contains doc keyword",
+			taskName: "update-doc-strings",
+			expected: "docs",
+		},
+
+		// Default case
+		{
+			name:     "generic task defaults to feat",
+			taskName: "kanban-drag-select",
+			expected: "feat",
+		},
+		{
+			name:     "show-project-name",
+			taskName: "show-project-name-in-header",
+			expected: "feat",
+		},
+
+		// Case insensitivity
+		{
+			name:     "uppercase FIX prefix",
+			taskName: "FIX-login-issue",
+			expected: "fix",
+		},
+		{
+			name:     "mixed case",
+			taskName: "Fix-Login-Issue",
+			expected: "fix",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := InferCommitType(tt.taskName)
+			if result != tt.expected {
+				t.Errorf("InferCommitType(%q) = %q, want %q", tt.taskName, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFormatTaskNameForCommit(t *testing.T) {
+	tests := []struct {
+		name     string
+		taskName string
+		expected string
+	}{
+		{
+			name:     "removes fix- prefix",
+			taskName: "fix-kanban-drag-select",
+			expected: "kanban drag select",
+		},
+		{
+			name:     "removes feat- prefix",
+			taskName: "feat-add-dark-mode",
+			expected: "add dark mode",
+		},
+		{
+			name:     "removes feature/ prefix",
+			taskName: "feature/user-settings",
+			expected: "user settings",
+		},
+		{
+			name:     "removes bugfix- prefix",
+			taskName: "bugfix-null-pointer",
+			expected: "null pointer",
+		},
+		{
+			name:     "removes refactor- prefix",
+			taskName: "refactor-database-layer",
+			expected: "database layer",
+		},
+		{
+			name:     "removes docs- prefix",
+			taskName: "docs-update-readme",
+			expected: "update readme",
+		},
+		{
+			name:     "removes chore- prefix",
+			taskName: "chore-update-deps",
+			expected: "update deps",
+		},
+		{
+			name:     "no prefix to remove",
+			taskName: "improve-commit-messages",
+			expected: "improve commit messages",
+		},
+		{
+			name:     "underscores replaced with spaces",
+			taskName: "fix-user_login_issue",
+			expected: "user login issue",
+		},
+		{
+			name:     "first letter lowercase",
+			taskName: "fix-Kanban-Drag",
+			expected: "kanban Drag",
+		},
+		{
+			name:     "empty string",
+			taskName: "",
+			expected: "",
+		},
+		{
+			name:     "just prefix",
+			taskName: "fix-",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatTaskNameForCommit(tt.taskName)
+			if result != tt.expected {
+				t.Errorf("FormatTaskNameForCommit(%q) = %q, want %q", tt.taskName, result, tt.expected)
+			}
+		})
+	}
+}

@@ -235,11 +235,153 @@ const (
 
 // Commit message templates
 const (
-	CommitMessageMerge           = "feat: %s" // Format string for merge commits
 	CommitMessageAutoCommit      = "chore: auto-commit on task end\n\n%s"
 	CommitMessageAutoCommitMerge = "chore: auto-commit before merge\n\n%s"
 	CommitMessageAutoCommitPush  = "chore: auto-commit before push"
 )
+
+// InferCommitType determines the conventional commit type from a task name.
+// It looks for common prefixes/keywords to classify the change.
+func InferCommitType(taskName string) string {
+	lower := strings.ToLower(taskName)
+
+	// Check prefixes first (most specific)
+	prefixes := []struct {
+		prefix     string
+		commitType string
+	}{
+		{"fix-", "fix"},
+		{"fix/", "fix"},
+		{"bugfix-", "fix"},
+		{"bugfix/", "fix"},
+		{"hotfix-", "fix"},
+		{"hotfix/", "fix"},
+		{"feat-", "feat"},
+		{"feat/", "feat"},
+		{"feature-", "feat"},
+		{"feature/", "feat"},
+		{"add-", "feat"},
+		{"add/", "feat"},
+		{"refactor-", "refactor"},
+		{"refactor/", "refactor"},
+		{"docs-", "docs"},
+		{"docs/", "docs"},
+		{"doc-", "docs"},
+		{"doc/", "docs"},
+		{"test-", "test"},
+		{"test/", "test"},
+		{"tests-", "test"},
+		{"tests/", "test"},
+		{"chore-", "chore"},
+		{"chore/", "chore"},
+		{"perf-", "perf"},
+		{"perf/", "perf"},
+		{"style-", "style"},
+		{"style/", "style"},
+		{"ci-", "ci"},
+		{"ci/", "ci"},
+		{"build-", "build"},
+		{"build/", "build"},
+	}
+
+	for _, p := range prefixes {
+		if strings.HasPrefix(lower, p.prefix) {
+			return p.commitType
+		}
+	}
+
+	// Check for keywords anywhere in the name
+	// Order matters: more specific keywords should come first
+	keywords := []struct {
+		keyword    string
+		commitType string
+	}{
+		// Fix-related keywords first (commonly used)
+		{"fix", "fix"},
+		{"bug", "fix"},
+		{"repair", "fix"},
+		{"patch", "fix"},
+		{"resolve", "fix"},
+		// Refactor keywords
+		{"refactor", "refactor"},
+		{"cleanup", "refactor"},
+		{"clean-up", "refactor"},
+		{"restructure", "refactor"},
+		{"reorganize", "refactor"},
+		{"improve", "refactor"},
+		// Docs keywords (before general feat keywords)
+		{"doc", "docs"},
+		{"readme", "docs"},
+		{"comment", "docs"},
+		// Test keywords
+		{"test", "test"},
+		{"spec", "test"},
+		// Performance keywords
+		{"perf", "perf"},
+		{"optim", "perf"},
+		{"speed", "perf"},
+		{"fast", "perf"},
+		// Feature keywords last (most general)
+		{"update", "feat"},
+		{"add", "feat"},
+		{"implement", "feat"},
+		{"create", "feat"},
+		{"new", "feat"},
+		{"introduce", "feat"},
+		{"enable", "feat"},
+		{"support", "feat"},
+	}
+
+	for _, kw := range keywords {
+		if strings.Contains(lower, kw.keyword) {
+			return kw.commitType
+		}
+	}
+
+	// Default to feat for general features
+	return "feat"
+}
+
+// FormatTaskNameForCommit converts a task name into a readable commit subject.
+// It removes common prefixes and converts to readable format.
+func FormatTaskNameForCommit(taskName string) string {
+	lower := strings.ToLower(taskName)
+
+	// Remove common prefixes
+	prefixesToRemove := []string{
+		"fix-", "fix/", "bugfix-", "bugfix/", "hotfix-", "hotfix/",
+		"feat-", "feat/", "feature-", "feature/",
+		"add-", "add/",
+		"refactor-", "refactor/",
+		"docs-", "docs/", "doc-", "doc/",
+		"test-", "test/", "tests-", "tests/",
+		"chore-", "chore/",
+		"perf-", "perf/",
+		"style-", "style/",
+		"ci-", "ci/",
+		"build-", "build/",
+	}
+
+	result := taskName
+	for _, prefix := range prefixesToRemove {
+		if strings.HasPrefix(lower, prefix) {
+			result = taskName[len(prefix):]
+			break
+		}
+	}
+
+	// Replace hyphens with spaces for readability
+	result = strings.ReplaceAll(result, "-", " ")
+	result = strings.ReplaceAll(result, "_", " ")
+
+	// Trim and ensure first letter is lowercase (conventional commit style)
+	result = strings.TrimSpace(result)
+	if len(result) > 0 {
+		result = strings.ToLower(result[:1]) + result[1:]
+	}
+
+	return result
+}
 
 // Double-press detection
 const (

@@ -75,6 +75,15 @@ type Client interface {
 	// Status
 	Status(dir string) (string, error)
 	Checkout(dir, target string) error
+
+	// Log
+	GetBranchCommits(dir, branch, baseBranch string, maxCount int) ([]CommitInfo, error)
+}
+
+// CommitInfo represents basic information about a git commit.
+type CommitInfo struct {
+	Hash    string
+	Subject string
 }
 
 // Worktree represents a git worktree.
@@ -521,6 +530,71 @@ func (c *gitClient) Status(dir string) (string, error) {
 
 func (c *gitClient) Checkout(dir, target string) error {
 	return c.run(dir, "checkout", target)
+}
+
+// GetBranchCommits returns commit information for commits unique to a branch.
+// It returns commits that are in 'branch' but not in 'baseBranch'.
+func (c *gitClient) GetBranchCommits(dir, branch, baseBranch string, maxCount int) ([]CommitInfo, error) {
+	// Use git log with a specific format to get commits unique to the branch
+	args := []string{"log", "--oneline", "--format=%H %s", fmt.Sprintf("%s..%s", baseBranch, branch)}
+	if maxCount > 0 {
+		args = append(args, fmt.Sprintf("-n%d", maxCount))
+	}
+
+	output, err := c.runOutput(dir, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	if output == "" {
+		return nil, nil
+	}
+
+	var commits []CommitInfo
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Format is "hash subject..."
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		commits = append(commits, CommitInfo{
+			Hash:    parts[0],
+			Subject: parts[1],
+		})
+	}
+
+	return commits, nil
+}
+
+// GenerateMergeCommitMessage generates a well-formatted merge commit message.
+// It includes the inferred commit type, formatted subject, and commit history.
+func GenerateMergeCommitMessage(taskName string, commits []CommitInfo) string {
+	commitType := constants.InferCommitType(taskName)
+	subject := constants.FormatTaskNameForCommit(taskName)
+
+	// Build the commit message
+	var msg strings.Builder
+	msg.WriteString(fmt.Sprintf("%s: %s\n", commitType, subject))
+
+	// Add commit history as body if there are any commits
+	if len(commits) > 0 {
+		msg.WriteString("\n")
+		msg.WriteString("Changes:\n")
+		for _, commit := range commits {
+			// Truncate long subjects
+			subj := commit.Subject
+			if len(subj) > 72 {
+				subj = subj[:69] + "..."
+			}
+			msg.WriteString(fmt.Sprintf("- %s\n", subj))
+		}
+	}
+
+	return msg.String()
 }
 
 // CopyUntrackedFiles copies untracked files from source to destination.

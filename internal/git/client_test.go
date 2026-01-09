@@ -171,3 +171,120 @@ func TestCopyUntrackedFilesCreatesDirectories(t *testing.T) {
 		t.Errorf("Copied file not found: %v", err)
 	}
 }
+
+func TestGenerateMergeCommitMessage(t *testing.T) {
+	tests := []struct {
+		name            string
+		taskName        string
+		commits         []CommitInfo
+		wantContains    []string
+		wantNotContains []string
+	}{
+		{
+			name:     "fix task with no commits",
+			taskName: "fix-kanban-drag-select",
+			commits:  nil,
+			wantContains: []string{
+				"fix: kanban drag select",
+			},
+			wantNotContains: []string{
+				"Changes:",
+			},
+		},
+		{
+			name:     "fix task with commits",
+			taskName: "fix-login-bug",
+			commits: []CommitInfo{
+				{Hash: "abc123", Subject: "Fix null pointer exception"},
+				{Hash: "def456", Subject: "Add error handling"},
+			},
+			wantContains: []string{
+				"fix: login bug",
+				"Changes:",
+				"- Fix null pointer exception",
+				"- Add error handling",
+			},
+		},
+		{
+			name:     "feature task",
+			taskName: "add-dark-mode",
+			commits: []CommitInfo{
+				{Hash: "abc123", Subject: "Implement dark mode toggle"},
+			},
+			wantContains: []string{
+				"feat: dark mode",
+				"Changes:",
+				"- Implement dark mode toggle",
+			},
+		},
+		{
+			name:     "refactor task with improve keyword",
+			taskName: "improve-commit-messages",
+			commits: []CommitInfo{
+				{Hash: "abc123", Subject: "Add commit type inference"},
+				{Hash: "def456", Subject: "Add commit body generation"},
+			},
+			wantContains: []string{
+				"refactor: improve commit messages",
+				"Changes:",
+				"- Add commit type inference",
+				"- Add commit body generation",
+			},
+		},
+		{
+			name:     "docs task",
+			taskName: "docs-update-readme",
+			commits: []CommitInfo{
+				{Hash: "abc123", Subject: "Update installation instructions"},
+			},
+			wantContains: []string{
+				"docs: update readme",
+				"Changes:",
+				"- Update installation instructions",
+			},
+		},
+		{
+			name:     "long commit subject truncated",
+			taskName: "fix-bug",
+			commits: []CommitInfo{
+				{Hash: "abc123", Subject: "This is a very long commit message that exceeds the seventy-two character limit and should be truncated"},
+			},
+			wantContains: []string{
+				"fix: bug",
+				"...",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GenerateMergeCommitMessage(tt.taskName, tt.commits)
+
+			for _, want := range tt.wantContains {
+				if !contains(result, want) {
+					t.Errorf("GenerateMergeCommitMessage() result does not contain %q\nGot:\n%s", want, result)
+				}
+			}
+
+			for _, notWant := range tt.wantNotContains {
+				if contains(result, notWant) {
+					t.Errorf("GenerateMergeCommitMessage() result should not contain %q\nGot:\n%s", notWant, result)
+				}
+			}
+		})
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
