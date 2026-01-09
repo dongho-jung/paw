@@ -245,7 +245,7 @@ func (k *KanbanView) FocusedColumn() int {
 	return k.focusedCol
 }
 
-// ColumnWidth returns the width of each column (including border).
+// ColumnWidth returns the width of each column (including border and padding).
 func (k *KanbanView) ColumnWidth() int {
 	// Must match the condition in Render(): minColumnWidth*4 + columnGap = 70
 	const minColumnWidth = 15
@@ -257,7 +257,7 @@ func (k *KanbanView) ColumnWidth() int {
 	if columnWidth < minColumnWidth {
 		columnWidth = minColumnWidth
 	}
-	return columnWidth + 2 // +2 for left and right border
+	return columnWidth + 4 // +4 for border (2) and padding (2)
 }
 
 // ScrollUp scrolls the kanban view up by n lines.
