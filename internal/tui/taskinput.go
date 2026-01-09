@@ -83,6 +83,7 @@ type TaskInput struct {
 
 	// Double-press cancel detection
 	cancelPressTime time.Time
+	cancelKey       string // Track which key was pressed for cancel ("esc" or "ctrl+c")
 
 	// History search request
 	historyRequested bool
@@ -262,6 +263,7 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case cancelClearMsg:
 		// Clear the cancel pending state after timeout
 		m.cancelPressTime = time.Time{}
+		m.cancelKey = ""
 		return m, nil
 
 	case tea.BackgroundColorMsg:
@@ -364,9 +366,10 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cancelled = true
 				return m, tea.Quit
 			}
-			// First press or timeout - record time and wait for second press
+			// First press or timeout - record time and key, then wait for second press
 			// Return a tick command to clear the pending state after timeout
 			m.cancelPressTime = now
+			m.cancelKey = keyStr // Store which key was pressed ("esc" or "ctrl+c")
 			return m, tea.Tick(cancelDoublePressTimeout, func(t time.Time) tea.Msg {
 				return cancelClearMsg{}
 			})
@@ -654,7 +657,12 @@ func (m *TaskInput) View() tea.View {
 		cancelHintStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("214")). // Orange/yellow for visibility
 			Bold(true)
-		cancelHint := cancelHintStyle.Render("Press Esc again to cancel")
+		// Display the appropriate key based on what was pressed
+		keyName := "Esc"
+		if m.cancelKey == "ctrl+c" {
+			keyName = "Ctrl+C"
+		}
+		cancelHint := cancelHintStyle.Render(fmt.Sprintf("Press %s again to cancel", keyName))
 		hintWidth := lipgloss.Width(cancelHint)
 
 		sb.WriteString(leftContent)
