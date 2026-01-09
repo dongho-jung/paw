@@ -127,14 +127,19 @@ func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
 	ta.VirtualCursor = false
 
 	// Custom styling using v2 API - assign directly to Styles field
-	ta.Styles = textarea.DefaultStyles(true) // dark mode
+	// Use detected isDark value for proper theme-aware styling
+	ta.Styles = textarea.DefaultStyles(isDark)
+	// Accent color: darker blue for light bg (good contrast), bright cyan for dark bg
+	lightDark := lipgloss.LightDark(isDark)
+	accentColor := lightDark(lipgloss.Color("25"), lipgloss.Color("39"))
+	dimColor := lightDark(lipgloss.Color("250"), lipgloss.Color("240"))
 	ta.Styles.Focused.Base = lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("39")).
+		BorderForeground(accentColor).
 		Padding(0, 1)
 	ta.Styles.Blurred.Base = lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("240")).
+		BorderForeground(dimColor).
 		Padding(0, 1)
 	// Keep text and placeholder fully readable when blurred (border color already indicates focus)
 	// Copy all text-related styles from focused to blurred to prevent dimming
