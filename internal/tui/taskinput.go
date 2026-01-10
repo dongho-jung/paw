@@ -559,12 +559,8 @@ func (m *TaskInput) View() tea.View {
 		Bold(true)
 	tipStyle := helpStyle
 
-	// Detect narrow terminal using same logic as WindowSizeMsg handler
-	const kanbanColumnGap = 8
-	const minOptionsPanelWidth = 43
-	kanbanColWidth := (m.width - kanbanColumnGap) / 4
-	kanbanColDisplayWidth := kanbanColWidth + 2
-	isNarrow := kanbanColDisplayWidth < minOptionsPanelWidth
+	// Show warning if terminal is smaller than 85x22
+	isNarrow := m.width < 85 || m.height < 22
 
 	// Left side: PAW {version} - {projectName}  Tip: {tip} or Warning
 	versionText := versionStyle.Render("PAW " + Version)
