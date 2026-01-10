@@ -9,6 +9,7 @@ import (
 
 	"github.com/dongho-jung/paw/internal/app"
 	"github.com/dongho-jung/paw/internal/config"
+	"github.com/dongho-jung/paw/internal/constants"
 	"github.com/dongho-jung/paw/internal/embed"
 	"github.com/dongho-jung/paw/internal/git"
 	"github.com/dongho-jung/paw/internal/logging"
@@ -40,8 +41,8 @@ var toggleLogCmd = &cobra.Command{
 		logCmd := fmt.Sprintf("%s internal log-viewer %s", pawBin, logPath)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:  "90%",
-			Height: "80%",
+			Width:  constants.PopupWidthFull,
+			Height: constants.PopupHeightFull,
 			Title:  " Log Viewer ",
 			Close:  true,
 			Style:  "fg=terminal,bg=terminal",
@@ -78,8 +79,8 @@ var toggleHelpCmd = &cobra.Command{
 		helpCmd := fmt.Sprintf("%s internal help-viewer", pawBin)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:  "80%",
-			Height: "80%",
+			Width:  constants.PopupWidthHelp,
+			Height: constants.PopupHeightHelp,
 			Title:  " Help ",
 			Close:  true,
 			Style:  "fg=terminal,bg=terminal",
@@ -150,8 +151,8 @@ var toggleGitStatusCmd = &cobra.Command{
 		gitCmd := fmt.Sprintf("%s internal git-viewer %s", pawBin, panePath)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:     "90%",
-			Height:    "80%",
+			Width:     constants.PopupWidthFull,
+			Height:    constants.PopupHeightFull,
 			Title:     " Git ",
 			Close:     true,
 			Style:     "fg=terminal,bg=terminal",
@@ -191,20 +192,35 @@ var toggleShowDiffCmd = &cobra.Command{
 		gitClient := git.New()
 		mainBranch := gitClient.GetMainBranch(panePath)
 
-		// Build command to show diff between main and current branch with color
-		// Uses less -R to preserve colors and allow scrolling, closes with q
-		// git diff main...HEAD shows changes on the current branch since it diverged from main
-		popupCmd := fmt.Sprintf("cd '%s' && git diff --color=always %s...HEAD | less -R", panePath, mainBranch)
+		pawBin, err := os.Executable()
+		if err != nil {
+			pawBin = "paw"
+		}
+
+		// Run diff viewer in popup (closes with q/Esc/Ctrl+D)
+		diffCmd := fmt.Sprintf("%s internal diff-viewer %s %s", pawBin, panePath, mainBranch)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:     "90%",
-			Height:    "80%",
+			Width:     constants.PopupWidthFull,
+			Height:    constants.PopupHeightFull,
 			Title:     fmt.Sprintf(" Diff (%s...HEAD) ", mainBranch),
 			Close:     true,
 			Style:     "fg=terminal,bg=terminal",
 			Directory: panePath,
-		}, popupCmd)
+		}, diffCmd)
 		return nil
+	},
+}
+
+var diffViewerCmd = &cobra.Command{
+	Use:    "diff-viewer [work-dir] [main-branch]",
+	Short:  "Run the diff viewer",
+	Args:   cobra.ExactArgs(2),
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		workDir := args[0]
+		mainBranch := args[1]
+		return tui.RunDiffViewer(workDir, mainBranch)
 	},
 }
 
@@ -230,8 +246,8 @@ var toggleTemplateCmd = &cobra.Command{
 		templateCmd := fmt.Sprintf("%s internal template-viewer %s", pawBin, sessionName)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:     "90%",
-			Height:    "80%",
+			Width:     constants.PopupWidthFull,
+			Height:    constants.PopupHeightFull,
 			Title:     " Templates ",
 			Close:     true,
 			Style:     "fg=terminal,bg=terminal",

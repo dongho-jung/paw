@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 
+	"github.com/dongho-jung/paw/internal/constants"
 	"github.com/dongho-jung/paw/internal/logging"
 	"github.com/dongho-jung/paw/internal/tmux"
 	"github.com/dongho-jung/paw/internal/tui"
@@ -58,8 +59,8 @@ var toggleSetupCmd = &cobra.Command{
 		setupCmd := fmt.Sprintf("%s internal setup-wizard %s", pawBin, sessionName)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:     "60%",
-			Height:    "50%",
+			Width:     constants.PopupWidthFull,
+			Height:    constants.PopupHeightFull,
 			Title:     " Setup ",
 			Close:     true,
 			Style:     "fg=terminal,bg=terminal",
@@ -123,8 +124,8 @@ var toggleCmdPaletteCmd = &cobra.Command{
 		paletteCmd := fmt.Sprintf("%s internal cmd-palette-tui %s", pawBin, sessionName)
 
 		return tm.DisplayPopup(tmux.PopupOpts{
-			Width:  "60",
-			Height: "20",
+			Width:  constants.PopupWidthPalette,
+			Height: constants.PopupHeightPalette,
 			Title:  "",
 			Close:  true,
 			Style:  "fg=terminal,bg=terminal",
@@ -139,6 +140,11 @@ var cmdPaletteTUICmd = &cobra.Command{
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sessionName := args[0]
+
+		appCtx, err := getAppFromSession(sessionName)
+		if err != nil {
+			return err
+		}
 
 		// Define available commands
 		commands := []tui.Command{
@@ -163,7 +169,6 @@ var cmdPaletteTUICmd = &cobra.Command{
 			return nil
 		}
 
-		// Execute the selected command
 		pawBin, err := os.Executable()
 		if err != nil {
 			pawBin = "paw"
@@ -171,8 +176,20 @@ var cmdPaletteTUICmd = &cobra.Command{
 
 		switch selected.ID {
 		case "show-diff":
-			showDiffCmd := exec.Command(pawBin, "internal", "toggle-show-diff", sessionName)
-			return showDiffCmd.Run()
+			// Queue the diff popup to open after this popup closes
+			// Use tmux run-shell -b (background) with a small delay
+			if !appCtx.IsGitRepo {
+				fmt.Println("Not a git repository")
+				return nil
+			}
+
+			tm := tmux.New(sessionName)
+			// Run toggle-show-diff in background after popup closes
+			_ = tm.Run("run-shell", "-b",
+				fmt.Sprintf("sleep 0.1 && %s internal toggle-show-diff %s", pawBin, sessionName))
+			// Exit immediately to close this popup
+			return nil
+
 		case "restore-panes":
 			restoreCmd := exec.Command(pawBin, "internal", "restore-panes", sessionName)
 			return restoreCmd.Run()

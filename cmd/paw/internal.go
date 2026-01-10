@@ -44,6 +44,7 @@ func init() {
 	internalCmd.AddCommand(toggleGitStatusCmd)
 	internalCmd.AddCommand(gitViewerCmd)
 	internalCmd.AddCommand(toggleShowDiffCmd)
+	internalCmd.AddCommand(diffViewerCmd)
 	internalCmd.AddCommand(toggleTemplateCmd)
 	internalCmd.AddCommand(templateViewerCmd)
 	internalCmd.AddCommand(templateEditorCmd)

@@ -384,3 +384,18 @@ const (
 	WindowIDWaitMaxAttempts = 60                     // Max attempts to wait for window ID file
 	WindowIDWaitInterval    = 500 * time.Millisecond // Interval between checks
 )
+
+// Popup sizes (percentage-based for compatibility)
+const (
+	// Full size for content viewers (log, git, diff, template)
+	PopupWidthFull  = "94%"
+	PopupHeightFull = "90%"
+
+	// Compact size for help viewer
+	PopupWidthHelp  = "80"
+	PopupHeightHelp = "80%"
+
+	// Small size for command palette
+	PopupWidthPalette  = "60"
+	PopupHeightPalette = "20"
+)
