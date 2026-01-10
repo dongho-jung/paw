@@ -275,12 +275,8 @@ var templateViewerCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("template-viewer")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "template-viewer", "")
+		defer cleanup()
 
 		logging.Debug("-> templateViewerCmd(session=%s)", sessionName)
 		defer logging.Debug("<- templateViewerCmd")

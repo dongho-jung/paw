@@ -34,12 +34,8 @@ var ctrlCCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(app.GetLogPath(), app.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("ctrl-c")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(app, "ctrl-c", "")
+		defer cleanup()
 
 		logging.Debug("-> ctrlCCmd(session=%s)", sessionName)
 		defer logging.Debug("<- ctrlCCmd")
@@ -202,6 +198,13 @@ func setupLogger(logPath string, debug bool, scriptName string, taskName string)
 	logging.SetGlobal(logger)
 
 	return logger, func() { _ = logger.Close() }
+}
+
+// setupLoggerFromApp creates and configures a logger from app context.
+// This is a convenience wrapper around setupLogger for the common case
+// where an *app.App is available.
+func setupLoggerFromApp(appCtx *app.App, scriptName, taskName string) (logging.Logger, func()) {
+	return setupLogger(appCtx.GetLogPath(), appCtx.Debug, scriptName, taskName)
 }
 
 func renameWindowWithStatus(tm tmux.Client, windowID, name, pawDir, taskName, source string) error {

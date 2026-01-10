@@ -47,13 +47,8 @@ var watchWaitCmd = &cobra.Command{
 			return err
 		}
 
-		logger, _ := logging.New(app.GetLogPath(), app.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("watch-wait")
-			logger.SetTask(taskName)
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(app, "watch-wait", taskName)
+		defer cleanup()
 
 		logging.Debug("-> watchWaitCmd(session=%s, windowID=%s, task=%s)", sessionName, windowID, taskName)
 		defer logging.Debug("<- watchWaitCmd")

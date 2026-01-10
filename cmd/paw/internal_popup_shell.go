@@ -75,12 +75,8 @@ var restorePanesCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("restore-panes")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "restore-panes", "")
+		defer cleanup()
 
 		logging.Debug("-> restorePanesCmd(session=%s)", sessionName)
 		defer logging.Debug("<- restorePanesCmd")

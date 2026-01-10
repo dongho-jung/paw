@@ -33,12 +33,8 @@ var toggleNewCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("toggle-new")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "toggle-new", "")
+		defer cleanup()
 
 		logging.Debug("-> toggleNewCmd(session=%s)", sessionName)
 		defer logging.Debug("<- toggleNewCmd")
@@ -103,12 +99,8 @@ var newTaskCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("new-task")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "new-task", "")
+		defer cleanup()
 
 		// Set project name for TUI display
 		tui.SetProjectName(sessionName)
@@ -302,12 +294,8 @@ var spawnTaskCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("spawn-task")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "spawn-task", "")
+		defer cleanup()
 
 		tm := tmux.New(sessionName)
 		pawBin, _ := os.Executable()

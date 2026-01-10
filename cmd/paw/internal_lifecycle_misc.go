@@ -30,12 +30,8 @@ var doneTaskCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("done-task")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "done-task", "")
+		defer cleanup()
 
 		logging.Debug("-> doneTaskCmd(session=%s)", sessionName)
 		defer logging.Debug("<- doneTaskCmd")
@@ -108,13 +104,8 @@ var recoverTaskCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("recover-task")
-			logger.SetTask(taskName)
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "recover-task", taskName)
+		defer cleanup()
 
 		mgr := task.NewManager(appCtx.AgentsDir, appCtx.ProjectDir, appCtx.PawDir, appCtx.IsGitRepo, appCtx.Config)
 		t, err := mgr.GetTask(taskName)
@@ -149,13 +140,8 @@ var resumeAgentCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("resume-agent")
-			logger.SetTask(taskName)
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "resume-agent", taskName)
+		defer cleanup()
 
 		logging.Log("=== Resuming agent: %s ===", taskName)
 

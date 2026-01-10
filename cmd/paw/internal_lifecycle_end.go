@@ -47,13 +47,8 @@ var endTaskCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("end-task")
-			logger.SetTask(targetTask.Name)
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "end-task", targetTask.Name)
+		defer cleanup()
 
 		tm := tmux.New(sessionName)
 		if !endTaskUserInitiated {
@@ -239,12 +234,8 @@ var endTaskUICmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("end-task-ui")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "end-task-ui", "")
+		defer cleanup()
 
 		logging.Debug("-> endTaskUICmd(session=%s, windowID=%s)", sessionName, windowID)
 		defer logging.Debug("<- endTaskUICmd")

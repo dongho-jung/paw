@@ -34,12 +34,8 @@ var mergeTaskCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("merge-task")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "merge-task", "")
+		defer cleanup()
 
 		logging.Debug("-> mergeTaskCmd(session=%s, windowID=%s)", sessionName, windowID)
 		defer logging.Debug("<- mergeTaskCmd")
@@ -406,12 +402,8 @@ var mergeTaskUICmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("merge-task-ui")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "merge-task-ui", "")
+		defer cleanup()
 
 		logging.Debug("-> mergeTaskUICmd(session=%s)", sessionName)
 		defer logging.Debug("<- mergeTaskUICmd")

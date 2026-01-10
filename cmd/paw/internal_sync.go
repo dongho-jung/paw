@@ -48,13 +48,8 @@ var syncWithMainCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(app.GetLogPath(), app.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("sync-with-main")
-			logger.SetTask(targetTask.Name)
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(app, "sync-with-main", targetTask.Name)
+		defer cleanup()
 
 		logging.Log("=== Sync with main: %s ===", targetTask.Name)
 
@@ -178,12 +173,8 @@ var syncWithMainUICmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(app.GetLogPath(), app.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("sync-with-main-ui")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(app, "sync-with-main-ui", "")
+		defer cleanup()
 
 		logging.Debug("-> syncWithMainUICmd(session=%s, windowID=%s)", sessionName, windowID)
 		defer logging.Debug("<- syncWithMainUICmd")
@@ -236,12 +227,8 @@ var syncTaskCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(app.GetLogPath(), app.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("sync-task")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(app, "sync-task", "")
+		defer cleanup()
 
 		logging.Debug("-> syncTaskCmd(session=%s)", sessionName)
 		defer logging.Debug("<- syncTaskCmd")
@@ -317,12 +304,8 @@ var toggleBranchCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(app.GetLogPath(), app.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("toggle-branch")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(app, "toggle-branch", "")
+		defer cleanup()
 
 		logging.Debug("-> toggleBranchCmd(session=%s)", sessionName)
 		defer logging.Debug("<- toggleBranchCmd")

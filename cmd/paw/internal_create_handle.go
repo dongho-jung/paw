@@ -42,13 +42,8 @@ var handleTaskCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("handle-task")
-			logger.SetTask(taskName)
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "handle-task", taskName)
+		defer cleanup()
 
 		logging.Debug("New task detected: name=%s, agentDir=%s", taskName, agentDir)
 

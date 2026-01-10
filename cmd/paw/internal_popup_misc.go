@@ -166,12 +166,8 @@ var cmdPaletteTUICmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("cmd-palette-tui")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "cmd-palette-tui", "")
+		defer cleanup()
 
 		logging.Debug("-> cmdPaletteTUICmd(session=%s)", sessionName)
 		defer logging.Debug("<- cmdPaletteTUICmd")
@@ -264,12 +260,8 @@ var toggleSettingsCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("toggle-settings")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "toggle-settings", "")
+		defer cleanup()
 
 		logging.Debug("-> toggleSettingsCmd(session=%s)", sessionName)
 		defer logging.Debug("<- toggleSettingsCmd")
@@ -312,12 +304,8 @@ var settingsTUICmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("settings-tui")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "settings-tui", "")
+		defer cleanup()
 
 		logging.Debug("-> settingsTUICmd(session=%s)", sessionName)
 		defer logging.Debug("<- settingsTUICmd")

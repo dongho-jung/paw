@@ -33,12 +33,8 @@ var cancelTaskCmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("cancel-task")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "cancel-task", "")
+		defer cleanup()
 
 		logging.Debug("-> cancelTaskCmd(session=%s, windowID=%s)", sessionName, windowID)
 		defer logging.Debug("<- cancelTaskCmd")
@@ -236,12 +232,8 @@ var cancelTaskUICmd = &cobra.Command{
 		}
 
 		// Setup logging
-		logger, _ := logging.New(appCtx.GetLogPath(), appCtx.Debug)
-		if logger != nil {
-			defer func() { _ = logger.Close() }()
-			logger.SetScript("cancel-task-ui")
-			logging.SetGlobal(logger)
-		}
+		_, cleanup := setupLoggerFromApp(appCtx, "cancel-task-ui", "")
+		defer cleanup()
 
 		logging.Debug("-> cancelTaskUICmd(session=%s, windowID=%s)", sessionName, windowID)
 		defer logging.Debug("<- cancelTaskUICmd")
