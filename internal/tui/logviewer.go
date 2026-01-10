@@ -221,19 +221,13 @@ func (m *LogViewer) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.scrollToEnd()
 		m.horizontalPos = 0
 
-	case "s":
-		m.tailMode = !m.tailMode
-		if m.tailMode {
-			m.scrollToEnd()
-		}
-
 	case "w":
 		m.wordWrap = !m.wordWrap
 		if m.wordWrap {
 			m.horizontalPos = 0
 		}
 
-	case "l":
+	case "tab":
 		// Cycle through log levels: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 0
 		m.minLevel++
 		if m.minLevel > 5 {
@@ -448,7 +442,7 @@ func (m *LogViewer) View() tea.View {
 	}
 
 	// Keybindings hint
-	hint := "↑↓←→:scroll s:tail w:wrap l:level g/G:top/end ⌃O/q:close"
+	hint := "↑↓←→:scroll Tab:level w:wrap g/G:top/end ⌃O/q:close"
 	padding := m.width - len(status) - len(hint)
 	if padding < 0 {
 		hint = "q:close"
