@@ -94,7 +94,15 @@ func detectDarkModeWithRetry() bool {
 	}
 
 	// Use majority vote: if 2+ out of 3 say dark, return dark
-	return darkCount >= 2
+	isDark := darkCount >= 2
+
+	// Cache the result for consistency across all TUI components.
+	// This ensures components created before bubbletea starts use the same
+	// detection result. bubbletea's BackgroundColorMsg can still override
+	// this with a more accurate detection later.
+	setCachedDarkMode(isDark)
+
+	return isDark
 }
 
 // loadThemeFromConfig attempts to load the theme setting from .paw/config.
