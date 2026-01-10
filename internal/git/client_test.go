@@ -822,3 +822,29 @@ func TestResetPath(t *testing.T) {
 		t.Error("IsFileStaged() = true after reset, want false")
 	}
 }
+
+func TestIsFileTracked(t *testing.T) {
+	client := New()
+	gitDir := setupGitRepo(t)
+
+	// Create initial commit with a tracked file
+	createCommit(t, gitDir, "README.md", "test", "Initial commit")
+
+	// README.md should be tracked
+	if !client.IsFileTracked(gitDir, "README.md") {
+		t.Error("IsFileTracked() = false for tracked file, want true")
+	}
+
+	// Create an untracked file
+	_ = os.WriteFile(filepath.Join(gitDir, "untracked.txt"), []byte("content"), 0644)
+
+	// untracked.txt should not be tracked
+	if client.IsFileTracked(gitDir, "untracked.txt") {
+		t.Error("IsFileTracked() = true for untracked file, want false")
+	}
+
+	// Non-existent file should not be tracked
+	if client.IsFileTracked(gitDir, "nonexistent.txt") {
+		t.Error("IsFileTracked() = true for non-existent file, want false")
+	}
+}

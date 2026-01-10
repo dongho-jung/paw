@@ -82,6 +82,7 @@ type Client interface {
 	// Index
 	UpdateIndexAssumeUnchanged(dir, path string) error
 	IsFileStaged(dir, path string) (bool, error)
+	IsFileTracked(dir, path string) bool
 	ResetPath(dir, path string) error
 }
 
@@ -650,6 +651,14 @@ func (c *gitClient) IsFileStaged(dir, path string) (bool, error) {
 	}
 	// If output is not empty, the file is staged
 	return strings.TrimSpace(output) != "", nil
+}
+
+// IsFileTracked checks if a file is tracked in the git index.
+// Returns true if the file exists in the index (tracked), false otherwise.
+func (c *gitClient) IsFileTracked(dir, path string) bool {
+	// git ls-files --error-unmatch exits with status 1 if file is not tracked
+	err := c.run(dir, "ls-files", "--error-unmatch", path)
+	return err == nil
 }
 
 // ResetPath unstages a file from the git index.

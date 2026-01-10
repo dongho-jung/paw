@@ -167,10 +167,13 @@ func (m *Manager) SetupWorktree(task *Task) error {
 		}
 
 		// Layer 2: Mark as assume-unchanged (git index protection)
-		if err := m.gitClient.UpdateIndexAssumeUnchanged(worktreeDir, constants.ClaudeLink); err != nil {
-			logging.Warn("SetupWorktree: failed to mark .claude as assume-unchanged: %v", err)
-		} else {
-			logging.Debug("SetupWorktree: marked .claude as assume-unchanged")
+		// Note: assume-unchanged only works for tracked files, skip if untracked
+		if m.gitClient.IsFileTracked(worktreeDir, constants.ClaudeLink) {
+			if err := m.gitClient.UpdateIndexAssumeUnchanged(worktreeDir, constants.ClaudeLink); err != nil {
+				logging.Warn("SetupWorktree: failed to mark .claude as assume-unchanged: %v", err)
+			} else {
+				logging.Debug("SetupWorktree: marked .claude as assume-unchanged")
+			}
 		}
 	}
 
