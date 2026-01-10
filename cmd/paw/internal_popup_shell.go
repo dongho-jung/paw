@@ -142,7 +142,7 @@ var restorePanesCmd = &cobra.Command{
 			return nil
 		case "0":
 			// Both panes missing - respawn the window
-			logging.Info("Both panes missing, respawning agent pane")
+			logging.Log("Both panes missing, respawning agent pane")
 
 			// Start agent pane
 			startAgentScript := filepath.Join(agentDir, "start-agent")
@@ -176,7 +176,7 @@ var restorePanesCmd = &cobra.Command{
 
 			if paneCmd == "claude" || strings.Contains(paneCmd, "start-agent") {
 				// Agent pane exists, user pane is missing
-				logging.Info("User pane missing, creating it")
+				logging.Log("User pane missing, creating it")
 				taskFilePath := t.GetTaskFilePath()
 				userPaneCmd := fmt.Sprintf("sh -c 'cat %s; echo; exec %s'", taskFilePath, getShell())
 				if err := tm.SplitWindow(windowID, true, workDir, userPaneCmd); err != nil {
@@ -185,7 +185,7 @@ var restorePanesCmd = &cobra.Command{
 				_ = tm.DisplayMessage("Restored user pane", 2000)
 			} else {
 				// User pane exists (or unknown), agent pane is missing
-				logging.Info("Agent pane missing, creating it")
+				logging.Log("Agent pane missing, creating it")
 
 				// Need to create agent pane before the user pane
 				startAgentScript := filepath.Join(agentDir, "start-agent")
@@ -213,7 +213,7 @@ var restorePanesCmd = &cobra.Command{
 			return nil
 		}
 
-		logging.Info("Panes restored for task: %s", t.Name)
+		logging.Log("Panes restored for task: %s", t.Name)
 
 		// Check for stdin injection failure: if agent pane exists but session marker doesn't,
 		// it means the task instruction was never sent
@@ -251,7 +251,7 @@ func checkAndRecoverStdinInjection(tm tmux.Client, t *task.Task, windowID, agent
 	}
 
 	// Claude is running but session marker doesn't exist - stdin injection likely failed
-	logging.Info("Detected failed stdin injection for task %s, recovering...", t.Name)
+	logging.Log("Detected failed stdin injection for task %s, recovering...", t.Name)
 
 	// Load task options to get ultrathink setting
 	taskOpts, err := config.LoadTaskOptions(agentDir)
@@ -286,7 +286,7 @@ func checkAndRecoverStdinInjection(tm tmux.Client, t *task.Task, windowID, agent
 	}
 
 	_ = tm.DisplayMessage(fmt.Sprintf("Recovered task instruction for: %s", t.Name), 2000)
-	logging.Info("Successfully recovered stdin injection for task: %s", t.Name)
+	logging.Log("Successfully recovered stdin injection for task: %s", t.Name)
 
 	return nil
 }

@@ -409,7 +409,7 @@ var toggleBranchCmd = &cobra.Command{
 		}
 
 		_ = tm.DisplayMessage(fmt.Sprintf("Switched to %s", targetBranch), 1500)
-		logging.Info("Switched from %s to %s", currentBranch, targetBranch)
+		logging.Log("Switched from %s to %s", currentBranch, targetBranch)
 
 		return nil
 	},

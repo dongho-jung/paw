@@ -343,7 +343,7 @@ func runTemplateLoop(appCtx *app.App, sessionName string) error {
 				} else if err := templates.Save(appCtx.PawDir); err != nil {
 					logging.Warn("Failed to save templates: %v", err)
 				} else {
-					logging.Info("Created template: %s", result.Name)
+					logging.Log("Created template: %s", result.Name)
 				}
 			}
 			// Continue loop to show updated list
@@ -368,7 +368,7 @@ func runTemplateLoop(appCtx *app.App, sessionName string) error {
 					} else if err := templates.Save(appCtx.PawDir); err != nil {
 						logging.Warn("Failed to save templates: %v", err)
 					} else {
-						logging.Info("Updated template: %s", result.Name)
+						logging.Log("Updated template: %s", result.Name)
 					}
 				}
 			}
@@ -388,7 +388,7 @@ func runTemplateLoop(appCtx *app.App, sessionName string) error {
 				} else if err := templates.Save(appCtx.PawDir); err != nil {
 					logging.Warn("Failed to save templates: %v", err)
 				} else {
-					logging.Info("Deleted template: %s", selected.Name)
+					logging.Log("Deleted template: %s", selected.Name)
 				}
 			}
 			// Continue loop to show updated list
