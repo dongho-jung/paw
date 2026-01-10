@@ -247,15 +247,18 @@ func sendAgentResponse(tm tmux.Client, paneID, response string) error {
 // tryNotificationAction attempts to show a notification with action buttons
 // for simple prompts (2-5 options). Returns the selected option or empty string
 // if notification was not shown or user didn't select an action.
-func tryNotificationAction(taskName string, prompt askPrompt) string {
+// Always sends a notification: either with action buttons (2-5 options) or a simple one (fallback).
+func tryNotificationAction(notifications *config.NotificationsConfig, taskName string, prompt askPrompt) string {
 	logging.Debug("-> tryNotificationAction(task=%s, question=%q, options=%v)",
 		taskName, prompt.Question, prompt.Options)
 	defer logging.Debug("<- tryNotificationAction")
 
-	// Only use notification for simple prompts with 2-5 options
+	// Only use action buttons for simple prompts with 2-5 options
+	// For other cases, send a simple notification as fallback
 	if len(prompt.Options) < 2 || len(prompt.Options) > notifyMaxActions {
-		logging.Trace("tryNotificationAction: skipped, option count=%d not in range [2,%d]",
+		logging.Trace("tryNotificationAction: option count=%d not in range [2,%d], sending simple notification",
 			len(prompt.Options), notifyMaxActions)
+		notifyWaiting(notifications, taskName, prompt.Question)
 		return ""
 	}
 

@@ -152,7 +152,7 @@ var watchWaitCmd = &cobra.Command{
 							// Note: tryNotificationAction always shows a notification (either with actions
 							// or fallback to simple), so we mark notified=true before calling it
 							notified = true
-							choice := tryNotificationAction(taskName, prompt)
+							choice := tryNotificationAction(app.Config.Notifications, taskName, prompt)
 							// If user selects an action from notification, send it to the agent
 							if choice != "" {
 								if sendErr := sendAgentResponse(tm, paneID, choice); sendErr != nil {
