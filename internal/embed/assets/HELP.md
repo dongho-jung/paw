@@ -124,8 +124,24 @@ Fuzzy-searchable command palette for quick access to commands.
   Esc/⌃P      Close palette
 
 ### Available Commands
+  Settings       Configure PAW project settings
   Show Diff      Show diff between task branch and main
   Restore Panes  Restore missing panes in current task window
+
+## Settings UI (⌃P → Settings)
+
+Configure PAW settings with Global/Project scope support.
+
+### Navigation
+  ⌥Tab       Switch between Global and Project scope
+  Tab        Switch tab (General / Notifications)
+  ↑/↓/j/k    Navigate fields
+  ←/→/h/l    Change field value
+  Space      Toggle boolean fields
+  Enter      Edit text fields / Save and close
+  i          Toggle inherit from global (project scope only)
+  ⌃S         Save and close
+  Esc        Cancel
 
 ## Help Viewer (⌃/)
 

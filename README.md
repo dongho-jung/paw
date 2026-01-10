@@ -159,6 +159,12 @@ work_mode: worktree
 # - auto-pr: Auto commit + push + create pull request
 on_complete: confirm
 
+# UI color theme: auto, light, or dark
+# - auto: Auto-detect based on terminal background (default)
+# - light: Force light theme colors
+# - dark: Force dark theme colors
+theme: auto
+
 # Non-git workspace: shared or copy
 non_git_workspace: shared
 
@@ -199,6 +205,9 @@ log_max_backups: 3
 | `on_complete` | `confirm` | Commit only (no push/PR/merge) |
 |               | `auto-merge` | Auto commit + push + merge + clean up + close window (worktree mode only) |
 |               | `auto-pr` | Auto commit + push + create PR (worktree mode only) |
+| `theme` | `auto` | Auto-detect based on terminal background (default) |
+|         | `light` | Force light theme colors |
+|         | `dark` | Force dark theme colors |
 | `non_git_workspace` | `shared` | Use the project directory directly (default) |
 |                   | `copy` | Create a per-task workspace copy (isolation) |
 | `worktree_hook` | (command) | Shell command(s) to run after worktree/workspace creation (e.g., `npm install`) |
@@ -251,6 +260,7 @@ Install tmux/gh via Homebrew: `brew install tmux gh`. Install the Claude Code CL
 | Action | Shortcut |
 |--------|----------|
 | New task | `⌃N` |
+| Search task history (new task window) | `⌃R` |
 | Cancel task (double-press) | `⌃K` |
 | Finish task (double-press) | `⌃F` |
 | Toggle branch (task ↔ main) | `⌃↑` |
@@ -312,6 +322,41 @@ Use `paw logs --since 2h --task my-task` for CLI filtering.
 | `w` | Toggle word wrap |
 | `l` | Cycle log level filter (L0+ → L1+ → ... → L5 only) |
 | `q` / `Esc` | Close the log viewer |
+</details>
+
+## Settings UI
+
+Open via Command Palette (`⌃P` → "Settings") to configure PAW settings.
+
+The Settings UI supports both **Global** and **Project** scopes:
+- **Global settings** (`$HOME/.paw/config`): Default settings for all projects
+- **Project settings** (`.paw/config`): Project-specific overrides
+
+Press `⌥Tab` to switch between Global and Project views.
+
+<details>
+<summary>Controls</summary>
+
+| Key | Description |
+|----|-------------|
+| `⌥Tab` | Switch between Global and Project scope |
+| `Tab` | Switch tab (General / Notifications) |
+| `↑` / `↓` | Navigate fields |
+| `←` / `→` | Change field value |
+| `Space` | Toggle boolean fields |
+| `Enter` | Edit text fields / Save and close |
+| `i` | Toggle inherit from global (project scope only) |
+| `⌃S` | Save and close |
+| `Esc` | Cancel |
+</details>
+
+<details>
+<summary>Inheriting from Global Config</summary>
+
+Project settings can inherit values from global config. When a field is marked as inherited:
+- The value comes from global config
+- Press `i` on a field to toggle inherit on/off
+- Inherited fields show `(inherited)` indicator
 </details>
 
 ## Task history

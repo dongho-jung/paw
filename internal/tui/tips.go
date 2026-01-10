@@ -14,26 +14,43 @@ var ProjectName = ""
 
 // tips contains usage tips shown to users.
 var tips = []string{
+	// Keyboard shortcuts - Task commands
+	"Press ⌃N to create a new task",
 	"Press ⌃R to search task history",
+	"Press ⌃F to finish a completed task",
+	"Press ⌃K to cancel a running task",
+	"Press Alt+Enter or F5 to submit task",
+	"Press Esc twice quickly to cancel input",
+
+	// Keyboard shortcuts - Navigation
 	"Press ⌥Tab to switch between panels",
+	"Use ⌥←/→ to move between windows",
+	"Press ⌃↑ to toggle between task and main",
+	"Press ⌃↓ to sync with main branch",
+
+	// Keyboard shortcuts - Toggle panels
+	"Press ⌃P to open command palette",
 	"Press ⌃T to open template selector",
+	"Press ⌃G to view git status/log",
 	"Press ⌃O to view logs",
 	"Press ⌃B to toggle bottom shell",
 	"Press ⌃/ for help",
-	"Press ⌃F to finish a completed task",
-	"Press ⌃K to cancel a running task",
-	"Press ⌃↓ to sync with main branch",
+
+	// Mouse interactions
 	"Use mouse to select and copy text",
-	"Drag to select text, then ⌃C to copy",
 	"Scroll with mouse wheel in kanban",
+
+	// Workflow tips
 	"Each task runs in its own git worktree",
 	"Tasks can run in parallel without conflicts",
-	"Press Esc twice quickly to cancel input",
-	"Configure notifications in .paw/config",
-	"Use templates (⌃T) for repeated tasks",
-	"Task history is saved for easy reuse",
 	"Worktree mode keeps main branch clean",
+	"Task history is saved for easy reuse",
+
+	// Configuration
+	"Configure notifications in .paw/config",
 	"Run 'paw check' to verify dependencies",
+	"Run 'paw attach' to reconnect sessions",
+	"Run 'paw history show' to review past work",
 }
 
 // versionHashRegex matches the git hash suffix in version strings.

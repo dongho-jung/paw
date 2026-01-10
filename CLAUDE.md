@@ -105,6 +105,7 @@ paw/                           # This repository
 │   ├── internal_user_prompt_hook.go # User prompt submission hook
 │   ├── internal_utils.go      # Utility commands and helpers (ctrlC, renameWindow)
 │   ├── keybindings.go         # Tmux keybinding definitions
+│   ├── timeparse.go           # Time parsing utilities for logs/history
 │   ├── wait*.go               # Wait detection for user input prompts
 │   └── window_map.go          # Window ID to task name mapping
 ├── cmd/paw-notify/            # Notification helper (macOS app bundle)
@@ -143,6 +144,7 @@ paw/                           # This repository
 │       ├── helpviewer.go      # Help viewer
 │       ├── logviewer.go       # Log viewer with filtering
 │       ├── cmdpalette.go      # Command palette (⌃P)
+│       ├── settings.go        # Settings UI (global/project config editor)
 │       └── textarea/          # Custom textarea component (fork of bubbles)
 ├── Makefile                   # Build script
 └── go.mod                     # Go module file
