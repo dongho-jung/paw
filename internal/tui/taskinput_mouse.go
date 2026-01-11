@@ -228,17 +228,54 @@ func (m *TaskInput) switchFocusTo(panel FocusPanel) {
 	}
 }
 
+// switchFocusToKanbanColumn switches focus to a specific Kanban column.
+func (m *TaskInput) switchFocusToKanbanColumn(col int) {
+	// Blur current panel
+	switch m.focusPanel {
+	case FocusPanelLeft:
+		m.textarea.Blur()
+	case FocusPanelKanban:
+		// Already in Kanban, just switching columns
+	}
+
+	m.focusPanel = FocusPanelKanban
+	m.kanban.SetFocused(true)
+	m.kanban.SetFocusedColumn(col)
+	m.kanban.InitializeColumnSelection(col)
+}
+
 // updateKanbanPanel handles key events when the kanban panel is focused.
 func (m *TaskInput) updateKanbanPanel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	keyStr := msg.String()
 
 	switch keyStr {
+	// Up/Down: select task within the focused column
 	case "up", "k":
-		m.kanban.ScrollUp(1)
+		m.kanban.SelectPreviousTask()
 		return m, nil
 	case "down", "j":
-		m.kanban.ScrollDown(1)
+		m.kanban.SelectNextTask()
 		return m, nil
+	// Left/Right: cycle through columns
+	case "left", "h":
+		currentCol := m.kanban.FocusedColumn()
+		if currentCol > 0 {
+			m.switchFocusToKanbanColumn(currentCol - 1)
+		} else {
+			// Wrap to last column
+			m.switchFocusToKanbanColumn(3)
+		}
+		return m, nil
+	case "right", "l":
+		currentCol := m.kanban.FocusedColumn()
+		if currentCol < 3 {
+			m.switchFocusToKanbanColumn(currentCol + 1)
+		} else {
+			// Wrap to first column
+			m.switchFocusToKanbanColumn(0)
+		}
+		return m, nil
+	// Page scroll (scroll the kanban view)
 	case "pgup", "ctrl+u":
 		m.kanban.ScrollUp(5)
 		return m, nil

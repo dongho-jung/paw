@@ -32,6 +32,10 @@ type KanbanView struct {
 	focused      bool
 	focusedCol   int // -1 = none, 0-3 = specific column
 
+	// Task selection state (per column)
+	// -1 = no task selected, 0+ = index of selected task
+	selectedTaskIdx [4]int
+
 	// Text selection state (column-aware)
 	selecting     bool
 	hasSelection  bool // True if a selection was made (persists until ClearSelection)
@@ -47,10 +51,11 @@ type KanbanView struct {
 // NewKanbanView creates a new Kanban view.
 func NewKanbanView(isDark bool) *KanbanView {
 	return &KanbanView{
-		isDark:       isDark,
-		service:      service.NewTaskDiscoveryService(),
-		focusedCol:   -1, // No column focused initially
-		selectColumn: -1, // No column selected initially
+		isDark:          isDark,
+		service:         service.NewTaskDiscoveryService(),
+		focusedCol:      -1,                  // No column focused initially
+		selectColumn:    -1,                  // No column selected initially
+		selectedTaskIdx: [4]int{-1, -1, -1, -1}, // No task selected in any column
 	}
 }
 
@@ -88,6 +93,12 @@ func (k *KanbanView) Render() string {
 
 	taskNameStyle := lipgloss.NewStyle().
 		Foreground(normalColor)
+
+	// Selected task style: inverted colors for visibility
+	selectedTaskStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("231")). // White text
+		Background(lipgloss.Color("39")).  // Blue background
+		Bold(true)
 
 	actionStyle := lipgloss.NewStyle().
 		Foreground(dimColor).
@@ -146,7 +157,7 @@ func (k *KanbanView) Render() string {
 		// Each task shows: project/name (line 1), current action if any (line 2)
 		linesUsed := 2    // header + separator
 		linesSkipped := 0 // Track lines skipped for scroll
-		for _, task := range col.tasks {
+		for taskIdx, task := range col.tasks {
 			if linesUsed >= maxHeight {
 				break
 			}
@@ -169,7 +180,15 @@ func (k *KanbanView) Render() string {
 				continue
 			}
 
-			content.WriteString(taskNameStyle.Render(displayName))
+			// Determine if this task is selected
+			isSelected := k.focused && k.focusedCol == colIdx && k.selectedTaskIdx[colIdx] == taskIdx
+
+			// Apply appropriate style
+			if isSelected {
+				content.WriteString(selectedTaskStyle.Render(displayName))
+			} else {
+				content.WriteString(taskNameStyle.Render(displayName))
+			}
 			content.WriteString("\n")
 			linesUsed++
 
@@ -252,6 +271,97 @@ func (k *KanbanView) SetFocusedColumn(col int) {
 // FocusedColumn returns the currently focused column index (-1 if none).
 func (k *KanbanView) FocusedColumn() int {
 	return k.focusedCol
+}
+
+// ColumnTaskCount returns the number of tasks in a specific column.
+func (k *KanbanView) ColumnTaskCount(col int) int {
+	switch col {
+	case 0:
+		return len(k.working)
+	case 1:
+		return len(k.waiting)
+	case 2:
+		return len(k.done)
+	case 3:
+		return len(k.warning)
+	default:
+		return 0
+	}
+}
+
+// SelectedTaskIndex returns the selected task index for a column (-1 if none).
+func (k *KanbanView) SelectedTaskIndex(col int) int {
+	if col < 0 || col > 3 {
+		return -1
+	}
+	return k.selectedTaskIdx[col]
+}
+
+// SetSelectedTaskIndex sets the selected task index for a column.
+func (k *KanbanView) SetSelectedTaskIndex(col, idx int) {
+	if col < 0 || col > 3 {
+		return
+	}
+	taskCount := k.ColumnTaskCount(col)
+	if taskCount == 0 {
+		k.selectedTaskIdx[col] = -1
+		return
+	}
+	// Clamp index to valid range
+	if idx < 0 {
+		idx = 0
+	} else if idx >= taskCount {
+		idx = taskCount - 1
+	}
+	k.selectedTaskIdx[col] = idx
+}
+
+// SelectPreviousTask moves selection up in the focused column.
+func (k *KanbanView) SelectPreviousTask() {
+	if k.focusedCol < 0 || k.focusedCol > 3 {
+		return
+	}
+	taskCount := k.ColumnTaskCount(k.focusedCol)
+	if taskCount == 0 {
+		return
+	}
+	current := k.selectedTaskIdx[k.focusedCol]
+	if current <= 0 {
+		// Wrap to last task
+		k.selectedTaskIdx[k.focusedCol] = taskCount - 1
+	} else {
+		k.selectedTaskIdx[k.focusedCol] = current - 1
+	}
+}
+
+// SelectNextTask moves selection down in the focused column.
+func (k *KanbanView) SelectNextTask() {
+	if k.focusedCol < 0 || k.focusedCol > 3 {
+		return
+	}
+	taskCount := k.ColumnTaskCount(k.focusedCol)
+	if taskCount == 0 {
+		return
+	}
+	current := k.selectedTaskIdx[k.focusedCol]
+	if current < 0 || current >= taskCount-1 {
+		// Wrap to first task
+		k.selectedTaskIdx[k.focusedCol] = 0
+	} else {
+		k.selectedTaskIdx[k.focusedCol] = current + 1
+	}
+}
+
+// InitializeColumnSelection initializes selection when a column gains focus.
+// If the column has tasks and no selection, selects the first task.
+func (k *KanbanView) InitializeColumnSelection(col int) {
+	if col < 0 || col > 3 {
+		return
+	}
+	taskCount := k.ColumnTaskCount(col)
+	if taskCount > 0 && k.selectedTaskIdx[col] < 0 {
+		k.selectedTaskIdx[col] = 0
+	}
 }
 
 // ColumnWidth returns the width of each column (including border and padding).

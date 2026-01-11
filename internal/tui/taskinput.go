@@ -393,16 +393,24 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		// Toggle panel: Alt+Tab (cycle between input box and options only)
-		// Kanban is accessible via mouse click but not included in keyboard cycle
+		// Toggle panel: Alt+Tab (cycle through input box, options, and kanban columns)
+		// Cycle order: Left → Right → Kanban(col 0) → Kanban(col 1) → Kanban(col 2) → Kanban(col 3) → Left
 		case "alt+tab":
 			m.applyOptionInputValues()
 			switch m.focusPanel {
 			case FocusPanelLeft:
 				m.switchFocusTo(FocusPanelRight)
-			case FocusPanelRight, FocusPanelKanban:
-				// Always return to input box (Left panel)
-				m.switchFocusTo(FocusPanelLeft)
+			case FocusPanelRight:
+				// Move to first Kanban column
+				m.switchFocusToKanbanColumn(0)
+			case FocusPanelKanban:
+				// Cycle through Kanban columns, then back to Left
+				currentCol := m.kanban.FocusedColumn()
+				if currentCol < 3 {
+					m.switchFocusToKanbanColumn(currentCol + 1)
+				} else {
+					m.switchFocusTo(FocusPanelLeft)
+				}
 			}
 			return m, nil
 		}
