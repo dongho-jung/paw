@@ -20,8 +20,6 @@ Claude Code-based autonomous agent work environment
   ⌃R          Search task history (in new task window)
   ⌃K          Cancel task (double-press)
   ⌃F          Finish task (double-press, complete and cleanup)
-  ⌃↑          Toggle branch (task ↔ main)
-  ⌃↓          Sync from main (rebase)
   ⌃P          Command palette (fuzzy search commands)
   ⌃Q          Quit paw
 

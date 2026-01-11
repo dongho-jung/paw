@@ -100,7 +100,7 @@ paw/                           # This repository
 │   ├── internal_create*.go    # Task creation (toggleNew, newTask, spawnTask, handleTask)
 │   ├── internal_lifecycle*.go # Task lifecycle (endTask, cancelTask, merge, helpers)
 │   ├── internal_popup*.go     # Popup/UI (toggleLog, toggleHelp, toggleTemplate, shell)
-│   ├── internal_sync.go       # Sync commands (syncWithMain, syncTask, toggleBranch)
+│   ├── internal_sync.go       # Sync commands (syncWithMain)
 │   ├── internal_stop_hook.go  # Claude stop hook handling (task status classification)
 │   ├── internal_user_prompt_hook.go # User prompt submission hook
 │   ├── internal_utils.go      # Utility commands and helpers (ctrlC, renameWindow)

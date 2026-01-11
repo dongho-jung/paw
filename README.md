@@ -253,8 +253,6 @@ Install tmux/gh via Homebrew: `brew install tmux gh`. Install the Claude Code CL
 | Search task history (new task window) | `⌃R` |
 | Cancel task (double-press) | `⌃K` |
 | Finish task (double-press) | `⌃F` |
-| Toggle branch (task ↔ main) | `⌃↑` |
-| Sync from main (rebase) | `⌃↓` |
 | Command palette | `⌃P` |
 | Quit paw | `⌃Q` |
 

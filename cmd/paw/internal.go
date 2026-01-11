@@ -32,8 +32,6 @@ func init() {
 	// Sync commands
 	internalCmd.AddCommand(syncWithMainCmd)
 	internalCmd.AddCommand(syncWithMainUICmd)
-	internalCmd.AddCommand(syncTaskCmd)
-	internalCmd.AddCommand(toggleBranchCmd)
 
 	// Popup/UI commands
 	internalCmd.AddCommand(popupShellCmd)
