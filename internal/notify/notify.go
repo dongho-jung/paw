@@ -2,23 +2,12 @@
 package notify
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
-	"strconv"
-	"strings"
 
 	"github.com/dongho-jung/paw/internal/logging"
-)
-
-const (
-	// NotifyAppName is the name of the notification helper app bundle.
-	NotifyAppName = "paw-notify.app"
-	// NotifyBinaryName is the name of the executable inside the app bundle.
-	NotifyBinaryName = "paw-notify"
 )
 
 // SoundType represents different notification sounds.
@@ -37,9 +26,7 @@ const (
 	SoundCancelPending SoundType = "Tink"
 )
 
-// Send shows a desktop notification when supported.
-// It prefers using the paw-notify helper for consistent icon display,
-// falling back to AppleScript if the helper is not available.
+// Send shows a desktop notification using AppleScript (macOS only).
 func Send(title, message string) error {
 	logging.Debug("-> Send(title=%q, message=%q)", title, message)
 	defer logging.Debug("<- Send")
@@ -48,16 +35,6 @@ func Send(title, message string) error {
 		return nil
 	}
 
-	// Try paw-notify helper first for consistent icon display
-	if helperPath := findNotifyHelper(); helperPath != "" {
-		if err := sendViaHelper(helperPath, title, message); err == nil {
-			logging.Trace("Send: sent via paw-notify helper")
-			return nil
-		}
-		logging.Trace("Send: paw-notify helper failed, falling back to AppleScript")
-	}
-
-	// Fall back to AppleScript
 	script := fmt.Sprintf(`display notification %q with title %q`, message, title)
 	cmd := appleScriptCommand("-e", script)
 	if err := cmd.Run(); err != nil {
@@ -68,61 +45,6 @@ func Send(title, message string) error {
 		return err
 	}
 	return nil
-}
-
-// sendViaHelper sends a simple notification using the paw-notify helper.
-// Note: We don't pass icon as attachment because it would show on the right side
-// of the notification banner, taking space from action buttons. The app bundle
-// icon automatically shows on the left side.
-func sendViaHelper(helperPath, title, message string) error {
-	args := []string{
-		"--title", title,
-		"--body", message,
-		"--timeout", "1", // Short timeout since we don't need to wait for response
-	}
-
-	// Run the helper via 'open' command to ensure proper bundle ID recognition
-	openArgs := []string{
-		"-W", // Wait for app to finish
-		"-a", helperPath,
-		"--args",
-	}
-	openArgs = append(openArgs, args...)
-
-	cmd := exec.Command("open", openArgs...)
-	return cmd.Run()
-}
-
-// FindIconPath locates the paw icon for notifications.
-func FindIconPath() string {
-	candidates := []string{}
-
-	// ~/.local/share/paw/icon.png
-	if home, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates, filepath.Join(home, ".local", "share", "paw", "icon.png"))
-	}
-
-	// Same directory as current executable
-	if exe, err := os.Executable(); err == nil {
-		exeDir := filepath.Dir(exe)
-		candidates = append(candidates, filepath.Join(exeDir, "icon.png"))
-	}
-
-	// Inside the app bundle's Resources
-	if home, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates, filepath.Join(home, ".local", "share", "paw",
-			NotifyAppName, "Contents", "Resources", "icon.png"))
-	}
-
-	for _, path := range candidates {
-		if _, err := os.Stat(path); err == nil {
-			logging.Trace("findIconPath: found at %s", path)
-			return path
-		}
-	}
-
-	logging.Trace("findIconPath: not found")
-	return ""
 }
 
 // PlaySound plays a system sound (macOS only).
@@ -167,9 +89,9 @@ func appleScriptCommand(args ...string) *exec.Cmd {
 	return exec.Command("osascript", args...)
 }
 
-// SendWithActions shows a notification with action buttons and returns the selected action index.
-// Returns the 0-based index of the selected action, or -1 if dismissed/timed out/clicked without action.
-// If the notification helper is not available, falls back to a simple notification and returns -1.
+// SendWithActions shows a notification. Action buttons are not supported
+// without the native notification helper, so this falls back to a simple notification.
+// Always returns -1 (no action selected) since action buttons are not available.
 func SendWithActions(title, message, iconPath string, actions []string, timeoutSec int) (int, error) {
 	logging.Debug("-> SendWithActions(title=%q, actions=%v, timeout=%d)", title, actions, timeoutSec)
 	defer logging.Debug("<- SendWithActions")
@@ -178,104 +100,11 @@ func SendWithActions(title, message, iconPath string, actions []string, timeoutS
 		return -1, nil
 	}
 
-	// Find the notification helper
-	helperPath := findNotifyHelper()
-	if helperPath == "" {
-		logging.Debug("SendWithActions: notification helper not found, falling back to simple notification")
-		if err := Send(title, message); err != nil {
-			return -1, err
-		}
-		return -1, nil
+	// Action buttons require a native macOS app helper.
+	// Fall back to simple notification.
+	logging.Debug("SendWithActions: action buttons not available, sending simple notification")
+	if err := Send(title, message); err != nil {
+		return -1, err
 	}
-
-	logging.Trace("SendWithActions: using helper at %s", helperPath)
-
-	// Build command arguments
-	args := []string{
-		"--title", title,
-		"--body", message,
-		"--timeout", strconv.Itoa(timeoutSec),
-	}
-	if iconPath != "" {
-		args = append(args, "--icon", iconPath)
-	}
-	for _, action := range actions {
-		args = append(args, "--action", action)
-	}
-
-	// Run the helper via 'open' command to ensure proper bundle ID recognition
-	openArgs := []string{
-		"--stdout", "/dev/stdout",
-		"--stderr", "/dev/stderr",
-		"-W", // Wait for app to finish
-		"-a", helperPath,
-		"--args",
-	}
-	openArgs = append(openArgs, args...)
-
-	cmd := exec.Command("open", openArgs...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	logging.Trace("SendWithActions: running command: open %v", openArgs)
-	if err := cmd.Run(); err != nil {
-		logging.Debug("SendWithActions: helper failed err=%v stderr=%s", err, stderr.String())
-		// Fall back to simple notification
-		if sendErr := Send(title, message); sendErr != nil {
-			return -1, sendErr
-		}
-		return -1, nil
-	}
-
-	result := strings.TrimSpace(stdout.String())
-	logging.Trace("SendWithActions: helper returned %q", result)
-
-	// Parse result
-	if strings.HasPrefix(result, "ACTION_") {
-		indexStr := strings.TrimPrefix(result, "ACTION_")
-		index, err := strconv.Atoi(indexStr)
-		if err == nil && index >= 0 && index < len(actions) {
-			return index, nil
-		}
-	}
-
 	return -1, nil
 }
-
-// findNotifyHelper locates the paw-notify.app helper.
-// It searches in the following order:
-// 1. ~/.local/share/paw/paw-notify.app (installed location)
-// 2. Same directory as the paw binary
-// 3. Current working directory
-func findNotifyHelper() string {
-	candidates := []string{}
-
-	// 1. ~/.local/share/paw/
-	if home, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates, filepath.Join(home, ".local", "share", "paw", NotifyAppName))
-	}
-
-	// 2. Same directory as paw binary
-	if exe, err := os.Executable(); err == nil {
-		exeDir := filepath.Dir(exe)
-		candidates = append(candidates, filepath.Join(exeDir, NotifyAppName))
-	}
-
-	// 3. Current working directory
-	if cwd, err := os.Getwd(); err == nil {
-		candidates = append(candidates, filepath.Join(cwd, NotifyAppName))
-	}
-
-	for _, path := range candidates {
-		binaryPath := filepath.Join(path, "Contents", "MacOS", NotifyBinaryName)
-		if _, err := os.Stat(binaryPath); err == nil {
-			logging.Trace("findNotifyHelper: found at %s", path)
-			return path
-		}
-	}
-
-	logging.Trace("findNotifyHelper: not found, searched %v", candidates)
-	return ""
-}
-

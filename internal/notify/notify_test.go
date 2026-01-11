@@ -22,22 +22,6 @@ func TestSoundTypeConstants(t *testing.T) {
 	}
 }
 
-func TestAppNameConstants(t *testing.T) {
-	if NotifyAppName != "paw-notify.app" {
-		t.Errorf("NotifyAppName = %q, want %q", NotifyAppName, "paw-notify.app")
-	}
-	if NotifyBinaryName != "paw-notify" {
-		t.Errorf("NotifyBinaryName = %q, want %q", NotifyBinaryName, "paw-notify")
-	}
-}
-
-func TestFindIconPath(t *testing.T) {
-	// Just test that it doesn't panic
-	path := FindIconPath()
-	// Path may or may not exist depending on installation
-	_ = path
-}
-
 func TestSendNonDarwin(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		t.Skip("Skipping non-darwin test on darwin")
