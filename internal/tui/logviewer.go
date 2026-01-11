@@ -434,6 +434,32 @@ func (m *LogViewer) getFilteredLines() []string {
 	return filtered
 }
 
+// colorizeLogLine applies log level coloring to a line based on its level.
+// The level tag (e.g., [L2]) is colorized with the appropriate color.
+func (m *LogViewer) colorizeLogLine(line string) string {
+	level := getLogLevel(line)
+	if level < 0 || level > 5 {
+		return line // No level found, return as-is
+	}
+
+	levelColor := m.colors.LogLevelColor(level)
+	if levelColor == nil {
+		return line
+	}
+
+	// Find and colorize the level tag [LN]
+	levelTag := fmt.Sprintf("[L%d]", level)
+	idx := strings.Index(line, levelTag)
+	if idx < 0 {
+		return line
+	}
+
+	style := lipgloss.NewStyle().Foreground(levelColor)
+	coloredTag := style.Render(levelTag)
+
+	return line[:idx] + coloredTag + line[idx+len(levelTag):]
+}
+
 // getDisplayLines returns lines to display, handling word wrap if enabled.
 func (m *LogViewer) getDisplayLines() []string {
 	lines := m.getFilteredLines()
@@ -508,6 +534,9 @@ func (m *LogViewer) View() tea.View {
 		if len(line) > m.width {
 			line = line[:m.width]
 		}
+
+		// Apply log level colorization
+		line = m.colorizeLogLine(line)
 
 		// Apply search highlighting before padding
 		if m.searchQuery != "" && m.isMatchLine(i) {

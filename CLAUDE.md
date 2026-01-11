@@ -211,19 +211,20 @@ inherit:
 
 PAW uses a 6-level logging system (L0-L5):
 
-| Level | Name  | Description                                      | Output          |
-|-------|-------|--------------------------------------------------|-----------------|
-| L0    | Trace | Internal state tracking, loop iterations, dumps  | File only (debug mode) |
-| L1    | Debug | Retry attempts, state changes, conditional paths | Stderr + file (debug mode) |
-| L2    | Info  | Normal operation flow, task lifecycle events     | File only       |
-| L3    | Warn  | Non-fatal issues requiring attention             | Stderr + file   |
-| L4    | Error | Errors that affect functionality                 | Stderr + file   |
-| L5    | Fatal | Critical errors requiring immediate attention    | Stderr + file   |
+| Level | Name  | Color      | Description                                      | Output          |
+|-------|-------|------------|--------------------------------------------------|-----------------|
+| L0    | Trace | Gray       | Internal state tracking, loop iterations, dumps  | File only (debug mode) |
+| L1    | Debug | Blue       | Retry attempts, state changes, conditional paths | Stderr + file (debug mode) |
+| L2    | Info  | Green      | Normal operation flow, task lifecycle events     | File only       |
+| L3    | Warn  | Orange     | Non-fatal issues requiring attention             | Stderr + file   |
+| L4    | Error | Red        | Errors that affect functionality                 | Stderr + file   |
+| L5    | Fatal | Magenta    | Critical errors requiring immediate attention    | Stderr + file   |
 
 - Enable debug mode: `PAW_DEBUG=1 paw`
 - Log file location: `.paw/log`
 - View logs: Press `⌃O` to open the log viewer
-- Filter levels in log viewer: Press `l` to cycle through L0+ → L1+ → ... → L5 only
+- Filter levels in log viewer: Press `Tab` to cycle through L0+ → L1+ → ... → L5 only
+- Log level tags (`[L0]` through `[L5]`) are color-coded for quick identification
 
 ## Notifications
 

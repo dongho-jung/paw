@@ -43,6 +43,14 @@ type ThemeColors struct {
 	ErrorColor     color.Color // Error indicator
 	SearchMatch    color.Color // Search match highlight
 	SearchCurrent  color.Color // Current search match
+
+	// Log level colors
+	LogTrace color.Color // L0 - Trace level (least important)
+	LogDebug color.Color // L1 - Debug level
+	LogInfo  color.Color // L2 - Info level
+	LogWarn  color.Color // L3 - Warning level
+	LogError color.Color // L4 - Error level
+	LogFatal color.Color // L5 - Fatal level (most critical)
 }
 
 // NewThemeColors creates a new color palette based on dark mode setting.
@@ -75,6 +83,14 @@ func NewThemeColors(isDark bool) ThemeColors {
 			ErrorColor:     lipgloss.Color("196"), // Red
 			SearchMatch:    lipgloss.Color("226"), // Yellow
 			SearchCurrent:  lipgloss.Color("208"), // Orange
+
+			// Log level colors - distinct colors for dark backgrounds
+			LogTrace: lipgloss.Color("243"), // Gray (dim, least important)
+			LogDebug: lipgloss.Color("75"),  // Light blue
+			LogInfo:  lipgloss.Color("114"), // Green
+			LogWarn:  lipgloss.Color("214"), // Orange/yellow
+			LogError: lipgloss.Color("196"), // Bright red
+			LogFatal: lipgloss.Color("201"), // Magenta (most critical)
 		}
 	}
 
@@ -106,6 +122,14 @@ func NewThemeColors(isDark bool) ThemeColors {
 		ErrorColor:     lipgloss.Color("160"), // Dark red
 		SearchMatch:    lipgloss.Color("220"), // Yellow
 		SearchCurrent:  lipgloss.Color("208"), // Orange
+
+		// Log level colors - distinct colors for light backgrounds
+		LogTrace: lipgloss.Color("247"), // Gray (dim, least important)
+		LogDebug: lipgloss.Color("25"),  // Dark blue
+		LogInfo:  lipgloss.Color("28"),  // Dark green
+		LogWarn:  lipgloss.Color("166"), // Dark orange
+		LogError: lipgloss.Color("160"), // Dark red
+		LogFatal: lipgloss.Color("125"), // Dark magenta (most critical)
 	}
 }
 
@@ -117,6 +141,27 @@ func (tc ThemeColors) IsDark() bool {
 // LightDark returns a lipgloss.LightDark function bound to this theme.
 func (tc ThemeColors) LightDark() func(color.Color, color.Color) color.Color {
 	return lipgloss.LightDark(tc.isDark)
+}
+
+// LogLevelColor returns the color for a given log level (0-5).
+// Returns nil for invalid levels.
+func (tc ThemeColors) LogLevelColor(level int) color.Color {
+	switch level {
+	case 0:
+		return tc.LogTrace
+	case 1:
+		return tc.LogDebug
+	case 2:
+		return tc.LogInfo
+	case 3:
+		return tc.LogWarn
+	case 4:
+		return tc.LogError
+	case 5:
+		return tc.LogFatal
+	default:
+		return nil
+	}
 }
 
 const (
