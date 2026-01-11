@@ -19,11 +19,13 @@ const (
 	gitModeStatus gitMode = iota
 	gitModeLog
 	gitModeAll
+	gitModeDiff
 )
 
 // GitViewer provides an interactive git viewer with mode switching and vim-like navigation.
 type GitViewer struct {
 	workDir       string
+	mainBranch    string
 	mode          gitMode
 	lines         []string
 	scrollPos     int
@@ -52,15 +54,16 @@ type GitViewer struct {
 }
 
 // NewGitViewer creates a new git viewer for the given working directory.
-func NewGitViewer(workDir string) *GitViewer {
+func NewGitViewer(workDir, mainBranch string) *GitViewer {
 	// Detect dark mode BEFORE bubbletea starts
 	isDark := DetectDarkMode()
 
 	return &GitViewer{
-		workDir: workDir,
-		mode:    gitModeStatus, // Start in status mode by default
-		isDark:  isDark,
-		colors:  NewThemeColors(isDark),
+		workDir:    workDir,
+		mainBranch: mainBranch,
+		mode:       gitModeStatus, // Start in status mode by default
+		isDark:     isDark,
+		colors:     NewThemeColors(isDark),
 	}
 }
 
@@ -251,6 +254,46 @@ func (m *GitViewer) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.loadGitOutput()
 		}
 
+	case "d":
+		// Switch to diff mode (diff main...HEAD)
+		if m.mode != gitModeDiff {
+			m.mode = gitModeDiff
+			m.clearSearch() // Clear search on mode change
+			return m, m.loadGitOutput()
+		}
+
+	case "1":
+		// Quick switch to status mode
+		if m.mode != gitModeStatus {
+			m.mode = gitModeStatus
+			m.clearSearch()
+			return m, m.loadGitOutput()
+		}
+
+	case "2":
+		// Quick switch to log mode
+		if m.mode != gitModeLog {
+			m.mode = gitModeLog
+			m.clearSearch()
+			return m, m.loadGitOutput()
+		}
+
+	case "3":
+		// Quick switch to all mode
+		if m.mode != gitModeAll {
+			m.mode = gitModeAll
+			m.clearSearch()
+			return m, m.loadGitOutput()
+		}
+
+	case "4":
+		// Quick switch to diff mode
+		if m.mode != gitModeDiff {
+			m.mode = gitModeDiff
+			m.clearSearch()
+			return m, m.loadGitOutput()
+		}
+
 	case "w":
 		// Toggle word wrap
 		m.wordWrap = !m.wordWrap
@@ -276,13 +319,15 @@ func (m *GitViewer) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.scrollDown(m.contentHeight() / 2)
 
 	case "tab":
-		// Cycle through modes: status -> log -> all -> status
+		// Cycle through modes: status -> log -> all -> diff -> status
 		switch m.mode {
 		case gitModeStatus:
 			m.mode = gitModeLog
 		case gitModeLog:
 			m.mode = gitModeAll
 		case gitModeAll:
+			m.mode = gitModeDiff
+		case gitModeDiff:
 			m.mode = gitModeStatus
 		}
 		m.clearSearch() // Clear search on mode change
@@ -487,11 +532,13 @@ func (m *GitViewer) View() tea.View {
 	var modeStr string
 	switch m.mode {
 	case gitModeStatus:
-		modeStr = "[STATUS]"
+		modeStr = "[1:STATUS]"
 	case gitModeLog:
-		modeStr = "[LOG]"
+		modeStr = "[2:LOG]"
 	case gitModeAll:
-		modeStr = "[LOG --all]"
+		modeStr = "[3:LOG --all]"
+	case gitModeDiff:
+		modeStr = fmt.Sprintf("[4:DIFF %s...HEAD]", m.mainBranch)
 	}
 
 	var status string
@@ -516,7 +563,7 @@ func (m *GitViewer) View() tea.View {
 	}
 
 	// Keybindings hint (use ansi.StringWidth for unicode characters like ⌃)
-	hint := "/:search n/N:next/prev ⌃G/q:close"
+	hint := "Tab/1-4:mode /:search n/N:match q:close"
 	padding := m.width - ansi.StringWidth(status) - ansi.StringWidth(hint)
 	if padding < 0 {
 		hint = "⌃G/q:close"
@@ -870,6 +917,9 @@ func (m *GitViewer) loadGitOutput() tea.Cmd {
 		case gitModeAll:
 			// git log --all --decorate --oneline --graph with color
 			cmd = exec.Command("git", "log", "--all", "--decorate", "--oneline", "--graph", "--color=always")
+		case gitModeDiff:
+			// git diff main...HEAD shows changes on the current branch since it diverged from main
+			cmd = exec.Command("git", "diff", "--color=always", m.mainBranch+"...HEAD")
 		}
 
 		cmd.Dir = m.workDir
@@ -890,11 +940,11 @@ func (m *GitViewer) loadGitOutput() tea.Cmd {
 }
 
 // RunGitViewer runs the git viewer for the given working directory.
-func RunGitViewer(workDir string) error {
+func RunGitViewer(workDir, mainBranch string) error {
 	// Reset theme cache to ensure fresh detection on each TUI start
 	ResetDarkModeCache()
 
-	m := NewGitViewer(workDir)
+	m := NewGitViewer(workDir, mainBranch)
 	p := tea.NewProgram(m)
 	_, err := p.Run()
 	return err

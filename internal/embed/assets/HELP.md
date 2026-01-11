@@ -84,6 +84,36 @@ Browse and manage reusable task templates with fuzzy search.
   l           Cycle log level filter (L0+ → L1+ → ... → L5 only)
   ⌃O/q/Esc    Close the log viewer
 
+## Git Viewer (⌃G)
+
+### Modes (Tab to cycle, 1-4 for quick switch)
+  1: STATUS     git status
+  2: LOG        git log
+  3: LOG --all  git log --all --decorate --oneline --graph
+  4: DIFF       git diff main...HEAD
+
+### Navigation
+  ↑/↓/j/k     Scroll vertically
+  ←/→/h/l     Scroll horizontally (when word wrap is off)
+  g/G         Jump to top/bottom
+  PgUp/PgDn   Page scroll
+  ⌃U/⌃D       Half-page scroll
+  w           Toggle word wrap
+
+### Mode Switching
+  Tab         Cycle modes (STATUS → LOG → LOG --all → DIFF)
+  1/2/3/4     Jump to specific mode
+  s/L/a/d     Switch to STATUS/LOG/LOG --all/DIFF
+
+### Search
+  /           Start search
+  n/N         Next/previous match
+  Esc         Clear search
+
+### Other
+  ⌃C          Copy selection (drag to select)
+  ⌃G/q/Esc    Close the git viewer
+
 ## CLI Commands (outside tmux)
 
   paw logs --since 1h --task my-task
@@ -123,7 +153,6 @@ Fuzzy-searchable command palette for quick access to commands.
 
 ### Available Commands
   Settings       Configure PAW project settings
-  Show Diff      Show diff between task branch and main
   Restore Panes  Restore missing panes in current task window
 
 ## Settings UI (⌃P → Settings)

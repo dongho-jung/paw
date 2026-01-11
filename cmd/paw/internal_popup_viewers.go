@@ -112,13 +112,14 @@ var helpViewerCmd = &cobra.Command{
 }
 
 var gitViewerCmd = &cobra.Command{
-	Use:    "git-viewer [work-dir]",
+	Use:    "git-viewer [work-dir] [main-branch]",
 	Short:  "Run the git viewer",
-	Args:   cobra.ExactArgs(1),
+	Args:   cobra.ExactArgs(2),
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workDir := args[0]
-		return tui.RunGitViewer(workDir)
+		mainBranch := args[1]
+		return tui.RunGitViewer(workDir, mainBranch)
 	},
 }
 
@@ -148,13 +149,17 @@ var toggleGitStatusCmd = &cobra.Command{
 		}
 		panePath = strings.TrimSpace(panePath)
 
+		// Get the main branch name dynamically
+		gitClient := git.New()
+		mainBranch := gitClient.GetMainBranch(panePath)
+
 		pawBin, err := os.Executable()
 		if err != nil {
 			pawBin = "paw"
 		}
 
 		// Run git viewer in popup (closes with q/Esc/Ctrl+G)
-		gitCmd := fmt.Sprintf("%s internal git-viewer %s", pawBin, panePath)
+		gitCmd := fmt.Sprintf("%s internal git-viewer %s %s", pawBin, panePath, mainBranch)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
 			Width:     constants.PopupWidthFull,

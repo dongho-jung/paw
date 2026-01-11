@@ -180,11 +180,6 @@ var cmdPaletteTUICmd = &cobra.Command{
 				ID:          "settings",
 			},
 			{
-				Name:        "Show Diff",
-				Description: "Show diff between task branch and main",
-				ID:          "show-diff",
-			},
-			{
 				Name:        "Restore Panes",
 				Description: "Restore missing panes in current task window",
 				ID:          "restore-panes",
@@ -219,21 +214,6 @@ var cmdPaletteTUICmd = &cobra.Command{
 			// Run toggle-settings in background after popup closes
 			_ = tm.Run("run-shell", "-b",
 				fmt.Sprintf("sleep 0.1 && %s internal toggle-settings %s", pawBin, sessionName))
-			// Exit immediately to close this popup
-			return nil
-
-		case "show-diff":
-			// Queue the diff popup to open after this popup closes
-			// Use tmux run-shell -b (background) with a small delay
-			if !appCtx.IsGitRepo {
-				fmt.Println("Not a git repository")
-				return nil
-			}
-
-			tm := tmux.New(sessionName)
-			// Run toggle-show-diff in background after popup closes
-			_ = tm.Run("run-shell", "-b",
-				fmt.Sprintf("sleep 0.1 && %s internal toggle-show-diff %s", pawBin, sessionName))
 			// Exit immediately to close this popup
 			return nil
 
