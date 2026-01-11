@@ -198,14 +198,12 @@ Example project config with inherit:
 ```yaml
 work_mode: worktree
 on_complete: confirm
-theme: auto
 self_improve: false
 
 # Inherit settings from global config
 inherit:
   work_mode: true     # Use global work_mode
   on_complete: false  # Use project-specific value
-  theme: true         # Use global theme
   self_improve: true  # Use global self_improve
 ```
 

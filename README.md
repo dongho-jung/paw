@@ -159,12 +159,6 @@ work_mode: worktree
 # - auto-pr: Auto commit + push + create pull request
 on_complete: confirm
 
-# UI color theme: auto, light, or dark
-# - auto: Auto-detect based on terminal background (default)
-# - light: Force light theme colors
-# - dark: Force dark theme colors
-theme: auto
-
 # Non-git workspace: shared or copy
 non_git_workspace: shared
 
@@ -205,9 +199,6 @@ log_max_backups: 3
 | `on_complete` | `confirm` | Commit only (no push/PR/merge) |
 |               | `auto-merge` | Auto commit + push + merge + clean up + close window (worktree mode only) |
 |               | `auto-pr` | Auto commit + push + create PR (worktree mode only) |
-| `theme` | `auto` | Auto-detect based on terminal background (default) |
-|         | `light` | Force light theme colors |
-|         | `dark` | Force dark theme colors |
 | `non_git_workspace` | `shared` | Use the project directory directly (default) |
 |                   | `copy` | Create a per-task workspace copy (isolation) |
 | `worktree_hook` | (command) | Shell command(s) to run after worktree/workspace creation (e.g., `npm install`) |

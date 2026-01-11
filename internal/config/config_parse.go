@@ -87,8 +87,6 @@ func parseConfig(content string) (*Config, error) {
 			cfg.WorkMode = WorkMode(value)
 		case "on_complete":
 			cfg.OnComplete = OnComplete(value)
-		case "theme":
-			cfg.Theme = Theme(value)
 		case "worktree_hook":
 			cfg.WorktreeHook = value
 		case "pre_task_hook":
@@ -327,8 +325,6 @@ func parseInheritBlock(lines []string, i *int) *InheritConfig {
 			inherit.WorkMode = boolVal
 		case "on_complete":
 			inherit.OnComplete = boolVal
-		case "theme":
-			inherit.Theme = boolVal
 		case "non_git_workspace":
 			inherit.NonGitWorkspace = boolVal
 		case "verify_required":
@@ -411,7 +407,6 @@ func formatInheritBlock(inherit *InheritConfig) string {
 	sb.WriteString("inherit:\n")
 	sb.WriteString(fmt.Sprintf("  work_mode: %t\n", inherit.WorkMode))
 	sb.WriteString(fmt.Sprintf("  on_complete: %t\n", inherit.OnComplete))
-	sb.WriteString(fmt.Sprintf("  theme: %t\n", inherit.Theme))
 	sb.WriteString(fmt.Sprintf("  non_git_workspace: %t\n", inherit.NonGitWorkspace))
 	sb.WriteString(fmt.Sprintf("  verify_required: %t\n", inherit.VerifyRequired))
 	sb.WriteString(fmt.Sprintf("  verify_timeout: %t\n", inherit.VerifyTimeout))

@@ -8,7 +8,6 @@ import (
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/sahilm/fuzzy"
 
-	"github.com/dongho-jung/paw/internal/config"
 	"github.com/dongho-jung/paw/internal/logging"
 )
 
@@ -35,7 +34,6 @@ type CommandPalette struct {
 	cursor   int
 	action   CommandPaletteAction
 	selected *Command
-	theme    config.Theme
 	isDark   bool
 	colors   ThemeColors
 }
@@ -46,9 +44,7 @@ func NewCommandPalette(commands []Command) *CommandPalette {
 	defer logging.Debug("<- NewCommandPalette")
 
 	// Detect dark mode BEFORE bubbletea starts
-	// Uses config theme setting if available, otherwise auto-detects
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 
 	ti := textinput.New()
 	ti.Placeholder = "Type to search..."
@@ -61,7 +57,6 @@ func NewCommandPalette(commands []Command) *CommandPalette {
 		commands: commands,
 		filtered: commands,
 		cursor:   0,
-		theme:    theme,
 		isDark:   isDark,
 		colors:   NewThemeColors(isDark),
 	}
@@ -69,11 +64,7 @@ func NewCommandPalette(commands []Command) *CommandPalette {
 
 // Init initializes the command palette.
 func (m *CommandPalette) Init() tea.Cmd {
-	cmds := []tea.Cmd{textinput.Blink}
-	if m.theme == config.ThemeAuto {
-		cmds = append(cmds, tea.RequestBackgroundColor)
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(textinput.Blink, tea.RequestBackgroundColor)
 }
 
 // Update handles messages.
@@ -82,11 +73,9 @@ func (m *CommandPalette) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			m.isDark = msg.IsDark()
-			m.colors = NewThemeColors(m.isDark)
-			setCachedDarkMode(m.isDark)
-		}
+		m.isDark = msg.IsDark()
+		m.colors = NewThemeColors(m.isDark)
+		setCachedDarkMode(m.isDark)
 		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {

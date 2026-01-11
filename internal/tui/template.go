@@ -36,7 +36,6 @@ type TemplateUI struct {
 	previewScroll int
 	previewLines  []string
 	previewIndex  int
-	theme         config.Theme
 	isDark        bool
 	colors        ThemeColors
 }
@@ -44,13 +43,11 @@ type TemplateUI struct {
 // NewTemplateUI creates a new template UI.
 func NewTemplateUI(pawDir string) *TemplateUI {
 	// Detect dark mode BEFORE bubbletea starts
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 
 	return &TemplateUI{
 		pawDir:       pawDir,
 		previewIndex: -1,
-		theme:        theme,
 		isDark:       isDark,
 		colors:       NewThemeColors(isDark),
 	}
@@ -58,11 +55,7 @@ func NewTemplateUI(pawDir string) *TemplateUI {
 
 // Init initializes the template UI.
 func (m *TemplateUI) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadTemplates()}
-	if m.theme == config.ThemeAuto {
-		cmds = append(cmds, tea.RequestBackgroundColor)
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(m.loadTemplates(), tea.RequestBackgroundColor)
 }
 
 type templatesLoadedMsg struct {
@@ -120,11 +113,9 @@ func (m *TemplateUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			m.isDark = msg.IsDark()
-			m.colors = NewThemeColors(m.isDark)
-			setCachedDarkMode(m.isDark)
-		}
+		m.isDark = msg.IsDark()
+		m.colors = NewThemeColors(m.isDark)
+		setCachedDarkMode(m.isDark)
 		return m, nil
 
 	case tea.KeyMsg:

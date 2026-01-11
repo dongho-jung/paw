@@ -9,8 +9,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-
-	"github.com/dongho-jung/paw/internal/config"
 )
 
 // HelpViewer provides an interactive help viewer with vim-like navigation.
@@ -20,7 +18,6 @@ type HelpViewer struct {
 	horizontalPos int
 	width         int
 	height        int
-	theme         config.Theme
 	isDark        bool
 	colors        ThemeColors
 
@@ -42,12 +39,10 @@ func NewHelpViewer(content string) *HelpViewer {
 	}
 
 	// Detect dark mode BEFORE bubbletea starts
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 
 	return &HelpViewer{
 		lines:  lines,
-		theme:  theme,
 		isDark: isDark,
 		colors: NewThemeColors(isDark),
 	}
@@ -55,21 +50,16 @@ func NewHelpViewer(content string) *HelpViewer {
 
 // Init initializes the help viewer.
 func (m *HelpViewer) Init() tea.Cmd {
-	if m.theme == config.ThemeAuto {
-		return tea.RequestBackgroundColor
-	}
-	return nil
+	return tea.RequestBackgroundColor
 }
 
 // Update handles messages and updates the model.
 func (m *HelpViewer) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			m.isDark = msg.IsDark()
-			m.colors = NewThemeColors(m.isDark)
-			setCachedDarkMode(m.isDark)
-		}
+		m.isDark = msg.IsDark()
+		m.colors = NewThemeColors(m.isDark)
+		setCachedDarkMode(m.isDark)
 		return m, nil
 
 	case tea.KeyMsg:

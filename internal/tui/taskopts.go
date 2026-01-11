@@ -29,7 +29,6 @@ type TaskOptsUI struct {
 	height    int
 	done      bool
 	cancelled bool
-	theme     config.Theme
 	isDark    bool // Cached dark mode detection (must be detected before bubbletea starts)
 }
 
@@ -42,9 +41,7 @@ type TaskOptsResult struct {
 // NewTaskOptsUI creates a new task options UI.
 func NewTaskOptsUI(currentOpts *config.TaskOptions, activeTasks []string) *TaskOptsUI {
 	// Detect dark mode BEFORE bubbletea starts
-	// Uses config theme setting if available, otherwise auto-detects
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 
 	opts := config.DefaultTaskOptions()
 	if currentOpts != nil {
@@ -65,17 +62,13 @@ func NewTaskOptsUI(currentOpts *config.TaskOptions, activeTasks []string) *TaskO
 		options:  opts,
 		field:    TaskOptsFieldModel,
 		modelIdx: modelIdx,
-		theme:    theme,
 		isDark:   isDark,
 	}
 }
 
 // Init initializes the task options UI.
 func (m *TaskOptsUI) Init() tea.Cmd {
-	if m.theme == config.ThemeAuto {
-		return tea.RequestBackgroundColor
-	}
-	return nil
+	return tea.RequestBackgroundColor
 }
 
 // Update handles messages and updates the model.
@@ -86,10 +79,8 @@ func (m *TaskOptsUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			m.isDark = msg.IsDark()
-			setCachedDarkMode(m.isDark)
-		}
+		m.isDark = msg.IsDark()
+		setCachedDarkMode(m.isDark)
 		return m, nil
 
 	case tea.KeyMsg:

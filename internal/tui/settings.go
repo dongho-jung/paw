@@ -36,13 +36,12 @@ type SettingsField int
 const (
 	SettingsFieldWorkMode SettingsField = iota
 	SettingsFieldOnComplete
-	SettingsFieldTheme
 	SettingsFieldNonGitWorkspace
 	SettingsFieldVerifyRequired
 	SettingsFieldSelfImprove
 )
 
-const generalFieldCount = 6
+const generalFieldCount = 5
 
 // Notifications tab fields
 const (
@@ -70,7 +69,6 @@ type SettingsUI struct {
 	height    int
 	done      bool
 	cancelled bool
-	theme     config.Theme
 	isDark    bool
 	isGitRepo bool
 	colors    ThemeColors
@@ -78,7 +76,6 @@ type SettingsUI struct {
 	// Field indices for dropdown-style fields
 	workModeIdx        int
 	onCompleteIdx      int
-	themeIdx           int
 	nonGitWorkspaceIdx int
 
 	// Text input state for editable fields
@@ -106,8 +103,7 @@ func NewSettingsUI(globalCfg, projectCfg *config.Config, isGitRepo bool) *Settin
 	defer logging.Debug("<- NewSettingsUI")
 
 	// Detect dark mode BEFORE bubbletea starts
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 
 	if globalCfg == nil {
 		globalCfg = config.DefaultConfig()
@@ -146,15 +142,6 @@ func NewSettingsUI(globalCfg, projectCfg *config.Config, isGitRepo bool) *Settin
 		}
 	}
 
-	themeIdx := 0
-	themes := []config.Theme{config.ThemeAuto, config.ThemeLight, config.ThemeDark}
-	for i, t := range themes {
-		if t == cfg.Theme {
-			themeIdx = i
-			break
-		}
-	}
-
 	nonGitWorkspaceIdx := 0
 	if cfg.NonGitWorkspace == string(config.NonGitWorkspaceCopy) {
 		nonGitWorkspaceIdx = 1
@@ -182,13 +169,11 @@ func NewSettingsUI(globalCfg, projectCfg *config.Config, isGitRepo bool) *Settin
 		config:             cfg,
 		tab:                SettingsTabGeneral,
 		field:              0,
-		theme:              theme,
 		isDark:             isDark,
 		isGitRepo:          isGitRepo,
 		colors:             NewThemeColors(isDark),
 		workModeIdx:        workModeIdx,
 		onCompleteIdx:      onCompleteIdx,
-		themeIdx:           themeIdx,
 		nonGitWorkspaceIdx: nonGitWorkspaceIdx,
 		slackWebhook:       slackWebhook,
 		ntfyTopic:          ntfyTopic,
@@ -198,10 +183,7 @@ func NewSettingsUI(globalCfg, projectCfg *config.Config, isGitRepo bool) *Settin
 
 // Init initializes the settings UI.
 func (m *SettingsUI) Init() tea.Cmd {
-	if m.theme == config.ThemeAuto {
-		return tea.RequestBackgroundColor
-	}
-	return nil
+	return tea.RequestBackgroundColor
 }
 
 // Update handles messages and updates the model.
@@ -213,11 +195,9 @@ func (m *SettingsUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			m.isDark = msg.IsDark()
-			m.colors = NewThemeColors(m.isDark)
-			setCachedDarkMode(m.isDark)
-		}
+		m.isDark = msg.IsDark()
+		m.colors = NewThemeColors(m.isDark)
+		setCachedDarkMode(m.isDark)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -319,12 +299,6 @@ func (m *SettingsUI) toggleInheritForCurrentField() {
 		m.inheritConfig.OnComplete = !m.inheritConfig.OnComplete
 		if m.inheritConfig.OnComplete {
 			m.config.OnComplete = m.globalConfig.OnComplete
-			m.updateFieldIndices()
-		}
-	case SettingsFieldTheme:
-		m.inheritConfig.Theme = !m.inheritConfig.Theme
-		if m.inheritConfig.Theme {
-			m.config.Theme = m.globalConfig.Theme
 			m.updateFieldIndices()
 		}
 	case SettingsFieldNonGitWorkspace:
@@ -449,10 +423,6 @@ func (m *SettingsUI) handleLeft() {
 			if m.onCompleteIdx > 0 {
 				m.onCompleteIdx--
 			}
-		case SettingsFieldTheme:
-			if m.themeIdx > 0 {
-				m.themeIdx--
-			}
 		case SettingsFieldNonGitWorkspace:
 			if m.nonGitWorkspaceIdx > 0 {
 				m.nonGitWorkspaceIdx--
@@ -478,10 +448,6 @@ func (m *SettingsUI) handleRight() {
 			if m.onCompleteIdx < len(completes)-1 {
 				m.onCompleteIdx++
 			}
-		case SettingsFieldTheme:
-			if m.themeIdx < 2 {
-				m.themeIdx++
-			}
 		case SettingsFieldNonGitWorkspace:
 			if m.nonGitWorkspaceIdx < 1 {
 				m.nonGitWorkspaceIdx++
@@ -504,11 +470,6 @@ func (m *SettingsUI) applyChanges() {
 	completes := config.ValidOnCompletes()
 	if m.onCompleteIdx < len(completes) {
 		m.config.OnComplete = completes[m.onCompleteIdx]
-	}
-
-	themes := []config.Theme{config.ThemeAuto, config.ThemeLight, config.ThemeDark}
-	if m.themeIdx < len(themes) {
-		m.config.Theme = themes[m.themeIdx]
 	}
 
 	if m.nonGitWorkspaceIdx == 0 {
@@ -578,16 +539,6 @@ func (m *SettingsUI) updateFieldIndices() {
 	for i, c := range config.ValidOnCompletes() {
 		if c == m.config.OnComplete {
 			m.onCompleteIdx = i
-			break
-		}
-	}
-
-	// Theme
-	m.themeIdx = 0
-	themes := []config.Theme{config.ThemeAuto, config.ThemeLight, config.ThemeDark}
-	for i, t := range themes {
-		if t == m.config.Theme {
-			m.themeIdx = i
 			break
 		}
 	}
@@ -767,31 +718,6 @@ func (m *SettingsUI) renderGeneralTab(sb *strings.Builder, labelStyle, selectedL
 				}
 			} else {
 				parts = append(parts, dimStyle.Render(" "+string(c)+" "))
-			}
-		}
-		sb.WriteString(label + strings.Join(parts, "") + inheritIndicator(inherited))
-		sb.WriteString("\n")
-	}
-
-	// Theme
-	{
-		label := labelStyle.Render("Theme:")
-		if m.field == SettingsFieldTheme {
-			label = selectedLabelStyle.Render("Theme:")
-		}
-
-		inherited := m.scope == SettingsScopeProject && m.inheritConfig != nil && m.inheritConfig.Theme
-		themes := []config.Theme{config.ThemeAuto, config.ThemeLight, config.ThemeDark}
-		var parts []string
-		for i, t := range themes {
-			if i == m.themeIdx {
-				if m.field == SettingsFieldTheme {
-					parts = append(parts, selectedValueStyle.Render("["+string(t)+"]"))
-				} else {
-					parts = append(parts, valueStyle.Render("["+string(t)+"]"))
-				}
-			} else {
-				parts = append(parts, dimStyle.Render(" "+string(t)+" "))
 			}
 		}
 		sb.WriteString(label + strings.Join(parts, "") + inheritIndicator(inherited))

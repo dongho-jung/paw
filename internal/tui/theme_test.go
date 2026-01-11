@@ -2,32 +2,14 @@ package tui
 
 import (
 	"testing"
-
-	"github.com/dongho-jung/paw/internal/config"
 )
 
 func TestDetectDarkMode_CachesBehavior(t *testing.T) {
 	// Reset cache to ensure clean state
 	cachedDarkMode.Store(darkModeUnknown)
 
-	// Test explicit light theme
-	t.Run("Light theme returns false", func(t *testing.T) {
-		result := detectDarkMode(config.ThemeLight)
-		if result {
-			t.Errorf("expected false for light theme, got true")
-		}
-	})
-
-	// Test explicit dark theme
-	t.Run("Dark theme returns true", func(t *testing.T) {
-		result := detectDarkMode(config.ThemeDark)
-		if !result {
-			t.Errorf("expected true for dark theme, got false")
-		}
-	})
-
 	// Test cache consistency
-	t.Run("Cache is set after explicit theme", func(t *testing.T) {
+	t.Run("Cache is set after explicit set", func(t *testing.T) {
 		// Reset cache
 		cachedDarkMode.Store(darkModeUnknown)
 
@@ -72,25 +54,25 @@ func TestDetectDarkMode_CachesBehavior(t *testing.T) {
 		}
 	})
 
-	// Test that auto mode uses cache when available
-	t.Run("Auto mode uses cached value", func(t *testing.T) {
+	// Test that DetectDarkMode uses cache when available
+	t.Run("DetectDarkMode uses cached value", func(t *testing.T) {
 		// Set cache to light
 		cachedDarkMode.Store(darkModeUnknown)
 		setCachedDarkMode(false)
 
-		// Auto mode should use cached value
-		result := detectDarkMode(config.ThemeAuto)
+		// DetectDarkMode should use cached value
+		result := DetectDarkMode()
 		if result {
-			t.Errorf("expected false (light) from cached auto detection, got true")
+			t.Errorf("expected false (light) from cached detection, got true")
 		}
 
 		// Set cache to dark
 		setCachedDarkMode(true)
 
-		// Auto mode should use updated cached value
-		result = detectDarkMode(config.ThemeAuto)
+		// DetectDarkMode should use updated cached value
+		result = DetectDarkMode()
 		if !result {
-			t.Errorf("expected true (dark) from cached auto detection, got false")
+			t.Errorf("expected true (dark) from cached detection, got false")
 		}
 	})
 

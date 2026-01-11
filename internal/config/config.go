@@ -16,7 +16,6 @@ import (
 type InheritConfig struct {
 	WorkMode        bool `yaml:"work_mode"`
 	OnComplete      bool `yaml:"on_complete"`
-	Theme           bool `yaml:"theme"`
 	NonGitWorkspace bool `yaml:"non_git_workspace"`
 	VerifyRequired  bool `yaml:"verify_required"`
 	VerifyTimeout   bool `yaml:"verify_timeout"`
@@ -34,7 +33,6 @@ func DefaultInheritConfig() *InheritConfig {
 	return &InheritConfig{
 		WorkMode:        true,
 		OnComplete:      true,
-		Theme:           true,
 		NonGitWorkspace: true,
 		VerifyRequired:  true,
 		VerifyTimeout:   true,
@@ -104,15 +102,6 @@ const (
 	NonGitWorkspaceCopy   NonGitWorkspaceMode = "copy"
 )
 
-// Theme defines the UI color theme setting.
-type Theme string
-
-const (
-	ThemeAuto  Theme = "auto"  // Auto-detect based on terminal background
-	ThemeLight Theme = "light" // Force light theme colors
-	ThemeDark  Theme = "dark"  // Force dark theme colors
-)
-
 // SlackConfig holds Slack notification settings.
 type SlackConfig struct {
 	Webhook string `yaml:"webhook"` // Slack incoming webhook URL
@@ -134,7 +123,6 @@ type NotificationsConfig struct {
 type Config struct {
 	WorkMode        WorkMode             `yaml:"work_mode"`
 	OnComplete      OnComplete           `yaml:"on_complete"`
-	Theme           Theme                `yaml:"theme"`
 	WorktreeHook    string               `yaml:"worktree_hook"`
 	PreTaskHook     string               `yaml:"pre_task_hook"`
 	PostTaskHook    string               `yaml:"post_task_hook"`
@@ -166,16 +154,12 @@ func (c *Config) Normalize() []string {
 
 	c.WorkMode = WorkMode(strings.TrimSpace(string(c.WorkMode)))
 	c.OnComplete = OnComplete(strings.TrimSpace(string(c.OnComplete)))
-	c.Theme = Theme(strings.TrimSpace(string(c.Theme)))
 
 	if c.WorkMode == "" {
 		c.WorkMode = WorkModeWorktree
 	}
 	if c.OnComplete == "" {
 		c.OnComplete = OnCompleteConfirm
-	}
-	if c.Theme == "" {
-		c.Theme = ThemeAuto
 	}
 
 	if !isValidWorkMode(c.WorkMode) {
@@ -191,11 +175,6 @@ func (c *Config) Normalize() []string {
 	if c.WorkMode == WorkModeMain && (c.OnComplete == OnCompleteAutoMerge || c.OnComplete == OnCompleteAutoPR) {
 		warnings = append(warnings, fmt.Sprintf("on_complete %q is not supported in main mode; defaulting to %q", c.OnComplete, OnCompleteConfirm))
 		c.OnComplete = OnCompleteConfirm
-	}
-
-	if !isValidTheme(c.Theme) {
-		warnings = append(warnings, fmt.Sprintf("invalid theme %q; defaulting to %q", c.Theme, ThemeAuto))
-		c.Theme = ThemeAuto
 	}
 
 	if c.VerifyTimeout <= 0 {
@@ -234,7 +213,6 @@ func DefaultConfig() *Config {
 	return &Config{
 		WorkMode:        WorkModeWorktree,
 		OnComplete:      OnCompleteConfirm,
-		Theme:           ThemeAuto,
 		LogFormat:       "text",
 		LogMaxSizeMB:    10,
 		LogMaxBackups:   3,
@@ -258,9 +236,6 @@ func (c *Config) MergeWithGlobal(global *Config) {
 	}
 	if c.Inherit.OnComplete {
 		c.OnComplete = global.OnComplete
-	}
-	if c.Inherit.Theme {
-		c.Theme = global.Theme
 	}
 	if c.Inherit.NonGitWorkspace {
 		c.NonGitWorkspace = global.NonGitWorkspace
@@ -324,10 +299,6 @@ func isValidOnComplete(value OnComplete) bool {
 	return value == OnCompleteConfirm || value == OnCompleteAutoMerge || value == OnCompleteAutoPR
 }
 
-func isValidTheme(theme Theme) bool {
-	return theme == ThemeAuto || theme == ThemeLight || theme == ThemeDark
-}
-
 // Load reads the configuration from the given paw directory.
 func Load(pawDir string) (*Config, error) {
 	logging.Debug("-> config.Load(pawDir=%s)", pawDir)
@@ -377,13 +348,6 @@ work_mode: %s
 # - auto-pr: Auto commit + push + create pull request
 on_complete: %s
 
-# UI color theme: auto, light, or dark
-# - auto: Auto-detect based on terminal background (default)
-# - light: Force light theme colors (dark text on light background)
-# - dark: Force dark theme colors (light text on dark background)
-# Use explicit value if auto-detection doesn't work correctly
-theme: %s
-
 # Non-git workspace: shared or copy
 non_git_workspace: %s
 
@@ -416,7 +380,7 @@ log_max_backups: %d
 # When enabled, the agent reflects on mistakes at task finish and
 # appends learnings to CLAUDE.md, then merges to the default branch.
 self_improve: %t
-`, c.WorkMode, c.OnComplete, c.Theme, c.NonGitWorkspace, c.VerifyTimeout, c.VerifyRequired, c.LogFormat, c.LogMaxSizeMB, c.LogMaxBackups, c.SelfImprove)
+`, c.WorkMode, c.OnComplete, c.NonGitWorkspace, c.VerifyTimeout, c.VerifyRequired, c.LogFormat, c.LogMaxSizeMB, c.LogMaxBackups, c.SelfImprove)
 
 	// Add worktree_hook if set
 	if c.WorktreeHook != "" {

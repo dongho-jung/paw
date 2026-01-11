@@ -8,8 +8,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
-
-	"github.com/dongho-jung/paw/internal/config"
 )
 
 // StepStatus represents the status of a step.
@@ -39,7 +37,6 @@ type EndTaskUI struct {
 	err         error
 	width       int
 	height      int
-	theme       config.Theme
 	isDark      bool
 	colors      ThemeColors
 }
@@ -54,8 +51,7 @@ type stepCompleteMsg struct {
 // NewEndTaskUI creates a new finish task UI.
 func NewEndTaskUI(taskName string, isGitRepo bool) *EndTaskUI {
 	// Detect dark mode BEFORE bubbletea starts
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 
 	steps := []Step{}
 
@@ -76,7 +72,6 @@ func NewEndTaskUI(taskName string, isGitRepo bool) *EndTaskUI {
 	return &EndTaskUI{
 		taskName: taskName,
 		steps:    steps,
-		theme:    theme,
 		isDark:   isDark,
 		colors:   NewThemeColors(isDark),
 	}
@@ -84,22 +79,16 @@ func NewEndTaskUI(taskName string, isGitRepo bool) *EndTaskUI {
 
 // Init initializes the finish task UI.
 func (m *EndTaskUI) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.runNextStep()}
-	if m.theme == config.ThemeAuto {
-		cmds = append(cmds, tea.RequestBackgroundColor)
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(m.runNextStep(), tea.RequestBackgroundColor)
 }
 
 // Update handles messages and updates the model.
 func (m *EndTaskUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			m.isDark = msg.IsDark()
-			m.colors = NewThemeColors(m.isDark)
-			setCachedDarkMode(m.isDark)
-		}
+		m.isDark = msg.IsDark()
+		m.colors = NewThemeColors(m.isDark)
+		setCachedDarkMode(m.isDark)
 		return m, nil
 
 	case tea.KeyMsg:

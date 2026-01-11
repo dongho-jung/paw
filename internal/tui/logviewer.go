@@ -12,8 +12,6 @@ import (
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
-
-	"github.com/dongho-jung/paw/internal/config"
 )
 
 // LogViewer provides an interactive log viewer with vim-like navigation.
@@ -31,7 +29,6 @@ type LogViewer struct {
 	lastSize             int64
 	lastEndedWithNewline bool
 	err                  error
-	theme                config.Theme
 	isDark               bool
 	colors               ThemeColors
 
@@ -81,14 +78,12 @@ func NewLogViewer(logFile string) *LogViewer {
 	}
 
 	// Detect dark mode BEFORE bubbletea starts
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 
 	return &LogViewer{
 		logFile:  logFile,
 		tailMode: true,
 		minLevel: minLevel,
-		theme:    theme,
 		isDark:   isDark,
 		colors:   NewThemeColors(isDark),
 	}
@@ -96,25 +91,16 @@ func NewLogViewer(logFile string) *LogViewer {
 
 // Init initializes the log viewer.
 func (m *LogViewer) Init() tea.Cmd {
-	cmds := []tea.Cmd{
-		m.loadFile(),
-		m.tick(),
-	}
-	if m.theme == config.ThemeAuto {
-		cmds = append(cmds, tea.RequestBackgroundColor)
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(m.loadFile(), m.tick(), tea.RequestBackgroundColor)
 }
 
 // Update handles messages and updates the model.
 func (m *LogViewer) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			m.isDark = msg.IsDark()
-			m.colors = NewThemeColors(m.isDark)
-			setCachedDarkMode(m.isDark)
-		}
+		m.isDark = msg.IsDark()
+		m.colors = NewThemeColors(m.isDark)
+		setCachedDarkMode(m.isDark)
 		return m, nil
 
 	case tea.KeyMsg:

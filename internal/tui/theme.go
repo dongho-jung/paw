@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss/v2"
-
-	"github.com/dongho-jung/paw/internal/config"
 	"github.com/dongho-jung/paw/internal/constants"
 )
 
@@ -173,31 +171,16 @@ const (
 var cachedDarkMode atomic.Int32
 
 // DetectDarkMode returns whether the terminal is in dark mode.
-// It checks the theme config setting first:
-//   - "light": always returns false (dark mode = off)
-//   - "dark": always returns true (dark mode = on)
-//   - "auto" or empty: uses lipgloss.HasDarkBackground() to auto-detect
+// It auto-detects based on terminal background color using lipgloss.
 //
 // This function should be called BEFORE bubbletea starts, as
 // lipgloss.HasDarkBackground() reads from stdin.
 func DetectDarkMode() bool {
-	theme := loadThemeFromConfig()
-	return detectDarkMode(theme)
-}
-
-func detectDarkMode(theme config.Theme) bool {
-	switch theme {
-	case config.ThemeLight:
-		return false
-	case config.ThemeDark:
-		return true
-	default:
-		if isDark, ok := cachedDarkModeValue(); ok {
-			return isDark
-		}
-		// Auto-detect with improved reliability
-		return detectDarkModeWithRetry()
+	if isDark, ok := cachedDarkModeValue(); ok {
+		return isDark
 	}
+	// Auto-detect with improved reliability
+	return detectDarkModeWithRetry()
 }
 
 func cachedDarkModeValue() (bool, bool) {
@@ -269,28 +252,9 @@ func detectDarkModeWithRetry() bool {
 	return isDark
 }
 
-// loadThemeFromConfig attempts to load the theme setting from .paw/config.
-// Returns ThemeAuto if the config cannot be loaded.
-func loadThemeFromConfig() config.Theme {
-	// Find .paw directory
-	pawDir := findPawDir()
-	if pawDir == "" {
-		return config.ThemeAuto
-	}
-
-	cfg, err := config.Load(pawDir)
-	if err != nil {
-		return config.ThemeAuto
-	}
-
-	if cfg.Theme == "" {
-		return config.ThemeAuto
-	}
-
-	return cfg.Theme
-}
-
-// findPawDir looks for .paw directory starting from current dir up to root.
+// findPawDir searches for the .paw directory starting from the current
+// working directory and going up to parent directories.
+// Returns the path to .paw directory or empty string if not found.
 func findPawDir() string {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -305,6 +269,7 @@ func findPawDir() string {
 
 		parent := filepath.Dir(dir)
 		if parent == dir {
+			// Reached root
 			break
 		}
 		dir = parent

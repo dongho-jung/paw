@@ -5,8 +5,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
-
-	"github.com/dongho-jung/paw/internal/config"
 )
 
 // BranchAction represents the selected action.
@@ -21,17 +19,14 @@ const (
 // BranchMenu is a simple menu for branch operations.
 type BranchMenu struct {
 	action BranchAction
-	theme  config.Theme
 	isDark bool
 	colors ThemeColors
 }
 
 // NewBranchMenu creates a new branch menu.
 func NewBranchMenu() *BranchMenu {
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 	return &BranchMenu{
-		theme:  theme,
 		isDark: isDark,
 		colors: NewThemeColors(isDark),
 	}
@@ -39,21 +34,16 @@ func NewBranchMenu() *BranchMenu {
 
 // Init initializes the menu.
 func (m *BranchMenu) Init() tea.Cmd {
-	if m.theme == config.ThemeAuto {
-		return tea.RequestBackgroundColor
-	}
-	return nil
+	return tea.RequestBackgroundColor
 }
 
 // Update handles key events.
 func (m *BranchMenu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			m.isDark = msg.IsDark()
-			m.colors = NewThemeColors(m.isDark)
-			setCachedDarkMode(m.isDark)
-		}
+		m.isDark = msg.IsDark()
+		m.colors = NewThemeColors(m.isDark)
+		setCachedDarkMode(m.isDark)
 		return m, nil
 
 	case tea.KeyMsg:

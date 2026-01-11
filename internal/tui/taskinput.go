@@ -53,8 +53,7 @@ type TaskInput struct {
 	height      int
 	options     *config.TaskOptions
 	activeTasks []string // Active task names for dependency selection
-	theme       config.Theme
-	isDark      bool // Cached dark mode detection (must be detected before bubbletea starts)
+	isDark      bool     // Cached dark mode detection (must be detected before bubbletea starts)
 
 	// Dynamic textarea height
 	textareaHeight    int // Current textarea height (visible lines)
@@ -130,9 +129,7 @@ func NewTaskInput() *TaskInput {
 // NewTaskInputWithTasks creates a new task input model with active task list.
 func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
 	// Detect dark mode BEFORE bubbletea starts
-	// Uses config theme setting if available, otherwise auto-detects
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 
 	ta := textarea.New()
 	ta.Placeholder = "Describe your task here... and press Alt+Enter\n\nExamples:\n- Add user authentication\n- Fix bug in login form"
@@ -169,7 +166,6 @@ func NewTaskInputWithTasks(activeTasks []string) *TaskInput {
 		height:            15,
 		options:           opts,
 		activeTasks:       activeTasks,
-		theme:             theme,
 		isDark:            isDark,
 		textareaHeight:    textareaDefaultHeight,
 		textareaMaxHeight: 15, // Will be updated on WindowSizeMsg
@@ -221,11 +217,7 @@ func (m *TaskInput) applyTheme(isDark bool) {
 func (m *TaskInput) Init() tea.Cmd {
 	// Refresh Kanban data on init
 	m.kanban.Refresh()
-	cmds := []tea.Cmd{textarea.Blink, m.tickCmd()}
-	if m.theme == config.ThemeAuto {
-		cmds = append(cmds, tea.RequestBackgroundColor)
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(textarea.Blink, m.tickCmd(), tea.RequestBackgroundColor)
 }
 
 // tickCmd returns a command that triggers a tick after 5 seconds.
@@ -339,11 +331,9 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			isDark := msg.IsDark()
-			setCachedDarkMode(isDark)
-			m.applyTheme(isDark)
-		}
+		isDark := msg.IsDark()
+		setCachedDarkMode(isDark)
+		m.applyTheme(isDark)
 		return m, nil
 
 	case tea.WindowSizeMsg:

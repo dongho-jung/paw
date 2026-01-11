@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 
-	"github.com/dongho-jung/paw/internal/config"
 	"github.com/dongho-jung/paw/internal/tui/textarea"
 )
 
@@ -47,7 +46,6 @@ type TemplateEditor struct {
 	done         bool
 	saved        bool
 	cancelled    bool
-	theme        config.Theme
 	isDark       bool
 	nameCursor   int
 }
@@ -55,9 +53,7 @@ type TemplateEditor struct {
 // NewTemplateEditor creates a new template editor.
 func NewTemplateEditor(mode TemplateEditorMode, name, content string) *TemplateEditor {
 	// Detect dark mode BEFORE bubbletea starts
-	// Uses config theme setting if available, otherwise auto-detects
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 
 	ta := textarea.New()
 	ta.Placeholder = "Enter template content..."
@@ -85,7 +81,6 @@ func NewTemplateEditor(mode TemplateEditorMode, name, content string) *TemplateE
 		nameInput:    name,
 		contentArea:  ta,
 		focusedField: TemplateEditorFieldName,
-		theme:        theme,
 		isDark:       isDark,
 		nameCursor:   len(name),
 	}
@@ -119,11 +114,7 @@ func (m *TemplateEditor) applyTheme(isDark bool) {
 
 // Init initializes the template editor.
 func (m *TemplateEditor) Init() tea.Cmd {
-	cmds := []tea.Cmd{textarea.Blink}
-	if m.theme == config.ThemeAuto {
-		cmds = append(cmds, tea.RequestBackgroundColor)
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(textarea.Blink, tea.RequestBackgroundColor)
 }
 
 // Update handles messages and updates the model.
@@ -148,11 +139,9 @@ func (m *TemplateEditor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.contentArea.SetWidth(contentWidth)
 		m.contentArea.SetHeight(contentHeight)
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			isDark := msg.IsDark()
-			setCachedDarkMode(isDark)
-			m.applyTheme(isDark)
-		}
+		isDark := msg.IsDark()
+		setCachedDarkMode(isDark)
+		m.applyTheme(isDark)
 		return m, nil
 
 	case tea.KeyMsg:

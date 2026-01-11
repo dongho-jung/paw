@@ -10,8 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-
-	"github.com/dongho-jung/paw/internal/config"
 )
 
 // DiffViewer provides an interactive diff viewer with vim-like navigation.
@@ -26,7 +24,6 @@ type DiffViewer struct {
 	width         int
 	height        int
 	err           error
-	theme         config.Theme
 	isDark        bool
 	colors        ThemeColors
 
@@ -49,13 +46,11 @@ type DiffViewer struct {
 // NewDiffViewer creates a new diff viewer for the given working directory.
 func NewDiffViewer(workDir, mainBranch string) *DiffViewer {
 	// Detect dark mode BEFORE bubbletea starts
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 
 	return &DiffViewer{
 		workDir:    workDir,
 		mainBranch: mainBranch,
-		theme:      theme,
 		isDark:     isDark,
 		colors:     NewThemeColors(isDark),
 	}
@@ -63,22 +58,16 @@ func NewDiffViewer(workDir, mainBranch string) *DiffViewer {
 
 // Init initializes the diff viewer.
 func (m *DiffViewer) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadDiffOutput()}
-	if m.theme == config.ThemeAuto {
-		cmds = append(cmds, tea.RequestBackgroundColor)
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(m.loadDiffOutput(), tea.RequestBackgroundColor)
 }
 
 // Update handles messages and updates the model.
 func (m *DiffViewer) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			m.isDark = msg.IsDark()
-			m.colors = NewThemeColors(m.isDark)
-			setCachedDarkMode(m.isDark)
-		}
+		m.isDark = msg.IsDark()
+		m.colors = NewThemeColors(m.isDark)
+		setCachedDarkMode(m.isDark)
 		return m, nil
 
 	case tea.KeyMsg:

@@ -7,8 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/sahilm/fuzzy"
-
-	"github.com/dongho-jung/paw/internal/config"
 )
 
 // InputHistoryAction represents the selected action.
@@ -27,7 +25,6 @@ type InputHistoryPicker struct {
 	cursor   int
 	action   InputHistoryAction
 	selected string
-	theme    config.Theme
 	isDark   bool
 	colors   ThemeColors
 	width    int
@@ -37,9 +34,7 @@ type InputHistoryPicker struct {
 // NewInputHistoryPicker creates a new input history picker.
 func NewInputHistoryPicker(history []string) *InputHistoryPicker {
 	// Detect dark mode BEFORE bubbletea starts
-	// Uses config theme setting if available, otherwise auto-detects
-	theme := loadThemeFromConfig()
-	isDark := detectDarkMode(theme)
+	isDark := DetectDarkMode()
 
 	ti := textinput.New()
 	ti.Placeholder = "Type to search history..."
@@ -58,7 +53,6 @@ func NewInputHistoryPicker(history []string) *InputHistoryPicker {
 		history:  history,
 		filtered: filtered,
 		cursor:   0,
-		theme:    theme,
 		isDark:   isDark,
 		colors:   NewThemeColors(isDark),
 		width:    80,
@@ -68,11 +62,7 @@ func NewInputHistoryPicker(history []string) *InputHistoryPicker {
 
 // Init initializes the input history picker.
 func (m *InputHistoryPicker) Init() tea.Cmd {
-	cmds := []tea.Cmd{textinput.Blink}
-	if m.theme == config.ThemeAuto {
-		cmds = append(cmds, tea.RequestBackgroundColor)
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(textinput.Blink, tea.RequestBackgroundColor)
 }
 
 // Update handles messages.
@@ -89,11 +79,9 @@ func (m *InputHistoryPicker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.input.SetWidth(inputWidth)
 		}
 	case tea.BackgroundColorMsg:
-		if m.theme == config.ThemeAuto {
-			m.isDark = msg.IsDark()
-			m.colors = NewThemeColors(m.isDark)
-			setCachedDarkMode(m.isDark)
-		}
+		m.isDark = msg.IsDark()
+		m.colors = NewThemeColors(m.isDark)
+		setCachedDarkMode(m.isDark)
 		return m, nil
 
 	case tea.KeyMsg:
