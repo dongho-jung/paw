@@ -151,6 +151,57 @@ func (m *CommandPalette) updateFiltered() {
 	}
 }
 
+// renderInputWithCursor renders the text input value with a cursor at the correct position.
+// This handles CJK characters correctly by using rune-based cursor positioning.
+func (m *CommandPalette) renderInputWithCursor() string {
+	value := m.input.Value()
+	pos := m.input.Position()
+	runes := []rune(value)
+
+	// If no value, show placeholder with cursor
+	if len(runes) == 0 {
+		cursorStyle := lipgloss.NewStyle().Reverse(true)
+		placeholder := m.input.Placeholder
+		if len(placeholder) > 0 {
+			// Show cursor on first character of placeholder
+			return cursorStyle.Render(string(placeholder[0])) + placeholder[1:]
+		}
+		return cursorStyle.Render(" ")
+	}
+
+	// Clamp position to valid range
+	if pos > len(runes) {
+		pos = len(runes)
+	}
+	if pos < 0 {
+		pos = 0
+	}
+
+	cursorStyle := lipgloss.NewStyle().Reverse(true)
+
+	// Build the string with cursor
+	var sb strings.Builder
+
+	// Text before cursor
+	if pos > 0 {
+		sb.WriteString(string(runes[:pos]))
+	}
+
+	// Cursor character (or space if at end)
+	if pos < len(runes) {
+		sb.WriteString(cursorStyle.Render(string(runes[pos])))
+	} else {
+		sb.WriteString(cursorStyle.Render(" "))
+	}
+
+	// Text after cursor
+	if pos+1 < len(runes) {
+		sb.WriteString(string(runes[pos+1:]))
+	}
+
+	return sb.String()
+}
+
 // View renders the command palette.
 func (m *CommandPalette) View() tea.View {
 	c := m.colors
@@ -192,8 +243,8 @@ func (m *CommandPalette) View() tea.View {
 	sb.WriteString(titleStyle.Render("Command Palette"))
 	sb.WriteString("\n\n")
 
-	// Input
-	sb.WriteString(inputStyle.Render(m.input.View()))
+	// Input - use custom rendering for proper Korean/CJK cursor positioning
+	sb.WriteString(inputStyle.Render(m.renderInputWithCursor()))
 	sb.WriteString("\n\n")
 
 	// Filtered commands

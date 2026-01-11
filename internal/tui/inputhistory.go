@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/v2/textinput"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
+	rw "github.com/mattn/go-runewidth"
 	"github.com/sahilm/fuzzy"
 )
 
@@ -219,8 +220,8 @@ func (m *InputHistoryPicker) View() tea.View {
 	sb.WriteString(titleStyle.Render("Task History"))
 	sb.WriteString("\n\n")
 
-	// Input
-	sb.WriteString(inputStyle.Render(m.input.View()))
+	// Input - use custom rendering for proper Korean/CJK cursor positioning
+	sb.WriteString(inputStyle.Render(m.renderInputWithCursor()))
 	sb.WriteString("\n\n")
 
 	// Calculate available height for list
@@ -308,15 +309,78 @@ func (m *InputHistoryPicker) View() tea.View {
 	return v
 }
 
-// truncateWithEllipsis truncates a string to maxLen and adds ellipsis if needed.
+// renderInputWithCursor renders the text input value with a cursor at the correct position.
+// This handles CJK characters correctly by using runewidth for cursor positioning.
+func (m *InputHistoryPicker) renderInputWithCursor() string {
+	value := m.input.Value()
+	pos := m.input.Position()
+	runes := []rune(value)
+
+	// If no value, show placeholder with cursor
+	if len(runes) == 0 {
+		cursorStyle := lipgloss.NewStyle().Reverse(true)
+		placeholder := m.input.Placeholder
+		if len(placeholder) > 0 {
+			// Show cursor on first character of placeholder
+			return cursorStyle.Render(string(placeholder[0])) + placeholder[1:]
+		}
+		return cursorStyle.Render(" ")
+	}
+
+	// Clamp position to valid range
+	if pos > len(runes) {
+		pos = len(runes)
+	}
+	if pos < 0 {
+		pos = 0
+	}
+
+	cursorStyle := lipgloss.NewStyle().Reverse(true)
+
+	// Build the string with cursor
+	var sb strings.Builder
+
+	// Text before cursor
+	if pos > 0 {
+		sb.WriteString(string(runes[:pos]))
+	}
+
+	// Cursor character (or space if at end)
+	if pos < len(runes) {
+		sb.WriteString(cursorStyle.Render(string(runes[pos])))
+	} else {
+		sb.WriteString(cursorStyle.Render(" "))
+	}
+
+	// Text after cursor
+	if pos+1 < len(runes) {
+		sb.WriteString(string(runes[pos+1:]))
+	}
+
+	return sb.String()
+}
+
+// truncateWithEllipsis truncates a string to maxLen display width and adds ellipsis if needed.
+// It uses runewidth to correctly handle CJK characters (which are 2 cells wide).
 func truncateWithEllipsis(s string, maxLen int) string {
 	if maxLen <= 3 {
 		return s
 	}
-	if len(s) <= maxLen {
+	if rw.StringWidth(s) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+
+	// Truncate to fit maxLen-3 (leaving room for "...")
+	runes := []rune(s)
+	width := 0
+	for i, r := range runes {
+		charWidth := rw.RuneWidth(r)
+		if width+charWidth > maxLen-3 {
+			return string(runes[:i]) + "..."
+		}
+		width += charWidth
+	}
+	return s
 }
 
 // Result returns the selected content and action.
