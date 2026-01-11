@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dongho-jung/paw/internal/task"
@@ -482,6 +484,220 @@ func TestIsUIDecoration(t *testing.T) {
 			got := isUIDecoration(tt.line)
 			if got != tt.want {
 				t.Fatalf("isUIDecoration(%q) = %v, want %v", tt.line, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadAndClearStatusSignal(t *testing.T) {
+	tests := []struct {
+		name       string
+		content    string
+		wantStatus string
+		wantExists bool // whether file should exist after call
+	}{
+		{
+			name:       "valid done status",
+			content:    "done",
+			wantStatus: "done",
+			wantExists: false,
+		},
+		{
+			name:       "valid waiting status",
+			content:    "waiting",
+			wantStatus: "waiting",
+			wantExists: false,
+		},
+		{
+			name:       "valid working status",
+			content:    "working",
+			wantStatus: "working",
+			wantExists: false,
+		},
+		{
+			name:       "status with whitespace",
+			content:    "  done  \n",
+			wantStatus: "done",
+			wantExists: false,
+		},
+		{
+			name:       "invalid status",
+			content:    "invalid",
+			wantStatus: "",
+			wantExists: false,
+		},
+		{
+			name:       "empty file",
+			content:    "",
+			wantStatus: "",
+			wantExists: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temp file
+			tmpDir := t.TempDir()
+			signalPath := filepath.Join(tmpDir, ".status-signal")
+
+			if err := os.WriteFile(signalPath, []byte(tt.content), 0644); err != nil {
+				t.Fatalf("failed to write test file: %v", err)
+			}
+
+			got := readAndClearStatusSignal(signalPath)
+
+			if string(got) != tt.wantStatus {
+				t.Errorf("readAndClearStatusSignal() = %q, want %q", got, tt.wantStatus)
+			}
+
+			// Check if file was deleted
+			_, err := os.Stat(signalPath)
+			fileExists := !os.IsNotExist(err)
+			if fileExists != tt.wantExists {
+				t.Errorf("file exists = %v, want %v", fileExists, tt.wantExists)
+			}
+		})
+	}
+
+	// Test non-existent file
+	t.Run("non-existent file", func(t *testing.T) {
+		got := readAndClearStatusSignal("/non/existent/path/.status-signal")
+		if got != "" {
+			t.Errorf("readAndClearStatusSignal() = %q, want empty string", got)
+		}
+	})
+}
+
+func TestIsIdlePromptPattern(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    bool
+	}{
+		{
+			name: "thinking completed with empty prompt",
+			content: `⏺ Working on something...
+✻ Brewed for 34s
+─────────────────────────────────────────
+❯
+`,
+			want: true,
+		},
+		{
+			name: "cogitated with empty prompt",
+			content: `⏺ Working on something...
+✻ Cogitated for 37s
+─────────────────────────────────────────
+❯
+`,
+			want: true,
+		},
+		{
+			name: "empty prompt with status line",
+			content: `⏺ Done with response
+─────────────────────────────────────────
+❯
+─────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+`,
+			want: true,
+		},
+		{
+			name: "bypass permissions status line with prompt",
+			content: `Some output
+❯
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+`,
+			want: true,
+		},
+		{
+			name: "shift+tab to cycle status line with prompt",
+			content: `Some output
+>
+  shift+tab to cycle
+`,
+			want: true,
+		},
+		{
+			name: "active tool call - not idle",
+			content: `⏺ Read(file.go)
+  Reading 100 lines...
+`,
+			want: false,
+		},
+		{
+			name: "in progress response - not idle",
+			content: `⏺ Working on the task
+Let me analyze this...
+`,
+			want: false,
+		},
+		{
+			name: "thinking in progress - not idle",
+			content: `⏺ Working on task
+✻ Brewing...
+`,
+			want: false,
+		},
+		{
+			name: "empty content",
+			content: "",
+			want:    false,
+		},
+		{
+			name: "single line content",
+			content: "Just one line",
+			want:    false,
+		},
+		{
+			name: "prompt without status line - not enough signal",
+			content: `Some output here
+❯
+`,
+			want: false,
+		},
+		{
+			name: "real example from task",
+			content: `✻ Brewed for 34s
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+`,
+			want: true,
+		},
+		{
+			name: "real example without marker - should be detected",
+			content: `  8/10 - 이대로 써도 충분히 좋음.
+
+✻ Cogitated for 37s
+
+❯ ultrathink 근데...
+
+⏺ Read(~/projects/paw/Makefile)
+  ⎿  Read 176 lines
+
+⏺ 현재 지원되는 설치 방법
+  macOS
+  brew install dongho-jung/tap/paw
+
+✻ Brewed for 34s
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+`,
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isIdlePromptPattern(tt.content)
+			if got != tt.want {
+				t.Fatalf("isIdlePromptPattern() = %v, want %v", got, tt.want)
 			}
 		})
 	}

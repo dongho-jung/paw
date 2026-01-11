@@ -224,22 +224,6 @@ func sendOSC9(message string, inTmux bool) {
 	writeOSC(osc, inTmux)
 }
 
-// sendOSC99 sends basic Kitty-style notification (legacy function for compatibility).
-// Format: ESC ] 99 ; i=id:d=done:p=urgency ; body BEL
-// Supported by: Kitty
-// See: https://sw.kovidgoyal.net/kitty/desktop-notifications/
-func sendOSC99(title, message string, inTmux bool) {
-	body := title
-	if message != "" && message != title {
-		body = title + ": " + message
-	}
-	// i=1: notification id (for updates/close)
-	// d=0: notification is not done (show it)
-	// p=2: high urgency
-	osc := fmt.Sprintf("%s]99;i=1:d=0:p=2;%s%s", ESC, body, BEL)
-	writeOSC(osc, inTmux)
-}
-
 // sendOSC99Enhanced sends Kitty-style notification with full options.
 // Format: ESC ] 99 ; metadata ; payload <terminator>
 // Metadata keys:

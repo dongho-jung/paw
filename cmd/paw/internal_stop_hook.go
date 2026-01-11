@@ -125,7 +125,31 @@ var stopHookCmd = &cobra.Command{
 
 		paneContent = tailString(paneContent, constants.SummaryMaxLen)
 
-		// Check for explicit markers first (fast path)
+		// Check status signal file first (highest priority - Claude writes directly)
+		// This is more reliable than terminal parsing since it's a direct file write.
+		pawDir := os.Getenv("PAW_DIR")
+		if pawDir != "" {
+			signalPath := filepath.Join(pawDir, "agents", taskName, constants.StatusSignalFileName)
+			if signalStatus := readAndClearStatusSignal(signalPath); signalStatus != "" {
+				logging.Info("stopHookCmd: task=%s detected=status_signal status=%s", taskName, signalStatus)
+				stopHookTrace("Status signal file detected: %s", signalStatus)
+
+				newName := windowNameForStatus(taskName, signalStatus)
+				stopHookTrace("Renaming window from status signal task=%s windowID=%s to status=%s", taskName, windowID, signalStatus)
+
+				if err := renameWindowCmd.RunE(renameWindowCmd, []string{windowID, newName}); err != nil {
+					logging.Warn("stopHookCmd: failed to rename window: %v", err)
+					stopHookTrace("Rename FAILED task=%s error=%v", taskName, err)
+					return nil
+				}
+
+				logging.Info("stopHookCmd: task=%s status_changed_to=%s window=%s (via signal file)", taskName, signalStatus, newName)
+				stopHookTrace("STATUS UPDATE SUCCESS (signal) task=%s status=%s", taskName, signalStatus)
+				return nil
+			}
+		}
+
+		// Check for explicit markers in terminal (fast path)
 		// IMPORTANT: Waiting markers take priority over done markers because they indicate
 		// user action is needed NOW. This handles the case where:
 		// - Task outputs PAW_DONE (Done state)
@@ -136,21 +160,22 @@ var stopHookCmd = &cobra.Command{
 		if hasWaitingMarker(paneContent) {
 			// Detect PAW_WAITING marker directly in stop hook
 			// This is more reliable than watch-wait's distance-limited detection
-			logging.Debug("stopHookCmd: PAW_WAITING marker detected")
+			logging.Info("stopHookCmd: task=%s detected=PAW_WAITING_marker", taskName)
 			status = task.StatusWaiting
 			stopHookTrace("PAW_WAITING marker detected for task=%s", taskName)
 		} else if hasAskUserQuestionInLastSegment(paneContent) {
 			// AskUserQuestion without PAW_WAITING marker
 			// Set to WAITING directly since watch-wait may not detect the UI
-			logging.Debug("stopHookCmd: AskUserQuestion detected in last segment")
+			logging.Info("stopHookCmd: task=%s detected=AskUserQuestion", taskName)
 			status = task.StatusWaiting
 			stopHookTrace("AskUserQuestion detected for task=%s", taskName)
 		} else if hasDoneMarker(paneContent) {
-			logging.Debug("stopHookCmd: PAW_DONE marker detected")
+			logging.Info("stopHookCmd: task=%s detected=PAW_DONE_marker", taskName)
 			status = task.StatusDone
 			stopHookTrace("PAW_DONE marker detected for task=%s", taskName)
 		} else {
 			// Fallback to Claude classification with progressive model escalation
+			logging.Info("stopHookCmd: task=%s no_marker_found, starting_classification", taskName)
 			stopHookTrace("Calling Claude for classification task=%s content_len=%d (will try haiku→sonnet→opus→opus+thinking)", taskName, len(paneContent))
 
 			var err error
@@ -173,8 +198,9 @@ var stopHookCmd = &cobra.Command{
 			return nil
 		}
 
+		// L2 logging for all status changes
+		logging.Info("stopHookCmd: task=%s status_changed_to=%s window=%s", taskName, status, newName)
 		stopHookTrace("STATUS UPDATE SUCCESS task=%s status=%s newName=%s", taskName, status, newName)
-		logging.Debug("stopHookCmd: status updated to %s", status)
 		return nil
 	},
 }
@@ -188,15 +214,37 @@ func classifyStopStatus(taskName, paneContent string) (task.Status, error) {
 	//
 	// NOTE: WARNING status has been removed from UI. Error states now map to WAITING
 	// to indicate user attention is needed.
-	prompt := fmt.Sprintf(`You are classifying the current state of a coding task.
 
-Return exactly one label: WORKING or DONE.
+	// Fast path: Check for obvious idle prompt patterns before calling Claude
+	if isIdlePromptPattern(paneContent) {
+		logging.Info("classifyStopStatus: idle prompt pattern detected, status=DONE")
+		stopHookTrace("Idle prompt pattern detected - skipping Claude classification")
+		return task.StatusDone, nil
+	}
+
+	prompt := fmt.Sprintf(`You are classifying the current state of a Claude Code CLI session.
+
+Return exactly one label: WORKING or DONE
 
 Definitions:
-- WORKING: actively processing, making tool calls, executing commands, in progress, asking user questions, or encountering errors that need attention.
-- DONE: work completed successfully and ready for review/merge.
+- WORKING: Claude is actively processing - making tool calls, executing commands, writing code, running builds/tests, or in the middle of a response.
+- DONE: Claude has finished responding and is idle. The terminal shows an empty input prompt (❯) waiting for the next user input.
 
-If unsure, return WORKING.
+Key indicators of DONE state:
+- Empty input prompt line (❯ or >) at the end
+- Status line showing "bypass permissions" or permission settings
+- "Brewed for Xs" or "Cogitated for Xs" followed by prompt (thinking completed)
+- Horizontal separator lines (─────) before empty prompt
+- Response text followed by waiting for next input
+
+Key indicators of WORKING state:
+- Active tool calls (⏺ Read, ⏺ Edit, ⏺ Bash, etc.)
+- Build/test output in progress
+- Partial response being streamed
+- Error messages being handled
+
+IMPORTANT: Do NOT return "unsure" or any other value. You MUST choose either WORKING or DONE.
+If the terminal shows an idle prompt waiting for input, return DONE.
 
 Task: %s
 Terminal output (most recent):
@@ -205,6 +253,7 @@ Terminal output (most recent):
 
 	// Progressive model escalation: haiku -> sonnet -> opus -> opus with thinking
 	// This handles cases where the agent forgot to output markers in long responses
+	// If a model returns unparseable output, escalate to the next model instead of giving up
 	attempts := []modelAttempt{
 		{model: "haiku", thinking: false, timeout: constants.ClaudeNameGenTimeout1},
 		{model: "sonnet", thinking: false, timeout: constants.ClaudeNameGenTimeout2},
@@ -231,18 +280,73 @@ Terminal output (most recent):
 
 		status, ok := parseStopHookDecision(output)
 		if !ok {
-			lastErr = fmt.Errorf("unrecognized stop-hook output: %q", output)
-			logging.Debug("classifyStopStatus: attempt %d parse failed: %v", i+1, lastErr)
-			stopHookTrace("Classification attempt %d parse failed: %v", i+1, lastErr)
+			// Instead of giving up, escalate to next model for unparseable output
+			lastErr = fmt.Errorf("unrecognized stop-hook output: %q (escalating to next model)", output)
+			logging.Info("classifyStopStatus: attempt %d unparseable output=%q, escalating", i+1, output)
+			stopHookTrace("Classification attempt %d unparseable: %q (escalating)", i+1, output)
 			continue
 		}
 
+		logging.Info("classifyStopStatus: SUCCESS model=%s status=%s", modelDesc, status)
 		stopHookTrace("Classification SUCCESS at attempt %d: status=%s", i+1, status)
-		logging.Debug("classifyStopStatus: success at attempt %d, status=%s", i+1, status)
 		return status, nil
 	}
 
 	return "", lastErr
+}
+
+// isIdlePromptPattern checks for obvious terminal patterns indicating Claude is idle.
+// This provides a fast path before expensive Claude classification.
+func isIdlePromptPattern(content string) bool {
+	lines := strings.Split(content, "\n")
+	lines = trimTrailingEmptyLines(lines)
+	if len(lines) < 2 {
+		return false
+	}
+
+	// Check the last few lines for idle prompt patterns
+	lastLines := lines
+	if len(lastLines) > 10 {
+		lastLines = lastLines[len(lastLines)-10:]
+	}
+
+	hasEmptyPrompt := false
+	hasStatusLine := false
+	hasThinkingComplete := false
+
+	for _, line := range lastLines {
+		trimmed := strings.TrimSpace(line)
+
+		// Empty prompt line (❯ or > alone, or with just whitespace)
+		if trimmed == "❯" || trimmed == ">" {
+			hasEmptyPrompt = true
+		}
+
+		// Status line patterns
+		if strings.Contains(trimmed, "bypass permissions") ||
+			strings.Contains(trimmed, "shift+tab to cycle") ||
+			strings.HasPrefix(trimmed, "⏵⏵") {
+			hasStatusLine = true
+		}
+
+		// Thinking completed patterns
+		if strings.HasPrefix(trimmed, "✻ Brewed for") ||
+			strings.HasPrefix(trimmed, "✻ Cogitated for") {
+			hasThinkingComplete = true
+		}
+	}
+
+	// Pattern: thinking completed + empty prompt indicates done
+	if hasThinkingComplete && hasEmptyPrompt {
+		return true
+	}
+
+	// Pattern: empty prompt + status line indicates done
+	if hasEmptyPrompt && hasStatusLine {
+		return true
+	}
+
+	return false
 }
 
 func runClaudePromptWithModel(prompt, model string, thinking bool, timeout time.Duration) (string, error) {
@@ -320,6 +424,38 @@ func windowNameForStatus(taskName string, status task.Status) string {
 	}
 
 	return emoji + constants.TruncateForWindowName(taskName)
+}
+
+// readAndClearStatusSignal reads the status signal file and deletes it.
+// This allows Claude to directly signal its status by writing to a file,
+// which is more reliable than parsing terminal output.
+// Returns empty string if file doesn't exist or is invalid.
+func readAndClearStatusSignal(signalPath string) task.Status {
+	data, err := os.ReadFile(signalPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logging.Debug("readAndClearStatusSignal: failed to read %s: %v", signalPath, err)
+		}
+		return ""
+	}
+
+	// Delete the signal file immediately to prevent reuse
+	if err := os.Remove(signalPath); err != nil {
+		logging.Debug("readAndClearStatusSignal: failed to delete %s: %v", signalPath, err)
+	}
+
+	statusStr := strings.TrimSpace(string(data))
+	status := task.Status(statusStr)
+
+	// Validate the status
+	switch status {
+	case task.StatusWorking, task.StatusWaiting, task.StatusDone:
+		logging.Debug("readAndClearStatusSignal: valid status=%s", status)
+		return status
+	default:
+		logging.Debug("readAndClearStatusSignal: invalid status=%q", statusStr)
+		return ""
+	}
 }
 
 func tailString(value string, maxLen int) string {

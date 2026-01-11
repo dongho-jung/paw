@@ -221,6 +221,7 @@ const (
 	BinSymlinkName         = "bin"                // Symlink to current paw binary (updated on attach)
 	VersionFileName        = ".version"           // Stores PAW version for upgrade detection
 	HistorySelectionFile   = ".history-selection" // Temp file for Ctrl+R history selection
+	StatusSignalFileName   = ".status-signal"     // Temp file for Claude to signal status directly
 )
 
 // Tmux related constants

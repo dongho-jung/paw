@@ -163,6 +163,7 @@ paw/                           # This repository
         │   └── window_id      # Tmux window ID (used in cleanup)
         ├── .session-started   # Session marker (for resume on reopen)
         ├── .status            # Task status (working/waiting/done, persisted for resume)
+        ├── .status-signal     # Temp file for Claude to signal status (deleted after read)
         ├── .options.json      # Task options (model, ultrathink, depends_on, pre_worktree_hook)
         └── .pr                # PR number (when created)
 

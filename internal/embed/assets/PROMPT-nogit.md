@@ -51,18 +51,27 @@ Always include a Plan confirmation question for complex tasks, even if no other 
 If the Plan includes options, include them in the same AskUserQuestion call.
 
 **⚠️ Waiting state (CRITICAL):**
-When you ask and wait for a reply, print a line containing exactly `PAW_WAITING` (not a shell command) right before asking to trigger notifications.
-PAW will switch the window state automatically. Do not rename windows manually.
-```text
-PAW_WAITING
+When you ask and wait for a reply, signal the waiting state so PAW can update notifications.
+**Preferred method (file signal):**
+```bash
+echo "waiting" > "$PAW_DIR/agents/$TASK_NAME/.status-signal"
 ```
+**Fallback (terminal marker):** Print `PAW_WAITING` on its own line if file write fails.
 
 **✅ Done state (CRITICAL):**
-When verification succeeds and work is complete, print a line containing exactly `PAW_DONE` to signal task completion.
-This ensures the window status changes to ✅ immediately.
-```text
-PAW_DONE
+When verification succeeds and work is complete, signal the done state.
+**Preferred method (file signal):**
+```bash
+echo "done" > "$PAW_DIR/agents/$TASK_NAME/.status-signal"
 ```
+**Fallback (terminal marker):** Print `PAW_DONE` on its own line if file write fails.
+
+**🚨 Status Signal Best Practices:**
+- **ALWAYS** signal status when your state changes (done, waiting)
+- File signal is more reliable than terminal markers (no parsing needed)
+- Signal file is automatically deleted after PAW reads it
+- If both file signal and terminal marker exist, file signal takes priority
+- Valid status values: `done`, `waiting`, `working`
 
 ---
 
