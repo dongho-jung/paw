@@ -115,8 +115,9 @@ var stopHookCmd = &cobra.Command{
 		}
 
 		// If window is already final and done marker is still valid in last segment, skip
+		// UNLESS there's a waiting marker (which indicates new work started)
 		// This allows re-classification when new work is requested after PAW_DONE
-		if isFinal && hasDoneMarker(paneContent) {
+		if isFinal && hasDoneMarker(paneContent) && !hasWaitingMarker(paneContent) && !hasAskUserQuestionInLastSegment(paneContent) {
 			logging.Debug("stopHookCmd: window already final (%s) with valid done marker, skipping", windowName)
 			stopHookTrace("Skipping: window already final (%s) with valid done marker", windowName)
 			return nil
@@ -125,12 +126,14 @@ var stopHookCmd = &cobra.Command{
 		paneContent = tailString(paneContent, constants.SummaryMaxLen)
 
 		// Check for explicit markers first (fast path)
+		// IMPORTANT: Waiting markers take priority over done markers because they indicate
+		// user action is needed NOW. This handles the case where:
+		// - Task outputs PAW_DONE (Done state)
+		// - User asks new question
+		// - Agent outputs PAW_WAITING
+		// - Old PAW_DONE is still in terminal, but PAW_WAITING should win
 		var status task.Status
-		if hasDoneMarker(paneContent) {
-			logging.Debug("stopHookCmd: PAW_DONE marker detected")
-			status = task.StatusDone
-			stopHookTrace("PAW_DONE marker detected for task=%s", taskName)
-		} else if hasWaitingMarker(paneContent) {
+		if hasWaitingMarker(paneContent) {
 			// Detect PAW_WAITING marker directly in stop hook
 			// This is more reliable than watch-wait's distance-limited detection
 			logging.Debug("stopHookCmd: PAW_WAITING marker detected")
@@ -142,6 +145,10 @@ var stopHookCmd = &cobra.Command{
 			logging.Debug("stopHookCmd: AskUserQuestion detected in last segment")
 			status = task.StatusWaiting
 			stopHookTrace("AskUserQuestion detected for task=%s", taskName)
+		} else if hasDoneMarker(paneContent) {
+			logging.Debug("stopHookCmd: PAW_DONE marker detected")
+			status = task.StatusDone
+			stopHookTrace("PAW_DONE marker detected for task=%s", taskName)
 		} else {
 			// Fallback to Claude classification with progressive model escalation
 			stopHookTrace("Calling Claude for classification task=%s content_len=%d (will try haiku→sonnet→opus→opus+thinking)", taskName, len(paneContent))

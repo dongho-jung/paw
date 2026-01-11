@@ -171,6 +171,16 @@ func TestHasWaitingMarker(t *testing.T) {
 			content: "⏺ First response\nPAW_WAITING\nUI here.\n⏺ New task started\nWorking on the new task...\n",
 			want:    false,
 		},
+		{
+			name:    "waiting after done (new work started)",
+			content: "⏺ First response\nPAW_DONE\nReady.\n⏺ New question response\nPAW_WAITING\n> 1. Option\n",
+			want:    true,
+		},
+		{
+			name:    "waiting after done without segment marker (real bug scenario)",
+			content: "⏺ PAW_DONE\n⏺ New response\n  PAW_WAITING\n☐ Notify\nEnter to select\n",
+			want:    true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -178,6 +188,97 @@ func TestHasWaitingMarker(t *testing.T) {
 			got := hasWaitingMarker(tt.content)
 			if got != tt.want {
 				t.Fatalf("hasWaitingMarker() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestWaitingPriorityOverDone tests that PAW_WAITING takes priority over PAW_DONE
+// when both markers exist. This is the real bug scenario where:
+// 1. Task outputs PAW_DONE (Done state)
+// 2. User asks new question
+// 3. Agent outputs PAW_WAITING (should become Waiting, not stay Done)
+func TestWaitingPriorityOverDone(t *testing.T) {
+	tests := []struct {
+		name          string
+		content       string
+		hasWaiting    bool
+		hasDone       bool
+		hasAskUser    bool
+		expectedPrio  string // "waiting" or "done" or "classify"
+	}{
+		{
+			name:         "only done marker",
+			content:      "⏺ First response\nAll done!\nPAW_DONE\nReady.\n",
+			hasWaiting:   false,
+			hasDone:      true,
+			hasAskUser:   false,
+			expectedPrio: "done",
+		},
+		{
+			name:         "done then waiting (new work)",
+			content:      "⏺ First response\nPAW_DONE\n⏺ New response\nPAW_WAITING\nEnter to select\n",
+			hasWaiting:   true,
+			hasDone:      false, // hasDoneMarker correctly ignores previous segment
+			hasAskUser:   false,
+			expectedPrio: "waiting",
+		},
+		{
+			name:         "done then AskUserQuestion",
+			content:      "⏺ First response\nPAW_DONE\n⏺ New response\nAskUserQuestion:\n  - question: Ready?\n",
+			hasWaiting:   false,
+			hasDone:      false, // hasDoneMarker correctly ignores previous segment
+			hasAskUser:   true,
+			expectedPrio: "waiting",
+		},
+		{
+			// Real bug scenario: agent outputs ⏺ PAW_DONE then user asks question
+			// Without a new ⏺ marker in the new response
+			name:         "done with waiting in same segment (no new segment marker)",
+			content:      "⏺ PAW_DONE\nReady.\n\n...user input...\n  PAW_WAITING\n☐ Question\n",
+			hasWaiting:   true,
+			hasDone:      true, // Both in same segment, both detected
+			hasAskUser:   false,
+			expectedPrio: "waiting", // But waiting should win
+		},
+		{
+			name:         "no markers",
+			content:      "⏺ Response\nWorking on task...\n",
+			hasWaiting:   false,
+			hasDone:      false,
+			hasAskUser:   false,
+			expectedPrio: "classify",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotWaiting := hasWaitingMarker(tt.content)
+			gotDone := hasDoneMarker(tt.content)
+			gotAskUser := hasAskUserQuestionInLastSegment(tt.content)
+
+			if gotWaiting != tt.hasWaiting {
+				t.Errorf("hasWaitingMarker() = %v, want %v", gotWaiting, tt.hasWaiting)
+			}
+			if gotDone != tt.hasDone {
+				t.Errorf("hasDoneMarker() = %v, want %v", gotDone, tt.hasDone)
+			}
+			if gotAskUser != tt.hasAskUser {
+				t.Errorf("hasAskUserQuestionInLastSegment() = %v, want %v", gotAskUser, tt.hasAskUser)
+			}
+
+			// Verify priority logic: waiting/ask > done > classify
+			var gotPrio string
+			if gotWaiting || gotAskUser {
+				gotPrio = "waiting"
+			} else if gotDone {
+				gotPrio = "done"
+			} else {
+				gotPrio = "classify"
+			}
+
+			if gotPrio != tt.expectedPrio {
+				t.Errorf("priority = %v, want %v", gotPrio, tt.expectedPrio)
 			}
 		})
 	}
