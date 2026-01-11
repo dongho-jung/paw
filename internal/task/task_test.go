@@ -507,8 +507,8 @@ func TestTransitionStatus(t *testing.T) {
 	if prev != StatusDone {
 		t.Fatalf("Expected previous status done, got %s", prev)
 	}
-	if valid {
-		t.Fatalf("Expected invalid transition done->working")
+	if !valid {
+		t.Fatalf("Expected valid transition done->working (allows resuming completed tasks)")
 	}
 }
 

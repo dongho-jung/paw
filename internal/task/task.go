@@ -48,7 +48,8 @@ var statusTransitions = map[Status]map[Status]bool{
 		StatusWorking:   true,
 	},
 	StatusDone: {
-		StatusDone: true,
+		StatusDone:    true,
+		StatusWorking: true, // Allow resuming work on a completed task
 	},
 }
 
