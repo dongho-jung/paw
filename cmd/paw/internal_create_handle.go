@@ -298,13 +298,13 @@ exec "%s" internal end-task "%s" "%s"
 		logging.Trace("handleTaskCmd: playing SoundTaskCreated for task=%s", taskName)
 		notify.PlaySound(notify.SoundTaskCreated)
 		if isReopen {
-			notify.SendAll(appCtx.Config.Notifications, "Session resumed", fmt.Sprintf("🔄 %s resumed", taskName))
+			_ = notify.Send("Session resumed", fmt.Sprintf("🔄 %s resumed", taskName))
 			logging.Trace("handleTaskCmd: displaying session resumed message for task=%s", taskName)
 			if err := tm.DisplayMessage(fmt.Sprintf("🔄 Session resumed: %s", taskName), 2000); err != nil {
 				logging.Trace("Failed to display message: %v", err)
 			}
 		} else {
-			notify.SendAll(appCtx.Config.Notifications, "Task started", fmt.Sprintf("🤖 %s started", taskName))
+			_ = notify.Send("Task started", fmt.Sprintf("🤖 %s started", taskName))
 			logging.Trace("handleTaskCmd: displaying task started message for task=%s", taskName)
 			if err := tm.DisplayMessage(fmt.Sprintf("🤖 Task started: %s", taskName), 2000); err != nil {
 				logging.Trace("Failed to display message: %v", err)

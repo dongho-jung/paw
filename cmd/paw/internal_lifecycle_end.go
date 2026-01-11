@@ -195,8 +195,8 @@ var endTaskCmd = &cobra.Command{
 		// Notify user that task completed successfully
 		logging.Trace("endTaskCmd: playing SoundTaskCompleted for task=%s", targetTask.Name)
 		notify.PlaySound(notify.SoundTaskCompleted)
-		// Send to all configured notification channels (macOS, Slack, ntfy)
-		notify.SendAll(appCtx.Config.Notifications, "Task completed", fmt.Sprintf("✅ %s completed successfully", targetTask.Name))
+		// Send desktop notification
+		_ = notify.Send("Task completed", fmt.Sprintf("✅ %s completed successfully", targetTask.Name))
 		logging.Trace("endTaskCmd: displaying completion message for task=%s", targetTask.Name)
 		if err := tm.DisplayMessage(fmt.Sprintf("✅ Task completed: %s", targetTask.Name), 2000); err != nil {
 			logging.Trace("Failed to display message: %v", err)
@@ -640,7 +640,7 @@ func handleMergeFailure(appCtx *app.App, targetTask *task.Task, windowID string,
 	}
 	logging.Trace("endTaskCmd: playing SoundError for merge failure task=%s", targetTask.Name)
 	notify.PlaySound(notify.SoundError)
-	notify.SendAll(appCtx.Config.Notifications, "Merge failed", fmt.Sprintf("⚠️ %s - manual resolution needed", targetTask.Name))
+	_ = notify.Send("Merge failed", fmt.Sprintf("⚠️ %s - manual resolution needed", targetTask.Name))
 	logging.Trace("endTaskCmd: displaying merge failure message for task=%s", targetTask.Name)
 	if err := tm.DisplayMessage(fmt.Sprintf("⚠️ Merge failed: %s - manual resolution needed", targetTask.Name), 3000); err != nil {
 		logging.Trace("Failed to display message: %v", err)

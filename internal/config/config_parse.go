@@ -34,12 +34,6 @@ func parseConfig(content string) (*Config, error) {
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
 
-		// Check for nested block (notifications:)
-		if key == "notifications" && value == "" {
-			cfg.Notifications = parseNotificationsBlock(lines, &i)
-			continue
-		}
-
 		// Check for nested block (inherit:)
 		if key == "inherit" && value == "" {
 			cfg.Inherit = parseInheritBlock(lines, &i)
@@ -117,158 +111,6 @@ func parseConfig(content string) (*Config, error) {
 	return cfg, nil
 }
 
-// parseNotificationsBlock parses the notifications configuration block.
-func parseNotificationsBlock(lines []string, i *int) *NotificationsConfig {
-	*i++ // Move past "notifications:" line
-	notifications := &NotificationsConfig{}
-
-	for *i < len(lines) {
-		line := lines[*i]
-
-		// Check if we're still in the notifications block (indented)
-		if len(line) == 0 {
-			*i++
-			continue
-		}
-		if line[0] != ' ' && line[0] != '\t' {
-			// Non-indented line, end of notifications block
-			break
-		}
-
-		trimmed := strings.TrimSpace(line)
-
-		// Skip empty lines and comments
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			*i++
-			continue
-		}
-
-		parts := strings.SplitN(trimmed, ":", 2)
-		if len(parts) != 2 {
-			*i++
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		switch key {
-		case "slack":
-			if value == "" {
-				notifications.Slack = parseSlackBlock(lines, i)
-			}
-		case "ntfy":
-			if value == "" {
-				notifications.Ntfy = parseNtfyBlock(lines, i)
-			}
-		default:
-			*i++
-		}
-	}
-
-	return notifications
-}
-
-// parseSlackBlock parses the slack configuration block.
-func parseSlackBlock(lines []string, i *int) *SlackConfig {
-	*i++ // Move past "slack:" line
-	slack := &SlackConfig{}
-	baseIndent := getIndentLevel(lines, *i-1)
-
-	for *i < len(lines) {
-		line := lines[*i]
-
-		// Check if we're still in the slack block (more indented than parent)
-		if len(line) == 0 {
-			*i++
-			continue
-		}
-
-		currentIndent := countLeadingSpaces(line)
-		if currentIndent <= baseIndent && strings.TrimSpace(line) != "" {
-			// Less or equal indent, end of slack block
-			break
-		}
-
-		trimmed := strings.TrimSpace(line)
-
-		// Skip empty lines and comments
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			*i++
-			continue
-		}
-
-		parts := strings.SplitN(trimmed, ":", 2)
-		if len(parts) != 2 {
-			*i++
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		switch key {
-		case "webhook":
-			slack.Webhook = value
-		}
-
-		*i++
-	}
-
-	return slack
-}
-
-// parseNtfyBlock parses the ntfy configuration block.
-func parseNtfyBlock(lines []string, i *int) *NtfyConfig {
-	*i++ // Move past "ntfy:" line
-	ntfy := &NtfyConfig{}
-	baseIndent := getIndentLevel(lines, *i-1)
-
-	for *i < len(lines) {
-		line := lines[*i]
-
-		// Check if we're still in the ntfy block (more indented than parent)
-		if len(line) == 0 {
-			*i++
-			continue
-		}
-
-		currentIndent := countLeadingSpaces(line)
-		if currentIndent <= baseIndent && strings.TrimSpace(line) != "" {
-			// Less or equal indent, end of ntfy block
-			break
-		}
-
-		trimmed := strings.TrimSpace(line)
-
-		// Skip empty lines and comments
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			*i++
-			continue
-		}
-
-		parts := strings.SplitN(trimmed, ":", 2)
-		if len(parts) != 2 {
-			*i++
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		switch key {
-		case "topic":
-			ntfy.Topic = value
-		case "server":
-			ntfy.Server = value
-		}
-
-		*i++
-	}
-
-	return ntfy
-}
-
 // parseInheritBlock parses the inherit configuration block.
 func parseInheritBlock(lines []string, i *int) *InheritConfig {
 	*i++ // Move past "inherit:" line
@@ -321,8 +163,6 @@ func parseInheritBlock(lines []string, i *int) *InheritConfig {
 			inherit.LogMaxSizeMB = boolVal
 		case "log_max_backups":
 			inherit.LogMaxBackups = boolVal
-		case "notifications":
-			inherit.Notifications = boolVal
 		case "self_improve":
 			inherit.SelfImprove = boolVal
 		}
@@ -377,41 +217,6 @@ func formatHook(key, hook string) string {
 	return fmt.Sprintf("%s: %s\n", key, hook)
 }
 
-// formatNotificationsBlock formats the notifications configuration block for saving.
-func formatNotificationsBlock(notifications *NotificationsConfig) string {
-	if notifications == nil {
-		return ""
-	}
-
-	// Check if there's anything to write
-	hasSlack := notifications.Slack != nil && notifications.Slack.Webhook != ""
-	hasNtfy := notifications.Ntfy != nil && (notifications.Ntfy.Topic != "" || notifications.Ntfy.Server != "")
-	if !hasSlack && !hasNtfy {
-		return ""
-	}
-
-	var sb strings.Builder
-	sb.WriteString("\n# Notification settings\n")
-	sb.WriteString("notifications:\n")
-
-	if hasSlack {
-		sb.WriteString("  slack:\n")
-		sb.WriteString(fmt.Sprintf("    webhook: %s\n", notifications.Slack.Webhook))
-	}
-
-	if hasNtfy {
-		sb.WriteString("  ntfy:\n")
-		if notifications.Ntfy.Topic != "" {
-			sb.WriteString(fmt.Sprintf("    topic: %s\n", notifications.Ntfy.Topic))
-		}
-		if notifications.Ntfy.Server != "" {
-			sb.WriteString(fmt.Sprintf("    server: %s\n", notifications.Ntfy.Server))
-		}
-	}
-
-	return sb.String()
-}
-
 // formatInheritBlock formats the inherit configuration block for saving.
 func formatInheritBlock(inherit *InheritConfig) string {
 	if inherit == nil {
@@ -428,7 +233,6 @@ func formatInheritBlock(inherit *InheritConfig) string {
 	sb.WriteString(fmt.Sprintf("  log_format: %t\n", inherit.LogFormat))
 	sb.WriteString(fmt.Sprintf("  log_max_size_mb: %t\n", inherit.LogMaxSizeMB))
 	sb.WriteString(fmt.Sprintf("  log_max_backups: %t\n", inherit.LogMaxBackups))
-	sb.WriteString(fmt.Sprintf("  notifications: %t\n", inherit.Notifications))
 	sb.WriteString(fmt.Sprintf("  self_improve: %t\n", inherit.SelfImprove))
 	return sb.String()
 }

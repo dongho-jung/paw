@@ -209,7 +209,7 @@ exec claude --continue --dangerously-skip-permissions
 
 		// Notify user
 		notify.PlaySound(notify.SoundTaskCreated)
-		notify.SendAll(appCtx.Config.Notifications, "Session resumed", fmt.Sprintf("🔄 %s resumed", taskName))
+		_ = notify.Send("Session resumed", fmt.Sprintf("🔄 %s resumed", taskName))
 		if err := tm.DisplayMessage(fmt.Sprintf("🔄 Session resumed: %s", taskName), 2000); err != nil {
 			logging.Trace("Failed to display message: %v", err)
 		}

@@ -73,7 +73,7 @@ go tool cover -html=coverage.out -o coverage.html
 | internal/embed | 75.0% | Embedded asset loading |
 | internal/git | 46.7% | Git operations tested with isolated repos |
 | internal/service | 33.5% | History and task discovery services |
-| internal/notify | 32.1% | Slack/ntfy helpers covered; macOS paths limited |
+| internal/notify | 32.1% | macOS desktop notification helpers |
 | internal/claude | 31.3% | CLI client command construction tested |
 | internal/task | 24.5% | Manager logic partially covered |
 | internal/tui | 10.7% | Interactive UI components partially tested |
@@ -278,45 +278,18 @@ PAW uses a 6-level logging system (L0-L5):
 
 ## Notifications
 
-PAW uses multiple notification channels to alert users:
+PAW uses desktop notifications and sounds to alert users:
 
-| Event                    | Sound       | Desktop Notification | Slack/ntfy | Statusline Message |
-|--------------------------|-------------|----------------------|------------|-------------------|
-| Task created             | Glass       | Yes                  | Yes        | `🤖 Task started: {name}` |
-| Task completed           | Hero        | Yes                  | Yes        | `✅ Task completed: {name}` |
-| User input needed        | Funk        | Yes (with actions)   | Yes        | `💬 {name} needs input` |
-| Cancel pending (⌃K)      | Tink        | -                    | -          | -                 |
-| Error (merge failed etc) | Basso       | Yes                  | Yes        | `⚠️ Merge failed: {name} - manual resolution needed` |
+| Event                    | Sound       | Desktop Notification | Statusline Message |
+|--------------------------|-------------|----------------------|-------------------|
+| Task created             | Glass       | Yes                  | `🤖 Task started: {name}` |
+| Task completed           | Hero        | Yes                  | `✅ Task completed: {name}` |
+| User input needed        | Funk        | Yes (with actions)   | `💬 {name} needs input` |
+| Cancel pending (⌃K)      | Tink        | -                    | -                 |
+| Error (merge failed etc) | Basso       | Yes                  | `⚠️ Merge failed: {name} - manual resolution needed` |
 
 - Sounds use macOS system sounds (`/System/Library/Sounds/`)
 - Statusline messages display via `tmux display-message -d 2000`
-
-### External Notification Channels
-
-PAW supports sending notifications to external services in addition to macOS desktop notifications. Configure these in `.paw/config`:
-
-```yaml
-# Slack notifications via incoming webhook
-notifications:
-  slack:
-    webhook: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
-
-# ntfy.sh notifications (or self-hosted ntfy server)
-notifications:
-  ntfy:
-    topic: your-topic-name
-    server: https://ntfy.sh  # Optional, defaults to https://ntfy.sh
-```
-
-**Slack setup**:
-1. Create an [Incoming Webhook](https://api.slack.com/messaging/webhooks) in your Slack workspace
-2. Copy the webhook URL to `.paw/config`
-
-**ntfy setup**:
-1. Choose a topic name (e.g., `paw-notifications`)
-2. Subscribe to the topic in the [ntfy app](https://ntfy.sh/) or web interface
-3. Add the topic to `.paw/config`
-4. (Optional) For self-hosted ntfy, specify the `server` URL
 
 ### Notification Action Buttons
 

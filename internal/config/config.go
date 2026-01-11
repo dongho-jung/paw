@@ -20,7 +20,6 @@ type InheritConfig struct {
 	LogFormat     bool `yaml:"log_format"`
 	LogMaxSizeMB  bool `yaml:"log_max_size_mb"`
 	LogMaxBackups bool `yaml:"log_max_backups"`
-	Notifications bool `yaml:"notifications"`
 	SelfImprove   bool `yaml:"self_improve"`
 }
 
@@ -34,7 +33,6 @@ func DefaultInheritConfig() *InheritConfig {
 		LogFormat:     true,
 		LogMaxSizeMB:  true,
 		LogMaxBackups: true,
-		Notifications: true,
 		SelfImprove:   true,
 	}
 }
@@ -88,38 +86,20 @@ const (
 	OnCompleteAutoPR    OnComplete = "auto-pr"    // Auto commit + create PR
 )
 
-// SlackConfig holds Slack notification settings.
-type SlackConfig struct {
-	Webhook string `yaml:"webhook"` // Slack incoming webhook URL
-}
-
-// NtfyConfig holds ntfy.sh notification settings.
-type NtfyConfig struct {
-	Topic  string `yaml:"topic"`  // ntfy topic name
-	Server string `yaml:"server"` // ntfy server URL (default: https://ntfy.sh)
-}
-
-// NotificationsConfig holds all notification channel settings.
-type NotificationsConfig struct {
-	Slack *SlackConfig `yaml:"slack"`
-	Ntfy  *NtfyConfig  `yaml:"ntfy"`
-}
-
 // Config represents the PAW project configuration.
 type Config struct {
-	WorkMode      WorkMode             `yaml:"work_mode"`
-	OnComplete    OnComplete           `yaml:"on_complete"`
-	Theme         string               `yaml:"theme"` // Theme preset: auto, dark, dark-blue, light, light-blue, etc.
-	WorktreeHook  string               `yaml:"worktree_hook"`
-	PreTaskHook   string               `yaml:"pre_task_hook"`
-	PostTaskHook  string               `yaml:"post_task_hook"`
-	PreMergeHook  string               `yaml:"pre_merge_hook"`
-	PostMergeHook string               `yaml:"post_merge_hook"`
-	Notifications *NotificationsConfig `yaml:"notifications"`
-	LogFormat     string               `yaml:"log_format"`
-	LogMaxSizeMB  int                  `yaml:"log_max_size_mb"`
-	LogMaxBackups int                  `yaml:"log_max_backups"`
-	SelfImprove   bool                 `yaml:"self_improve"`
+	WorkMode      WorkMode   `yaml:"work_mode"`
+	OnComplete    OnComplete `yaml:"on_complete"`
+	Theme         string     `yaml:"theme"` // Theme preset: auto, dark, dark-blue, light, light-blue, etc.
+	WorktreeHook  string     `yaml:"worktree_hook"`
+	PreTaskHook   string     `yaml:"pre_task_hook"`
+	PostTaskHook  string     `yaml:"post_task_hook"`
+	PreMergeHook  string     `yaml:"pre_merge_hook"`
+	PostMergeHook string     `yaml:"post_merge_hook"`
+	LogFormat     string     `yaml:"log_format"`
+	LogMaxSizeMB  int        `yaml:"log_max_size_mb"`
+	LogMaxBackups int        `yaml:"log_max_backups"`
+	SelfImprove   bool       `yaml:"self_improve"`
 
 	// Inherit specifies which fields inherit from global config.
 	// Only used in project-level config files.
@@ -217,9 +197,6 @@ func (c *Config) MergeWithGlobal(global *Config) {
 	if c.Inherit.LogMaxBackups {
 		c.LogMaxBackups = global.LogMaxBackups
 	}
-	if c.Inherit.Notifications && global.Notifications != nil {
-		c.Notifications = global.Notifications
-	}
 	if c.Inherit.SelfImprove {
 		c.SelfImprove = global.SelfImprove
 	}
@@ -231,18 +208,6 @@ func (c *Config) Clone() *Config {
 		return nil
 	}
 	clone := *c
-	if c.Notifications != nil {
-		notif := *c.Notifications
-		if c.Notifications.Slack != nil {
-			slack := *c.Notifications.Slack
-			notif.Slack = &slack
-		}
-		if c.Notifications.Ntfy != nil {
-			ntfy := *c.Notifications.Ntfy
-			notif.Ntfy = &ntfy
-		}
-		clone.Notifications = &notif
-	}
 	if c.Inherit != nil {
 		inherit := *c.Inherit
 		clone.Inherit = &inherit
@@ -348,11 +313,6 @@ self_improve: %t
 	}
 	if c.PostMergeHook != "" {
 		content += formatHook("post_merge_hook", c.PostMergeHook)
-	}
-
-	// Add notifications block if set
-	if c.Notifications != nil {
-		content += formatNotificationsBlock(c.Notifications)
 	}
 
 	// Add inherit block if set (project config only)

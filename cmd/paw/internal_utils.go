@@ -240,18 +240,9 @@ func renameWindowWithStatus(tm tmux.Client, windowID, name, pawDir, taskName, so
 	// NOTE: WAITING state is handled by watch-wait watcher (wait.go) which provides
 	// action buttons and prompt context. Warning states now also display as WAITING.
 	if prevStatus != status && status == task.StatusDone {
-		// Load config to get notification settings
-		var notificationsConfig *config.NotificationsConfig
-		sessionName := os.Getenv("SESSION_NAME")
-		if sessionName != "" {
-			if appCtx, err := getAppFromSession(sessionName); err == nil && appCtx.Config != nil {
-				notificationsConfig = appCtx.Config.Notifications
-			}
-		}
-
 		logging.Trace("renameWindowWithStatus: sending done notification for task=%s", taskName)
 		notify.PlaySound(notify.SoundTaskCompleted)
-		notify.SendAll(notificationsConfig, "Task ready", fmt.Sprintf("✅ %s is ready for review", taskName))
+		_ = notify.Send("Task ready", fmt.Sprintf("✅ %s is ready for review", taskName))
 	}
 
 	return nil

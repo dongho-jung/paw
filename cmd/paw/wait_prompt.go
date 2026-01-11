@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dongho-jung/paw/internal/config"
 	"github.com/dongho-jung/paw/internal/logging"
 	"github.com/dongho-jung/paw/internal/notify"
 	"github.com/dongho-jung/paw/internal/tmux"
@@ -204,25 +203,25 @@ func isUIHintLine(line string) bool {
 	return false
 }
 
-func notifyWaiting(notifications *config.NotificationsConfig, taskName, reason string) {
+func notifyWaiting(taskName, reason string) {
 	logging.Debug("-> notifyWaiting(task=%s, reason=%s)", taskName, reason)
 	defer logging.Debug("<- notifyWaiting")
 
 	title := taskName
 	message := "Waiting for your response"
 	logging.Trace("notifyWaiting: sending notifications title=%s", title)
-	// Send to all configured channels (macOS, Slack, ntfy)
-	notify.SendAll(notifications, title, message)
+	// Send desktop notification
+	_ = notify.Send(title, message)
 	// Play sound to alert user
 	logging.Trace("notifyWaiting: playing SoundNeedInput")
 	notify.PlaySound(notify.SoundNeedInput)
 }
 
-func notifyWaitingWithDisplay(tm tmux.Client, notifications *config.NotificationsConfig, taskName, reason string) {
+func notifyWaitingWithDisplay(tm tmux.Client, taskName, reason string) {
 	logging.Debug("-> notifyWaitingWithDisplay(task=%s, reason=%s)", taskName, reason)
 	defer logging.Debug("<- notifyWaitingWithDisplay")
 
-	notifyWaiting(notifications, taskName, reason)
+	notifyWaiting(taskName, reason)
 	// Show message in tmux status bar
 	displayMsg := fmt.Sprintf("💬 %s needs input", taskName)
 	if reason != "" && reason != "window" && reason != "marker" {
@@ -248,7 +247,7 @@ func sendAgentResponse(tm tmux.Client, paneID, response string) error {
 // for simple prompts (2-5 options). Returns the selected option or empty string
 // if notification was not shown or user didn't select an action.
 // Always sends a notification: either with action buttons (2-5 options) or a simple one (fallback).
-func tryNotificationAction(notifications *config.NotificationsConfig, taskName string, prompt askPrompt) string {
+func tryNotificationAction(taskName string, prompt askPrompt) string {
 	logging.Debug("-> tryNotificationAction(task=%s, question=%q, options=%v)",
 		taskName, prompt.Question, prompt.Options)
 	defer logging.Debug("<- tryNotificationAction")
@@ -258,7 +257,7 @@ func tryNotificationAction(notifications *config.NotificationsConfig, taskName s
 	if len(prompt.Options) < 2 || len(prompt.Options) > notifyMaxActions {
 		logging.Trace("tryNotificationAction: option count=%d not in range [2,%d], sending simple notification",
 			len(prompt.Options), notifyMaxActions)
-		notifyWaiting(notifications, taskName, prompt.Question)
+		notifyWaiting(taskName, prompt.Question)
 		return ""
 	}
 

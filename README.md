@@ -38,7 +38,6 @@ Each task gets its own git worktree. When done, PAW commits, pushes, and creates
 
 - Desktop notifications when agents need input
 - Action buttons to respond directly from notifications
-- Slack/ntfy integration for mobile alerts
 - Visual status: 🤖 working · 💬 waiting · ✅ done
 
 ### No Lock-in
@@ -211,7 +210,6 @@ log_max_backups: 3
 | `log_format` | `text/jsonl` | Log output format |
 | `log_max_size_mb` | (MB) | Log rotation size (default: 10) |
 | `log_max_backups` | (count) | Log rotation backups (default: 3) |
-| `notifications` | `slack.webhook`, `ntfy.topic`, `ntfy.server` | Optional external alerts via Slack webhook or ntfy.sh |
 
 When `non_git_workspace` is set to `copy`, PAW creates an isolated workspace under `.paw/agents/<task>/worktree`. Changes are not automatically merged back into the project; use hooks or manual copy when needed.
 
@@ -221,7 +219,6 @@ When `non_git_workspace` is set to `copy`, PAW creates an isolated workspace und
 - System prompt: Embedded in binary (copied to `.paw/.claude/` on setup)
 - `.paw/PROMPT.md`: Project-specific prompt (per project)
 - `.paw/memory`: Project memory (YAML, update in place for reusable info)
-- Notifications: Configure optional Slack/ntfy settings in `.paw/config`
 </details>
 
 ## Dependencies
@@ -327,12 +324,9 @@ Press `⌥Tab` to switch between Global and Project views.
 | Key | Description |
 |----|-------------|
 | `⌥Tab` | Switch between Global and Project scope |
-| `Tab` | Switch tab (General / Notifications) |
 | `↑` / `↓` | Navigate fields |
 | `←` / `→` | Change field value |
-| `Space` | Toggle boolean fields |
-| `Enter` | Edit text fields / Save and close |
-| `i` | Toggle inherit from global (project scope only) |
+| `Enter` | Save and close |
 | `⌃S` | Save and close |
 | `Esc` | Cancel |
 </details>

@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dongho-jung/paw/internal/config"
 	"github.com/dongho-jung/paw/internal/logging"
 )
 
@@ -280,39 +279,3 @@ func findNotifyHelper() string {
 	return ""
 }
 
-// SendAll sends a notification to all configured channels.
-// It sends to macOS desktop notification (if on macOS), Slack (if configured),
-// and ntfy (if configured). Errors from individual channels are logged but
-// do not prevent other channels from being notified.
-func SendAll(notifications *config.NotificationsConfig, title, message string) {
-	logging.Debug("-> SendAll(title=%q)", title)
-	defer logging.Debug("<- SendAll")
-
-	// Send macOS desktop notification (non-blocking, errors logged)
-	if err := Send(title, message); err != nil {
-		logging.Warn("SendAll: desktop notification failed: %v", err)
-	}
-
-	// Send to configured external channels
-	if notifications == nil {
-		return
-	}
-
-	// Send to Slack (non-blocking, errors logged)
-	if notifications.Slack != nil {
-		go func() {
-			if err := SendSlack(notifications.Slack, title, message); err != nil {
-				logging.Warn("SendAll: Slack notification failed: %v", err)
-			}
-		}()
-	}
-
-	// Send to ntfy (non-blocking, errors logged)
-	if notifications.Ntfy != nil {
-		go func() {
-			if err := SendNtfy(notifications.Ntfy, title, message); err != nil {
-				logging.Warn("SendAll: ntfy notification failed: %v", err)
-			}
-		}()
-	}
-}

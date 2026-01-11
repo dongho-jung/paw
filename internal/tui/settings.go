@@ -24,10 +24,9 @@ type SettingsTab int
 
 const (
 	SettingsTabGeneral SettingsTab = iota
-	SettingsTabNotifications
 )
 
-const settingsTabCount = 2
+const settingsTabCount = 1
 
 // SettingsField represents the current field being edited.
 type SettingsField int
@@ -41,15 +40,6 @@ const (
 )
 
 const generalFieldCount = 4
-
-// Notifications tab fields
-const (
-	SettingsFieldSlackWebhook SettingsField = iota
-	SettingsFieldNtfyTopic
-	SettingsFieldNtfyServer
-)
-
-const notificationsFieldCount = 3
 
 // SettingsUI provides an interactive settings configuration form.
 type SettingsUI struct {
@@ -78,13 +68,6 @@ type SettingsUI struct {
 	onCompleteIdx  int // 0=inherit, 1=confirm, 2=auto-merge, 3=auto-pr (project scope)
 	themeIdx       int // 0=auto, 1...N=presets (no inherit option)
 	selfImproveIdx int // 0=inherit, 1=on, 2=off (project scope) or 0=on, 1=off (global scope)
-
-	// Text input state for editable fields
-	slackWebhook string
-	ntfyTopic    string
-	ntfyServer   string
-	editingText  bool
-	cursorPos    int
 }
 
 // SettingsResult contains the result of the settings UI.
@@ -207,20 +190,6 @@ func (m *SettingsUI) initFieldIndices() {
 			m.selfImproveIdx = 1 + offset // off
 		}
 	}
-
-	// Initialize text fields
-	m.slackWebhook = ""
-	m.ntfyTopic = ""
-	m.ntfyServer = ""
-	if cfg.Notifications != nil {
-		if cfg.Notifications.Slack != nil {
-			m.slackWebhook = cfg.Notifications.Slack.Webhook
-		}
-		if cfg.Notifications.Ntfy != nil {
-			m.ntfyTopic = cfg.Notifications.Ntfy.Topic
-			m.ntfyServer = cfg.Notifications.Ntfy.Server
-		}
-	}
 }
 
 // getThemeOptions returns the list of available theme options.
@@ -252,11 +221,6 @@ func (m *SettingsUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		// Handle text editing mode
-		if m.editingText {
-			return m.handleTextInput(msg)
-		}
-
 		switch msg.String() {
 		case "esc", "ctrl+c":
 			m.cancelled = true
@@ -264,13 +228,7 @@ func (m *SettingsUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "enter":
-			// If on a text field, enter editing mode
-			if m.isTextField() {
-				m.editingText = true
-				m.cursorPos = len(m.getCurrentTextValue())
-				return m, nil
-			}
-			// Otherwise save and quit
+			// Save and quit
 			m.applyChanges()
 			m.done = true
 			return m, tea.Quit
@@ -319,151 +277,61 @@ func (m *SettingsUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *SettingsUI) handleTextInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		m.editingText = false
-		return m, nil
-	case "enter":
-		m.editingText = false
-		m.setCurrentTextValue(m.getCurrentTextValue())
-		return m, nil
-	case "backspace":
-		val := m.getCurrentTextValue()
-		if m.cursorPos > 0 {
-			val = val[:m.cursorPos-1] + val[m.cursorPos:]
-			m.cursorPos--
-			m.setCurrentTextValue(val)
-		}
-		return m, nil
-	case "delete":
-		val := m.getCurrentTextValue()
-		if m.cursorPos < len(val) {
-			val = val[:m.cursorPos] + val[m.cursorPos+1:]
-			m.setCurrentTextValue(val)
-		}
-		return m, nil
-	case "left":
-		if m.cursorPos > 0 {
-			m.cursorPos--
-		}
-		return m, nil
-	case "right":
-		if m.cursorPos < len(m.getCurrentTextValue()) {
-			m.cursorPos++
-		}
-		return m, nil
-	case "home", "ctrl+a":
-		m.cursorPos = 0
-		return m, nil
-	case "end", "ctrl+e":
-		m.cursorPos = len(m.getCurrentTextValue())
-		return m, nil
-	default:
-		// Insert character
-		if len(msg.String()) == 1 {
-			val := m.getCurrentTextValue()
-			val = val[:m.cursorPos] + msg.String() + val[m.cursorPos:]
-			m.cursorPos++
-			m.setCurrentTextValue(val)
-		}
-		return m, nil
-	}
-}
-
-func (m *SettingsUI) isTextField() bool {
-	return m.tab == SettingsTabNotifications
-}
-
-func (m *SettingsUI) getCurrentTextValue() string {
-	if m.tab == SettingsTabNotifications {
-		switch m.field {
-		case SettingsFieldSlackWebhook:
-			return m.slackWebhook
-		case SettingsFieldNtfyTopic:
-			return m.ntfyTopic
-		case SettingsFieldNtfyServer:
-			return m.ntfyServer
-		}
-	}
-	return ""
-}
-
-func (m *SettingsUI) setCurrentTextValue(val string) {
-	if m.tab == SettingsTabNotifications {
-		switch m.field {
-		case SettingsFieldSlackWebhook:
-			m.slackWebhook = val
-		case SettingsFieldNtfyTopic:
-			m.ntfyTopic = val
-		case SettingsFieldNtfyServer:
-			m.ntfyServer = val
-		}
-	}
-}
-
 func (m *SettingsUI) currentFieldCount() SettingsField {
-	if m.tab == SettingsTabGeneral {
-		return generalFieldCount
-	}
-	return notificationsFieldCount
+	return generalFieldCount
 }
 
 func (m *SettingsUI) handleLeft() {
-	if m.tab == SettingsTabGeneral {
-		switch m.field {
-		case SettingsFieldWorkMode:
-			if m.workModeIdx > 0 {
-				m.workModeIdx--
-			}
-		case SettingsFieldOnComplete:
-			if m.onCompleteIdx > 0 {
-				m.onCompleteIdx--
-			}
-		case SettingsFieldTheme:
-			if m.themeIdx > 0 {
-				m.themeIdx--
-			}
-		case SettingsFieldSelfImprove:
-			if m.selfImproveIdx > 0 {
-				m.selfImproveIdx--
-			}
+	switch m.field {
+	case SettingsFieldWorkMode:
+		if m.workModeIdx > 0 {
+			m.workModeIdx--
+		}
+	case SettingsFieldOnComplete:
+		if m.onCompleteIdx > 0 {
+			m.onCompleteIdx--
+		}
+	case SettingsFieldTheme:
+		if m.themeIdx > 0 {
+			m.themeIdx--
+		}
+	case SettingsFieldSelfImprove:
+		if m.selfImproveIdx > 0 {
+			m.selfImproveIdx--
 		}
 	}
 }
 
 func (m *SettingsUI) handleRight() {
-	if m.tab == SettingsTabGeneral {
-		switch m.field {
-		case SettingsFieldWorkMode:
-			maxIdx := len(config.ValidWorkModes()) - 1
-			if m.scope == SettingsScopeProject {
-				maxIdx++ // +1 for "inherit" option
-			}
-			if m.workModeIdx < maxIdx {
-				m.workModeIdx++
-			}
-		case SettingsFieldOnComplete:
-			maxIdx := len(config.ValidOnCompletes()) - 1
-			if m.scope == SettingsScopeProject {
-				maxIdx++ // +1 for "inherit" option
-			}
-			if m.onCompleteIdx < maxIdx {
-				m.onCompleteIdx++
-			}
-		case SettingsFieldTheme:
-			themeOptions := getThemeOptions()
-			if m.themeIdx < len(themeOptions)-1 {
-				m.themeIdx++
-			}
-		case SettingsFieldSelfImprove:
-			maxIdx := 1 // on=0, off=1
-			if m.scope == SettingsScopeProject {
-				maxIdx = 2 // inherit=0, on=1, off=2
-			}
-			if m.selfImproveIdx < maxIdx {
-				m.selfImproveIdx++
-			}
+	switch m.field {
+	case SettingsFieldWorkMode:
+		maxIdx := len(config.ValidWorkModes()) - 1
+		if m.scope == SettingsScopeProject {
+			maxIdx++ // +1 for "inherit" option
+		}
+		if m.workModeIdx < maxIdx {
+			m.workModeIdx++
+		}
+	case SettingsFieldOnComplete:
+		maxIdx := len(config.ValidOnCompletes()) - 1
+		if m.scope == SettingsScopeProject {
+			maxIdx++ // +1 for "inherit" option
+		}
+		if m.onCompleteIdx < maxIdx {
+			m.onCompleteIdx++
+		}
+	case SettingsFieldTheme:
+		themeOptions := getThemeOptions()
+		if m.themeIdx < len(themeOptions)-1 {
+			m.themeIdx++
+		}
+	case SettingsFieldSelfImprove:
+		maxIdx := 1 // on=0, off=1
+		if m.scope == SettingsScopeProject {
+			maxIdx = 2 // inherit=0, on=1, off=2
+		}
+		if m.selfImproveIdx < maxIdx {
+			m.selfImproveIdx++
 		}
 	}
 }
@@ -533,28 +401,6 @@ func (m *SettingsUI) applyChanges() {
 	} else {
 		// Global scope - no inherit option
 		m.config.SelfImprove = (m.selfImproveIdx == 0) // 0=on, 1=off
-	}
-
-	// Apply notification settings
-	if m.slackWebhook != "" || m.ntfyTopic != "" {
-		if m.config.Notifications == nil {
-			m.config.Notifications = &config.NotificationsConfig{}
-		}
-
-		if m.slackWebhook != "" {
-			if m.config.Notifications.Slack == nil {
-				m.config.Notifications.Slack = &config.SlackConfig{}
-			}
-			m.config.Notifications.Slack.Webhook = m.slackWebhook
-		}
-
-		if m.ntfyTopic != "" {
-			if m.config.Notifications.Ntfy == nil {
-				m.config.Notifications.Ntfy = &config.NtfyConfig{}
-			}
-			m.config.Notifications.Ntfy.Topic = m.ntfyTopic
-			m.config.Notifications.Ntfy.Server = m.ntfyServer
-		}
 	}
 }
 
@@ -628,15 +474,9 @@ func (m *SettingsUI) View() tea.View {
 		Foreground(c.TextDim).
 		MarginTop(1)
 
-	textInputStyle := lipgloss.NewStyle().
-		Foreground(c.TextNormal).
-		Background(c.Background).
-		Padding(0, 1)
-
-	editingTextStyle := lipgloss.NewStyle().
-		Foreground(c.Accent).
-		Background(c.Background).
-		Padding(0, 1)
+	// Use _ to suppress unused warnings
+	_ = tabStyle
+	_ = activeTabStyle
 
 	var sb strings.Builder
 
@@ -648,16 +488,6 @@ func (m *SettingsUI) View() tea.View {
 	sb.WriteString(titleStyle.Render("⚙ Settings " + scopeText))
 	sb.WriteString("\n\n")
 
-	// Tabs
-	tabs := []string{"General", "Notifications"}
-	for i, tab := range tabs {
-		if SettingsTab(i) == m.tab {
-			sb.WriteString(activeTabStyle.Render(tab))
-		} else {
-			sb.WriteString(tabStyle.Render(tab))
-		}
-	}
-	sb.WriteString("\n")
 	separatorWidth := m.width - 4 // account for margins
 	if separatorWidth < 40 {
 		separatorWidth = 40
@@ -665,21 +495,12 @@ func (m *SettingsUI) View() tea.View {
 	sb.WriteString(dimStyle.Render(strings.Repeat("─", separatorWidth)))
 	sb.WriteString("\n\n")
 
-	// Content based on tab
-	switch m.tab {
-	case SettingsTabGeneral:
-		m.renderGeneralTab(&sb, labelStyle, selectedLabelStyle, valueStyle, selectedValueStyle, dimStyle)
-	case SettingsTabNotifications:
-		m.renderNotificationsTab(&sb, labelStyle, selectedLabelStyle, textInputStyle, editingTextStyle, dimStyle)
-	}
+	// Content
+	m.renderGeneralTab(&sb, labelStyle, selectedLabelStyle, valueStyle, selectedValueStyle, dimStyle)
 
 	// Help text
 	sb.WriteString("\n")
-	if m.editingText {
-		sb.WriteString(helpStyle.Render("Enter: Confirm  |  Esc: Cancel  |  ←/→: Move cursor"))
-	} else {
-		sb.WriteString(helpStyle.Render("⌥Tab: Global/Project  |  Tab: Switch tab  |  ↑/↓: Navigate  |  ←/→: Change  |  ⌃S: Save  |  Esc: Cancel"))
-	}
+	sb.WriteString(helpStyle.Render("⌥Tab: Global/Project  |  ↑/↓: Navigate  |  ←/→: Change  |  ⌃S: Save  |  Esc: Cancel"))
 
 	v := tea.NewView(sb.String())
 	v.AltScreen = true
@@ -809,78 +630,6 @@ func (m *SettingsUI) renderGeneralTab(sb *strings.Builder, labelStyle, selectedL
 			}
 		}
 		sb.WriteString(label + renderSelector(currentValue, focused, hint))
-		sb.WriteString("\n")
-	}
-}
-
-func (m *SettingsUI) renderNotificationsTab(sb *strings.Builder, labelStyle, selectedLabelStyle, textInputStyle, editingTextStyle, dimStyle lipgloss.Style) {
-	// Slack Webhook
-	{
-		label := labelStyle.Render("Slack Webhook:")
-		if m.field == SettingsFieldSlackWebhook {
-			label = selectedLabelStyle.Render("Slack Webhook:")
-		}
-
-		value := m.slackWebhook
-		if value == "" {
-			value = "(not set)"
-		}
-
-		if m.field == SettingsFieldSlackWebhook && m.editingText {
-			// Show cursor in editing mode
-			display := m.slackWebhook[:m.cursorPos] + "█" + m.slackWebhook[m.cursorPos:]
-			sb.WriteString(label + editingTextStyle.Render(display))
-		} else if m.field == SettingsFieldSlackWebhook {
-			sb.WriteString(label + textInputStyle.Render(value))
-		} else {
-			sb.WriteString(label + dimStyle.Render(value))
-		}
-		sb.WriteString("\n")
-	}
-
-	// ntfy Topic
-	{
-		label := labelStyle.Render("ntfy Topic:")
-		if m.field == SettingsFieldNtfyTopic {
-			label = selectedLabelStyle.Render("ntfy Topic:")
-		}
-
-		value := m.ntfyTopic
-		if value == "" {
-			value = "(not set)"
-		}
-
-		if m.field == SettingsFieldNtfyTopic && m.editingText {
-			display := m.ntfyTopic[:m.cursorPos] + "█" + m.ntfyTopic[m.cursorPos:]
-			sb.WriteString(label + editingTextStyle.Render(display))
-		} else if m.field == SettingsFieldNtfyTopic {
-			sb.WriteString(label + textInputStyle.Render(value))
-		} else {
-			sb.WriteString(label + dimStyle.Render(value))
-		}
-		sb.WriteString("\n")
-	}
-
-	// ntfy Server
-	{
-		label := labelStyle.Render("ntfy Server:")
-		if m.field == SettingsFieldNtfyServer {
-			label = selectedLabelStyle.Render("ntfy Server:")
-		}
-
-		value := m.ntfyServer
-		if value == "" {
-			value = "(https://ntfy.sh)"
-		}
-
-		if m.field == SettingsFieldNtfyServer && m.editingText {
-			display := m.ntfyServer[:m.cursorPos] + "█" + m.ntfyServer[m.cursorPos:]
-			sb.WriteString(label + editingTextStyle.Render(display))
-		} else if m.field == SettingsFieldNtfyServer {
-			sb.WriteString(label + textInputStyle.Render(value))
-		} else {
-			sb.WriteString(label + dimStyle.Render(value))
-		}
 		sb.WriteString("\n")
 	}
 }

@@ -87,7 +87,7 @@ var watchWaitCmd = &cobra.Command{
 			isFinal = isFinalWindow(windowName)
 			if isWaitingWindow(windowName) {
 				if !notified {
-					notifyWaitingWithDisplay(tm, app.Config.Notifications, taskName, "window")
+					notifyWaitingWithDisplay(tm, taskName, "window")
 					notified = true
 				}
 			} else {
@@ -147,7 +147,7 @@ var watchWaitCmd = &cobra.Command{
 							// Note: tryNotificationAction always shows a notification (either with actions
 							// or fallback to simple), so we mark notified=true before calling it
 							notified = true
-							choice := tryNotificationAction(app.Config.Notifications, taskName, prompt)
+							choice := tryNotificationAction(taskName, prompt)
 							// If user selects an action from notification, send it to the agent
 							if choice != "" {
 								if sendErr := sendAgentResponse(tm, paneID, choice); sendErr != nil {
@@ -160,7 +160,7 @@ var watchWaitCmd = &cobra.Command{
 						}
 					} else if !notified {
 						logging.Debug("Wait detected: %s", reason)
-						notifyWaitingWithDisplay(tm, app.Config.Notifications, taskName, reason)
+						notifyWaitingWithDisplay(tm, taskName, reason)
 						notified = true
 					}
 				}
