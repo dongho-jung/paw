@@ -124,18 +124,24 @@ var stopHookCmd = &cobra.Command{
 
 		paneContent = tailString(paneContent, constants.SummaryMaxLen)
 
-		// Check for explicit PAW_DONE marker first (fast path)
+		// Check for explicit markers first (fast path)
 		var status task.Status
 		if hasDoneMarker(paneContent) {
 			logging.Debug("stopHookCmd: PAW_DONE marker detected")
 			status = task.StatusDone
 			stopHookTrace("PAW_DONE marker detected for task=%s", taskName)
+		} else if hasWaitingMarker(paneContent) {
+			// Detect PAW_WAITING marker directly in stop hook
+			// This is more reliable than watch-wait's distance-limited detection
+			logging.Debug("stopHookCmd: PAW_WAITING marker detected")
+			status = task.StatusWaiting
+			stopHookTrace("PAW_WAITING marker detected for task=%s", taskName)
 		} else if hasAskUserQuestionInLastSegment(paneContent) {
-			// Skip classification if AskUserQuestion is in the last segment
-			// The watch-wait watcher will handle WAITING status detection
-			logging.Debug("stopHookCmd: AskUserQuestion detected in last segment, skipping classification")
-			status = task.StatusWorking
-			stopHookTrace("AskUserQuestion detected for task=%s (skipping classification, watch-wait will handle)", taskName)
+			// AskUserQuestion without PAW_WAITING marker
+			// Set to WAITING directly since watch-wait may not detect the UI
+			logging.Debug("stopHookCmd: AskUserQuestion detected in last segment")
+			status = task.StatusWaiting
+			stopHookTrace("AskUserQuestion detected for task=%s", taskName)
 		} else {
 			// Fallback to Claude classification with progressive model escalation
 			stopHookTrace("Calling Claude for classification task=%s content_len=%d (will try haiku→sonnet→opus→opus+thinking)", taskName, len(paneContent))
@@ -334,6 +340,50 @@ func hasAskUserQuestionInLastSegment(content string) bool {
 		if strings.HasPrefix(trimmed, "AskUserQuestion") {
 			return true
 		}
+	}
+	return false
+}
+
+// hasWaitingMarker checks if the pane content contains the PAW_WAITING marker.
+// Similar to hasDoneMarker, the marker must appear in the last segment.
+// This allows the stop hook to directly set WAITING status when the agent
+// outputs PAW_WAITING, instead of relying on watch-wait's distance-limited detection.
+func hasWaitingMarker(content string) bool {
+	lines := strings.Split(content, "\n")
+	lines = trimTrailingEmptyLines(lines)
+	if len(lines) == 0 {
+		return false
+	}
+
+	// Find the last segment (after the last ⏺ marker)
+	segmentStart := findLastSegmentStartStopHook(lines)
+
+	// Check the last N lines from the segment for the marker
+	// Use a larger distance than doneMarker since UI may render after PAW_WAITING
+	const waitingMarkerMaxDistance = 100
+	start := len(lines) - waitingMarkerMaxDistance
+	if start < segmentStart {
+		start = segmentStart
+	}
+	for _, line := range lines[start:] {
+		if matchesWaitingMarkerStopHook(line) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesWaitingMarkerStopHook checks if a line contains the PAW_WAITING marker.
+// Allows prefix (like "⏺ " from Claude Code) but requires marker at end of line.
+func matchesWaitingMarkerStopHook(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	// Exact match
+	if trimmed == waitMarker {
+		return true
+	}
+	// Allow prefix (e.g., "⏺ PAW_WAITING") but marker must be at end
+	if strings.HasSuffix(trimmed, " "+waitMarker) {
+		return true
 	}
 	return false
 }

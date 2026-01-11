@@ -115,6 +115,74 @@ func TestHasDoneMarker(t *testing.T) {
 	}
 }
 
+func TestHasWaitingMarker(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    bool
+	}{
+		{
+			name:    "marker at end",
+			content: "Some output\nWorking on it...\nPAW_WAITING\n",
+			want:    true,
+		},
+		{
+			name:    "marker with trailing whitespace",
+			content: "Some output\n  PAW_WAITING  \n",
+			want:    true,
+		},
+		{
+			name:    "marker with UI after (within distance)",
+			content: "Some output\nPAW_WAITING\n🔒 Plan\n> 1. Option A\n  Description\n2. Option B\n  Description\nEnter to select\n",
+			want:    true,
+		},
+		{
+			name:    "marker with Claude Code prefix",
+			content: "Some output\n⏺ PAW_WAITING\nWaiting for input...\n",
+			want:    true,
+		},
+		{
+			name:    "no marker",
+			content: "Some output\nStill working...\n",
+			want:    false,
+		},
+		{
+			name:    "partial marker",
+			content: "PAW_WAITING_EXTRA\n",
+			want:    false,
+		},
+		{
+			name:    "marker embedded in text",
+			content: "Text PAW_WAITING text\n",
+			want:    false,
+		},
+		{
+			name:    "empty content",
+			content: "",
+			want:    false,
+		},
+		{
+			name:    "marker in last segment",
+			content: "⏺ First response\nPAW_WAITING\nUI here.\n⏺ Second response\nWorking...\nPAW_WAITING\nMore UI.\n",
+			want:    true,
+		},
+		{
+			name:    "marker only in previous segment (not last)",
+			content: "⏺ First response\nPAW_WAITING\nUI here.\n⏺ New task started\nWorking on the new task...\n",
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hasWaitingMarker(tt.content)
+			if got != tt.want {
+				t.Fatalf("hasWaitingMarker() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestHasAskUserQuestionInLastSegment(t *testing.T) {
 	tests := []struct {
 		name    string
