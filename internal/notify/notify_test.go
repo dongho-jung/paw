@@ -1,7 +1,6 @@
 package notify
 
 import (
-	"os"
 	"testing"
 )
 
@@ -84,35 +83,24 @@ func TestDetectTerminal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Save and clear relevant env vars
-			savedEnv := map[string]string{}
+			// Clear relevant env vars using t.Setenv (auto-restores after test)
 			envKeys := []string{
 				"KITTY_WINDOW_ID", "WEZTERM_PANE", "GHOSTTY_RESOURCES_DIR",
 				"WARP_TERMINAL_VERSION", "TERM_PROGRAM", "TERM",
 			}
 			for _, key := range envKeys {
-				savedEnv[key] = os.Getenv(key)
-				os.Unsetenv(key)
+				t.Setenv(key, "")
 			}
 
 			// Set test env vars
 			for k, v := range tt.envVars {
-				os.Setenv(k, v)
+				t.Setenv(k, v)
 			}
 
 			// Run test
 			result := detectTerminal()
 			if result != tt.expected {
 				t.Errorf("detectTerminal() = %q, want %q", result, tt.expected)
-			}
-
-			// Restore env vars
-			for k, v := range savedEnv {
-				if v == "" {
-					os.Unsetenv(k)
-				} else {
-					os.Setenv(k, v)
-				}
 			}
 		})
 	}
