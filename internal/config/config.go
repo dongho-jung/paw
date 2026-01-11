@@ -16,6 +16,7 @@ import (
 type InheritConfig struct {
 	WorkMode        bool `yaml:"work_mode"`
 	OnComplete      bool `yaml:"on_complete"`
+	Theme           bool `yaml:"theme"`
 	NonGitWorkspace bool `yaml:"non_git_workspace"`
 	VerifyRequired  bool `yaml:"verify_required"`
 	VerifyTimeout   bool `yaml:"verify_timeout"`
@@ -33,6 +34,7 @@ func DefaultInheritConfig() *InheritConfig {
 	return &InheritConfig{
 		WorkMode:        true,
 		OnComplete:      true,
+		Theme:           true,
 		NonGitWorkspace: true,
 		VerifyRequired:  true,
 		VerifyTimeout:   true,
@@ -123,6 +125,7 @@ type NotificationsConfig struct {
 type Config struct {
 	WorkMode        WorkMode             `yaml:"work_mode"`
 	OnComplete      OnComplete           `yaml:"on_complete"`
+	Theme           string               `yaml:"theme"` // Theme preset: auto, dark, dark-blue, light, light-blue, etc.
 	WorktreeHook    string               `yaml:"worktree_hook"`
 	PreTaskHook     string               `yaml:"pre_task_hook"`
 	PostTaskHook    string               `yaml:"post_task_hook"`
@@ -236,6 +239,9 @@ func (c *Config) MergeWithGlobal(global *Config) {
 	}
 	if c.Inherit.OnComplete {
 		c.OnComplete = global.OnComplete
+	}
+	if c.Inherit.Theme {
+		c.Theme = global.Theme
 	}
 	if c.Inherit.NonGitWorkspace {
 		c.NonGitWorkspace = global.NonGitWorkspace

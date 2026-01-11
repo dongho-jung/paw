@@ -243,6 +243,17 @@ func attachToSession(appCtx *app.App, tm tmux.Client) error {
 		logging.Debug("Failed to re-apply tmux config: %v", err)
 	}
 
+	// Detect terminal theme and apply theme-aware tmux colors.
+	// This ensures status bar, window tabs, and pane borders match the terminal's
+	// dark/light mode when re-attaching from a different terminal.
+	themePreset := ThemePreset(appCtx.Config.Theme)
+	if themePreset == "" {
+		themePreset = ThemeAuto
+	}
+	resolved := resolveThemePreset(themePreset)
+	applyTmuxTheme(tm, resolved)
+	logging.Debug("Applied theme on reattach: preset=%s resolved=%s", themePreset, resolved)
+
 	// Always respawn main window on reattach to ensure fresh theme detection.
 	// When user re-attaches from a terminal with different light/dark mode,
 	// the running TUI won't know about the change. Respawning forces theme re-detection.

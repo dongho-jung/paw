@@ -152,13 +152,13 @@ func (m *TaskOptsUI) handleRight() {
 // View renders the task options UI.
 func (m *TaskOptsUI) View() tea.View {
 	// Adaptive colors for light/dark terminal themes (use cached isDark value)
-	// Light theme: use darker colors for visibility on white background
-	// Dark theme: use lighter colors for visibility on dark background
+	// Light theme: use darker colors for visibility on light backgrounds
+	// Dark theme: use lighter colors for visibility on dark backgrounds
 	lightDark := lipgloss.LightDark(m.isDark)
 	normalColor := lightDark(lipgloss.Color("236"), lipgloss.Color("252"))
-	// Dim color: lighter on light bg (fades into background), darker on dark bg
-	dimColor := lightDark(lipgloss.Color("250"), lipgloss.Color("238"))
-	// Accent color: darker blue for light bg (good contrast), bright cyan for dark bg
+	// Dim color: medium contrast for non-selected items (readable on various backgrounds)
+	dimColor := lightDark(lipgloss.Color("245"), lipgloss.Color("243"))
+	// Accent color: darker blue for light bg, bright cyan for dark bg
 	accentColor := lightDark(lipgloss.Color("25"), lipgloss.Color("39"))
 
 	titleStyle := lipgloss.NewStyle().

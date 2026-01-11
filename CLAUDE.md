@@ -198,12 +198,14 @@ Example project config with inherit:
 ```yaml
 work_mode: worktree
 on_complete: confirm
+theme: auto
 self_improve: false
 
 # Inherit settings from global config
 inherit:
   work_mode: true     # Use global work_mode
   on_complete: false  # Use project-specific value
+  theme: true         # Use global theme
   self_improve: true  # Use global self_improve
 ```
 
@@ -225,6 +227,37 @@ To enable in `.paw/config`:
 ```yaml
 self_improve: true
 ```
+
+### Theme Settings
+
+PAW supports 12 theme presets for tmux status bar, window tabs, and pane borders. The theme automatically adapts to your terminal's light/dark mode, or you can set a specific preset.
+
+**Available presets:**
+
+| Dark Themes | Light Themes |
+|-------------|--------------|
+| `dark` (default dark) | `light` (default light) |
+| `dark-blue` | `light-blue` |
+| `dark-green` | `light-green` |
+| `dark-purple` | `light-purple` |
+| `dark-warm` | `light-warm` |
+| `dark-mono` | `light-mono` |
+
+**Configuration:**
+```yaml
+# Auto-detect based on terminal (default)
+theme: auto
+
+# Or set a specific preset
+theme: light-blue
+```
+
+**Theme detection methods (in order):**
+1. `COLORFGBG` environment variable (if set by terminal)
+2. OSC 11 query to terminal (background color detection)
+3. Fallback to dark mode
+
+When attaching to an existing session from a different terminal, PAW re-detects the theme and updates tmux colors automatically.
 
 ## Logging levels
 

@@ -3,6 +3,7 @@ package tui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	"github.com/atotto/clipboard"
@@ -85,7 +86,8 @@ func (k *KanbanView) Render() string {
 	// Styles (adaptive to light/dark mode)
 	lightDark := lipgloss.LightDark(k.isDark)
 	normalColor := lightDark(lipgloss.Color("236"), lipgloss.Color("252"))
-	dimColor := lightDark(lipgloss.Color("245"), lipgloss.Color("240"))
+	// Dim color: medium contrast for non-selected items (readable on various backgrounds)
+	dimColor := lightDark(lipgloss.Color("245"), lipgloss.Color("243"))
 
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -118,16 +120,23 @@ func (k *KanbanView) Render() string {
 	columnWidth := (k.width - columnGap) / 4
 
 	// Build each column
+	// Colors are chosen to have good contrast on both light and dark backgrounds
+	// Using bold text with medium-saturation colors for visibility
+	workingColor := lightDark(lipgloss.Color("28"), lipgloss.Color("34"))   // Dark green / Bright green
+	waitingColor := lightDark(lipgloss.Color("130"), lipgloss.Color("178")) // Dark orange / Gold
+	doneColor := lightDark(lipgloss.Color("240"), lipgloss.Color("250"))    // Dark gray / Light gray
+	warningColor := lightDark(lipgloss.Color("160"), lipgloss.Color("203")) // Dark red / Light red
+
 	columns := []struct {
 		emoji string
 		title string
 		tasks []*service.DiscoveredTask
-		color string
+		color color.Color
 	}{
-		{constants.EmojiWorking, "Working", working, "40"},  // Green
-		{constants.EmojiWaiting, "Waiting", waiting, "220"}, // Yellow
-		{constants.EmojiDone, "Done", done, "245"},          // Gray
-		{constants.EmojiWarning, "Warning", warning, "203"}, // Red
+		{constants.EmojiWorking, "Working", working, workingColor},
+		{constants.EmojiWaiting, "Waiting", waiting, waitingColor},
+		{constants.EmojiDone, "Done", done, doneColor},
+		{constants.EmojiWarning, "Warning", warning, warningColor},
 	}
 
 	var columnViews []string
@@ -146,7 +155,7 @@ func (k *KanbanView) Render() string {
 		var content strings.Builder
 
 		// Column header
-		colHeaderStyle := headerStyle.Foreground(lipgloss.Color(col.color))
+		colHeaderStyle := headerStyle.Foreground(col.color)
 		header := fmt.Sprintf("%s %s (%d)", col.emoji, col.title, len(col.tasks))
 		content.WriteString(colHeaderStyle.Render(header))
 		content.WriteString("\n")

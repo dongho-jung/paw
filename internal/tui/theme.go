@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -63,7 +64,7 @@ func NewThemeColors(isDark bool) ThemeColors {
 
 			// Text colors
 			TextNormal:   lipgloss.Color("252"), // Light gray
-			TextDim:      lipgloss.Color("240"), // Medium gray
+			TextDim:      lipgloss.Color("243"), // Medium gray (better contrast on dark backgrounds)
 			TextBright:   lipgloss.Color("255"), // White
 			TextInverted: lipgloss.Color("232"), // Near black
 
@@ -102,7 +103,7 @@ func NewThemeColors(isDark bool) ThemeColors {
 
 		// Text colors
 		TextNormal:   lipgloss.Color("236"), // Dark gray
-		TextDim:      lipgloss.Color("245"), // Medium gray
+		TextDim:      lipgloss.Color("245"), // Medium gray (good contrast on light backgrounds)
 		TextBright:   lipgloss.Color("232"), // Near black
 		TextInverted: lipgloss.Color("255"), // White
 
@@ -210,46 +211,86 @@ func ResetDarkModeCache() {
 	cachedDarkMode.Store(darkModeUnknown)
 }
 
-// detectDarkModeWithRetry performs dark mode detection with multiple attempts
-// to improve reliability. The OSC query to detect background color can be
-// unreliable if called too early or if there's buffered input.
+// detectDarkModeWithRetry performs dark mode detection with multiple methods
+// for improved reliability.
 func detectDarkModeWithRetry() bool {
-	// Flush stdout to ensure terminal is in a clean state
-	_ = os.Stdout.Sync()
-
-	// Small delay to let terminal settle after any previous output
-	time.Sleep(5 * time.Millisecond)
-
-	// Try detection multiple times and use majority vote
-	// This helps with intermittent detection failures
-	const attempts = 3
-	darkCount := 0
-	results := make([]bool, attempts)
-
-	for i := range attempts {
-		result := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
-		results[i] = result
-		if result {
-			darkCount++
-		}
-		// Small delay between attempts (except after last)
-		if i < attempts-1 {
-			time.Sleep(10 * time.Millisecond)
+	// Method 1: Check COLORFGBG environment variable
+	// Format: "fg;bg" where bg > 6 typically means light background
+	if colorfgbg := os.Getenv("COLORFGBG"); colorfgbg != "" {
+		parts := strings.Split(colorfgbg, ";")
+		if len(parts) >= 2 {
+			bg := 0
+			for _, ch := range parts[len(parts)-1] {
+				if ch >= '0' && ch <= '9' {
+					bg = bg*10 + int(ch-'0')
+				} else {
+					break
+				}
+			}
+			if parts[len(parts)-1] != "" {
+				// Background colors: 0-6 are dark, 7-15 are mixed, higher depends
+				isDark := bg <= 6 || (bg >= 8 && bg <= 14)
+				setCachedDarkMode(isDark)
+				return isDark
+			}
 		}
 	}
 
-	// Use majority vote: if 2+ out of 3 say dark, return dark
-	isDark := darkCount >= 2
+	// Method 2: Try OSC 11 query via lipgloss with improved handling
+	// Flush stdout and give terminal time to settle
+	_ = os.Stdout.Sync()
+	time.Sleep(10 * time.Millisecond)
 
-	// Theme detection result is cached, no stderr output to avoid TUI interference
+	// Run detection with multiple attempts for reliability
+	const attempts = 5
+	darkCount := 0
+	validCount := 0
 
-	// Cache the result for consistency across all TUI components.
-	// This ensures components created before bubbletea starts use the same
-	// detection result. bubbletea's BackgroundColorMsg can still override
-	// this with a more accurate detection later.
-	setCachedDarkMode(isDark)
+	for i := 0; i < attempts; i++ {
+		// Use a goroutine with timeout to avoid hanging
+		resultCh := make(chan bool, 1)
+		go func() {
+			resultCh <- lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+		}()
 
-	return isDark
+		select {
+		case result := <-resultCh:
+			validCount++
+			if result {
+				darkCount++
+			}
+		case <-time.After(50 * time.Millisecond):
+			// Timeout - detection failed for this attempt
+		}
+
+		// Small delay between attempts
+		if i < attempts-1 {
+			time.Sleep(15 * time.Millisecond)
+		}
+	}
+
+	// If we got at least some valid responses, use majority vote
+	if validCount >= 2 {
+		isDark := darkCount > validCount/2
+		setCachedDarkMode(isDark)
+		return isDark
+	}
+
+	// Method 3: Check if we're in a tmux session
+	if os.Getenv("TMUX") != "" {
+		// Inside tmux, OSC queries might not work reliably
+		// Check terminal type
+		term := os.Getenv("TERM_PROGRAM")
+		if strings.Contains(strings.ToLower(term), "apple_terminal") {
+			// Apple Terminal default is light
+			setCachedDarkMode(false)
+			return false
+		}
+	}
+
+	// Default fallback: assume dark mode (most common for terminal users)
+	setCachedDarkMode(true)
+	return true
 }
 
 // findPawDir searches for the .paw directory starting from the current

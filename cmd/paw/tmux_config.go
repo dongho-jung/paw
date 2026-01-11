@@ -36,6 +36,15 @@ func setupTmuxConfig(appCtx *app.App, tm tmux.Client) error {
 		pawBin = "paw"
 	}
 
+	// Detect terminal theme and apply theme-aware colors
+	// Use config theme if set, otherwise auto-detect
+	themePreset := ThemePreset(appCtx.Config.Theme)
+	if themePreset == "" {
+		themePreset = ThemeAuto
+	}
+	resolved := resolveThemePreset(themePreset)
+	applyTmuxTheme(tm, resolved)
+
 	// Change prefix to an unused key (M-F12) so C-b is available for toggle-bottom
 	// Note: "None" is not a valid tmux key, so we use an obscure key instead
 	_ = tm.SetOption("prefix", "M-F12", true)
@@ -55,19 +64,11 @@ func setupTmuxConfig(appCtx *app.App, tm tmux.Client) error {
 	_ = tm.SetOption("status-right", " ⌥←→:windows ⌥Tab:panes ^/:help ", true)
 	_ = tm.SetOption("status-right-length", "100", true)
 
-	// Window status format - removes index numbers (0:, 1:, 2:) and asterisk (*)
-	// Current window uses blue background and bold for visual distinction
-	_ = tm.SetOption("window-status-format", "#[fg=colour231] #W ", true)
-	_ = tm.SetOption("window-status-current-format", "#[fg=colour231,bg=colour24,bold] #W ", true)
+	// Window status separator (no separator between windows)
 	_ = tm.SetOption("window-status-separator", "", true)
 
-	// Pane border styling for visual distinction
-	_ = tm.SetOption("pane-border-style", "fg=colour238", true)            // Dim border for inactive panes
-	_ = tm.SetOption("pane-active-border-style", "fg=colour39,bold", true) // Bright cyan border for active pane
-
-	// Popup styling
+	// Popup styling (use terminal colors for content, border is set by applyTmuxTheme)
 	_ = tm.SetOption("popup-style", "fg=terminal,bg=terminal", true)
-	_ = tm.SetOption("popup-border-style", "fg=colour244", true)
 
 	// Enable mouse mode
 	_ = tm.SetOption("mouse", "on", true)
