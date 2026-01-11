@@ -45,6 +45,8 @@ func init() {
 	internalCmd.AddCommand(diffViewerCmd)
 	internalCmd.AddCommand(toggleHistoryCmd)
 	internalCmd.AddCommand(historyPickerCmd)
+	internalCmd.AddCommand(toggleProjectPickerCmd)
+	internalCmd.AddCommand(projectPickerCmd)
 	internalCmd.AddCommand(loadingScreenCmd)
 	internalCmd.AddCommand(toggleSetupCmd)
 	internalCmd.AddCommand(setupWizardCmd)

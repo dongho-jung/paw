@@ -414,4 +414,8 @@ const (
 	// Medium size for history picker
 	PopupWidthHistory  = "80%"
 	PopupHeightHistory = "70%"
+
+	// Medium size for project picker
+	PopupWidthProjectPicker  = "60"
+	PopupHeightProjectPicker = "50%"
 )

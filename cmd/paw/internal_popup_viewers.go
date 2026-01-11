@@ -329,3 +329,116 @@ var historyPickerCmd = &cobra.Command{
 		return nil
 	},
 }
+
+var toggleProjectPickerCmd = &cobra.Command{
+	Use:   "toggle-project-picker [session]",
+	Short: "Toggle project picker popup to switch between PAW sessions",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sessionName := args[0]
+		tm := tmux.New(sessionName)
+
+		pawBin, err := os.Executable()
+		if err != nil {
+			pawBin = "paw"
+		}
+
+		// Run project picker in popup
+		pickerCmd := fmt.Sprintf("%s internal project-picker %s", pawBin, sessionName)
+
+		_ = tm.DisplayPopup(tmux.PopupOpts{
+			Width:  constants.PopupWidthProjectPicker,
+			Height: constants.PopupHeightProjectPicker,
+			Title:  " Switch Project (⌃J) ",
+			Close:  true,
+			Style:  "fg=terminal,bg=terminal",
+		}, pickerCmd)
+		return nil
+	},
+}
+
+var projectPickerCmd = &cobra.Command{
+	Use:    "project-picker [session]",
+	Short:  "Run the project picker",
+	Args:   cobra.ExactArgs(1),
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		currentSession := args[0]
+
+		// Find all PAW sessions
+		sessions, err := findPawSessions()
+		if err != nil {
+			fmt.Println("Failed to find PAW sessions.")
+			return nil
+		}
+
+		// Filter out current session
+		var projects []tui.ProjectPickerItem
+		for _, s := range sessions {
+			if s.Name != currentSession {
+				projects = append(projects, tui.ProjectPickerItem{
+					Name:       s.Name,
+					SocketPath: s.SocketPath,
+				})
+			}
+		}
+
+		if len(projects) == 0 {
+			fmt.Println("No other PAW projects running.")
+			return nil
+		}
+
+		// Run project picker
+		action, selected, err := tui.RunProjectPicker(projects)
+		if err != nil {
+			fmt.Printf("Failed to run project picker: %v\n", err)
+			return nil
+		}
+
+		// If user selected a project, switch to it
+		if action == tui.ProjectPickerSelect && selected != nil {
+			// Switch to the selected session's main window
+			targetTm := tmux.New(selected.Name)
+
+			// Find the main window (first window, typically named "⭐️main" or similar)
+			windows, err := targetTm.ListWindows()
+			if err != nil || len(windows) == 0 {
+				// Fallback: just switch to session
+				return switchToSession(currentSession, selected.Name)
+			}
+
+			// Find main window (window index 0 or window named with ⭐️ prefix)
+			mainWindow := windows[0]
+			for _, w := range windows {
+				if strings.HasPrefix(w.Name, constants.EmojiNew) {
+					mainWindow = w
+					break
+				}
+			}
+
+			// Switch client to target session:window
+			return switchToSessionWindow(currentSession, selected.Name, mainWindow.ID)
+		}
+
+		return nil
+	},
+}
+
+// switchToSession switches the current tmux client to a different PAW session.
+func switchToSession(currentSession, targetSession string) error {
+	// We need to switch from current socket to target socket
+	// This requires switching the client to the target session
+	targetTm := tmux.New(targetSession)
+	return targetTm.SwitchClient(targetSession)
+}
+
+// switchToSessionWindow switches the current tmux client to a specific window in another PAW session.
+func switchToSessionWindow(currentSession, targetSession, windowID string) error {
+	targetTm := tmux.New(targetSession)
+
+	// First select the window in the target session
+	_ = targetTm.SelectWindow(windowID)
+
+	// Then switch client to target session
+	return targetTm.SwitchClient(targetSession)
+}

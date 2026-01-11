@@ -18,6 +18,7 @@ import (
 //   - Ctrl+B: Toggle bottom (shell)
 //   - Ctrl+/: Toggle help
 //   - Ctrl+R: Toggle history search (in new task window only)
+//   - Ctrl+J: Toggle project picker (switch between PAW sessions)
 //   - Alt+Left/Right: Move window
 //   - Alt+Tab: Cycle pane forward (in task windows) / Cycle options (in new task window)
 //   - Alt+Shift+Tab: Cycle pane backward (in task windows) / Cycle options backward (in new task window)
@@ -32,6 +33,7 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 	cmdToggleBottom := fmt.Sprintf("run-shell '%s internal popup-shell %s'", pawBin, sessionName)
 	cmdToggleHelp := fmt.Sprintf("run-shell '%s internal toggle-help %s'", pawBin, sessionName)
 	cmdToggleCmdPalette := fmt.Sprintf("run-shell '%s internal toggle-cmd-palette %s'", pawBin, sessionName)
+	cmdToggleProjectPicker := fmt.Sprintf("run-shell '%s internal toggle-project-picker %s'", pawBin, sessionName)
 
 	// Alt+Tab: context-aware - pass through to TUI in new task window, cycle panes otherwise
 	// #{m:pattern,string} checks if string matches pattern (⭐️* = starts with ⭐️)
@@ -63,7 +65,8 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 		{Key: "C-o", Command: cmdToggleLogs, NoPrefix: true},
 		{Key: "C-g", Command: cmdToggleGitStatus, NoPrefix: true},
 		{Key: "C-b", Command: cmdToggleBottom, NoPrefix: true},
-		{Key: "C-_", Command: cmdToggleHelp, NoPrefix: true}, // Ctrl+/ sends C-_
-		{Key: "C-r", Command: cmdCtrlR, NoPrefix: true},      // History search in new task window
+		{Key: "C-_", Command: cmdToggleHelp, NoPrefix: true},        // Ctrl+/ sends C-_
+		{Key: "C-r", Command: cmdCtrlR, NoPrefix: true},           // History search in new task window
+		{Key: "C-j", Command: cmdToggleProjectPicker, NoPrefix: true}, // Project picker
 	}
 }

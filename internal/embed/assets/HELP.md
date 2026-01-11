@@ -14,6 +14,7 @@ Claude Code-based autonomous agent work environment
 ### Navigation
   ⌥Tab        Cycle panes / Cycle options (in new task window)
   ⌥←/→        Move to previous/next window
+  ⌃J          Switch project (jump to other PAW sessions)
 
 ### Task Commands
   ⌃N          New task
@@ -158,3 +159,17 @@ Configure PAW settings with Global/Project scope support.
   PgUp/PgDn   Page scroll
   ⌃U/⌃D       Half-page scroll
   ⌃//q/Esc    Close the help viewer
+
+## Project Picker (⌃J)
+
+Switch between running PAW project sessions.
+
+### Navigation
+  ↑/↓         Navigate projects
+  Space/Enter Switch to selected project
+  Esc/⌃J      Cancel
+
+### Features
+  - Fuzzy search by project name
+  - Shows all running PAW sessions except current
+  - Jumps to main window of selected project
