@@ -12,6 +12,7 @@ import (
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // LogViewer provides an interactive log viewer with vim-like navigation.
@@ -506,19 +507,25 @@ func (m *LogViewer) View() tea.View {
 	for i := m.scrollPos; i < endPos; i++ {
 		screenY := i - m.scrollPos // Screen-relative Y position
 		line := displayLines[i]
+		lineWidth := ansi.StringWidth(line)
 
 		if !m.wordWrap {
-			// Apply horizontal scroll
-			if m.horizontalPos < len(line) {
-				line = line[m.horizontalPos:]
-			} else {
-				line = ""
+			// Apply horizontal scroll (visual width based)
+			if m.horizontalPos > 0 {
+				if m.horizontalPos < lineWidth {
+					line = ansi.Cut(line, m.horizontalPos, lineWidth)
+					lineWidth = ansi.StringWidth(line)
+				} else {
+					line = ""
+					lineWidth = 0
+				}
 			}
 		}
 
-		// Truncate to screen width
-		if len(line) > m.width {
-			line = line[:m.width]
+		// Truncate to screen width (visual width based)
+		if lineWidth > m.width {
+			line = ansi.Cut(line, 0, m.width)
+			lineWidth = m.width
 		}
 
 		// Apply log level colorization
@@ -530,8 +537,11 @@ func (m *LogViewer) View() tea.View {
 			line = m.highlightSearchMatches(line, isCurrentMatch)
 		}
 
-		// Pad to full width
-		line = fmt.Sprintf("%-*s", m.width, line)
+		// Pad to full width (using visual width)
+		visualWidth := ansi.StringWidth(line)
+		if visualWidth < m.width {
+			line = line + strings.Repeat(" ", m.width-visualWidth)
+		}
 
 		// Apply selection highlighting if this line is in selection
 		if m.hasSelection {
@@ -950,26 +960,29 @@ func (m *LogViewer) applySelectionToLine(line string, screenY int, highlightStyl
 		return line // Not in selection or invalid range
 	}
 
-	lineLen := len(line)
-	if startX >= lineLen {
+	lineWidth := ansi.StringWidth(line)
+	if startX >= lineWidth {
 		return line // Selection starts beyond line
 	}
-	if endX > lineLen {
-		endX = lineLen
+	if endX > lineWidth {
+		endX = lineWidth
 	}
 
-	// Split line into before, selected, and after parts
+	// Split line into before, selected, and after parts (visual width based)
 	before := ""
 	if startX > 0 {
-		before = line[:startX]
+		before = ansi.Cut(line, 0, startX)
 	}
-	selected := line[startX:endX]
+	selected := ansi.Cut(line, startX, endX)
 	after := ""
-	if endX < lineLen {
-		after = line[endX:]
+	if endX < lineWidth {
+		after = ansi.Cut(line, endX, lineWidth)
 	}
 
-	return before + highlightStyle.Render(selected) + after
+	// Strip ANSI from selected text and apply highlight
+	plainSelected := ansi.Strip(selected)
+
+	return before + highlightStyle.Render(plainSelected) + after
 }
 
 // copySelection copies the selected text to clipboard.
@@ -989,26 +1002,30 @@ func (m *LogViewer) copySelection() {
 		}
 
 		line := displayLines[lineIdx]
+		lineWidth := ansi.StringWidth(line)
 
 		if !m.wordWrap {
-			// Apply horizontal scroll offset for accurate X positions
+			// Apply horizontal scroll offset for accurate X positions (visual width based)
 			if m.horizontalPos > 0 {
-				if m.horizontalPos < len(line) {
-					line = line[m.horizontalPos:]
+				if m.horizontalPos < lineWidth {
+					line = ansi.Cut(line, m.horizontalPos, lineWidth)
+					lineWidth = ansi.StringWidth(line)
 				} else {
 					line = ""
+					lineWidth = 0
 				}
 			}
 		}
 
-		// Truncate to screen width
-		if len(line) > m.width {
-			line = line[:m.width]
+		// Truncate to screen width (visual width based)
+		if lineWidth > m.width {
+			line = ansi.Cut(line, 0, m.width)
+			lineWidth = m.width
 		}
 
 		// Pad for consistent width
-		if len(line) < m.width {
-			line = line + strings.Repeat(" ", m.width-len(line))
+		if lineWidth < m.width {
+			line = line + strings.Repeat(" ", m.width-lineWidth)
 		}
 
 		startX, endX := m.getSelectionXRange(screenY)
@@ -1019,9 +1036,9 @@ func (m *LogViewer) copySelection() {
 			endX = m.width
 		}
 
-		// Extract selected portion
-		selected := line[startX:endX]
-		plainSelected := strings.TrimRight(selected, " ")
+		// Extract selected portion (visual width based)
+		selected := ansi.Cut(line, startX, endX)
+		plainSelected := strings.TrimRight(ansi.Strip(selected), " ")
 		selectedLines = append(selectedLines, plainSelected)
 	}
 
