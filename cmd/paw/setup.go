@@ -15,6 +15,117 @@ import (
 	"github.com/dongho-jung/paw/internal/tmux"
 )
 
+// runCleanAll removes all PAW resources across all projects
+func runCleanAll(cmd *cobra.Command, args []string) error {
+	// Find all running PAW sessions
+	sessions, err := findPawSessions()
+	if err != nil {
+		return fmt.Errorf("failed to find PAW sessions: %w", err)
+	}
+
+	// Find all PAW workspaces in global directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	workspacesDir := filepath.Join(homeDir, ".local", "share", "paw", "workspaces")
+	var workspaces []string
+
+	entries, err := os.ReadDir(workspacesDir)
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				workspaces = append(workspaces, filepath.Join(workspacesDir, entry.Name()))
+			}
+		}
+	}
+
+	if len(sessions) == 0 && len(workspaces) == 0 {
+		fmt.Println("No PAW sessions or workspaces found.")
+		return nil
+	}
+
+	// Show what will be cleaned
+	if len(sessions) > 0 {
+		fmt.Printf("Found %d running PAW session(s):\n", len(sessions))
+		for _, s := range sessions {
+			fmt.Printf("  - %s\n", s.Name)
+		}
+	}
+	if len(workspaces) > 0 {
+		fmt.Printf("Found %d PAW workspace(s):\n", len(workspaces))
+		for _, w := range workspaces {
+			fmt.Printf("  - %s\n", filepath.Base(w))
+		}
+	}
+	fmt.Println()
+
+	// Confirm before cleaning
+	if !confirmPrompt("Clean all PAW resources? [y/N]: ") {
+		fmt.Println("Cancelled.")
+		return nil
+	}
+
+	fmt.Println()
+
+	// Kill all running sessions
+	for _, s := range sessions {
+		fmt.Printf("Killing session: %s\n", s.Name)
+		if err := forceKillSession(s, false); err != nil {
+			fmt.Printf("  Warning: failed to kill session: %v\n", err)
+		}
+	}
+
+	// Clean up each workspace
+	for _, wsPath := range workspaces {
+		fmt.Printf("Cleaning workspace: %s\n", filepath.Base(wsPath))
+
+		// Try to read project path to clean up git resources
+		projectPathFile := filepath.Join(wsPath, ".project-path")
+		if data, err := os.ReadFile(projectPathFile); err == nil {
+			projectDir := strings.TrimSpace(string(data))
+			cleanWorkspaceGitResources(wsPath, projectDir)
+		}
+
+		// Remove workspace directory
+		if err := os.RemoveAll(wsPath); err != nil {
+			fmt.Printf("  Warning: failed to remove workspace: %v\n", err)
+		}
+	}
+
+	fmt.Println("\nAll PAW resources cleaned successfully.")
+	return nil
+}
+
+// cleanWorkspaceGitResources cleans up git worktrees and branches for a workspace
+func cleanWorkspaceGitResources(wsPath, projectDir string) {
+	gitClient := git.New()
+	if !gitClient.IsGitRepo(projectDir) {
+		return
+	}
+
+	agentsDir := filepath.Join(wsPath, "agents")
+
+	// Load config if available
+	cfg, err := config.Load(wsPath)
+	if err != nil {
+		cfg = config.DefaultConfig()
+	}
+
+	mgr := task.NewManager(agentsDir, projectDir, wsPath, true, cfg)
+
+	// Prune stale worktree entries first
+	mgr.PruneWorktrees()
+
+	// Clean up tasks
+	tasks, _ := mgr.ListTasks()
+	for _, t := range tasks {
+		fmt.Printf("  Cleaning task: %s\n", t.Name)
+		_ = mgr.CleanupTask(t)
+	}
+}
+
 // runClean removes all PAW resources
 func runClean(cmd *cobra.Command, args []string) error {
 	cwd, err := os.Getwd()

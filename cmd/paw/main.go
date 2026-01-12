@@ -46,6 +46,7 @@ func init() {
 	rootCmd.AddCommand(attachCmd)
 	rootCmd.AddCommand(checkCmd)
 	rootCmd.AddCommand(cleanCmd)
+	rootCmd.AddCommand(cleanAllCmd)
 	rootCmd.AddCommand(killCmd)
 	rootCmd.AddCommand(killAllCmd)
 	rootCmd.AddCommand(locationCmd)
@@ -89,6 +90,20 @@ var cleanCmd = &cobra.Command{
 	Short: "Clean up all PAW resources",
 	Long:  "Remove all worktrees, branches, tmux session, and .paw directory",
 	RunE:  runClean,
+}
+
+var cleanAllCmd = &cobra.Command{
+	Use:   "clean-all",
+	Short: "Clean up all PAW resources across all projects",
+	Long: `Clean up all PAW sessions and workspaces across all projects.
+
+Prompts for confirmation before cleaning.
+
+This command:
+1. Kills all running PAW tmux sessions
+2. Removes all PAW workspaces from ~/.local/share/paw/workspaces/
+3. Cleans up git worktrees and branches for each workspace`,
+	RunE: runCleanAll,
 }
 
 var setupCmd = &cobra.Command{
