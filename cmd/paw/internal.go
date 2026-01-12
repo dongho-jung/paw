@@ -68,4 +68,7 @@ func init() {
 	endTaskCmd.Flags().StringVar(&paneCaptureFile, "pane-capture-file", "", "Path to pre-captured pane content file")
 	endTaskCmd.Flags().BoolVar(&endTaskUserInitiated, "user-initiated", false, "Require explicit user action to finish")
 	endTaskCmd.Flags().StringVar(&endTaskAction, "action", "keep", "Finish action: keep, merge, pr, drop")
+
+	// Add flags to end-task-ui command (receives action from finish-picker-tui)
+	endTaskUICmd.Flags().StringVar(&endTaskAction, "action", "keep", "Finish action: keep, merge, pr, drop")
 }
