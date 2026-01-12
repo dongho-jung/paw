@@ -46,6 +46,8 @@ func init() {
 	rootCmd.AddCommand(attachCmd)
 	rootCmd.AddCommand(checkCmd)
 	rootCmd.AddCommand(cleanCmd)
+	rootCmd.AddCommand(killCmd)
+	rootCmd.AddCommand(killAllCmd)
 	rootCmd.AddCommand(setupCmd)
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(historyCmd)
