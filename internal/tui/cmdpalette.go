@@ -231,7 +231,7 @@ func (m *CommandPalette) View() tea.View {
 
 	selectedDescStyle := lipgloss.NewStyle().
 		Foreground(c.Accent).
-		PaddingLeft(2)
+		PaddingLeft(4)
 
 	helpStyle := lipgloss.NewStyle().
 		Foreground(c.TextDim).
