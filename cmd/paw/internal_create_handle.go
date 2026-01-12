@@ -290,6 +290,11 @@ exec "%s" internal end-task "%s" "%s"
 		// Start wait watcher to handle window status + notifications when user input is needed
 		watchCmd := exec.Command(pawBin, "internal", "watch-wait", sessionName, windowID, taskName)
 		watchCmd.Dir = appCtx.ProjectDir
+		// CRITICAL: Pass PAW_DIR and PROJECT_DIR so watch-wait can find the correct workspace
+		// Without these, watch-wait relies on cwd-based resolution which fails for global workspaces
+		watchCmd.Env = append(os.Environ(),
+			"PAW_DIR="+appCtx.PawDir,
+			"PROJECT_DIR="+appCtx.ProjectDir)
 		if err := watchCmd.Start(); err != nil {
 			logging.Warn("Failed to start wait watcher: %v", err)
 		} else {
