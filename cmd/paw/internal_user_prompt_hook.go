@@ -56,6 +56,54 @@ var userPromptSubmitHookCmd = &cobra.Command{
 	},
 }
 
+// askUserQuestionPreHookCmd handles the PreToolUse hook for AskUserQuestion.
+// This is triggered when Claude calls AskUserQuestion (before showing UI to user).
+// Sets status to WAITING immediately when Claude asks a question.
+var askUserQuestionPreHookCmd = &cobra.Command{
+	Use:   "ask-user-question-pre-hook",
+	Short: "Handle Claude PreToolUse hook for AskUserQuestion to set waiting status",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sessionName := os.Getenv("SESSION_NAME")
+		windowID := os.Getenv("WINDOW_ID")
+		taskName := os.Getenv("TASK_NAME")
+
+		// Validate required environment variables
+		if err := validateRequiredParams(map[string]string{
+			"SESSION_NAME": sessionName,
+			"WINDOW_ID":    windowID,
+			"TASK_NAME":    taskName,
+		}); err != nil {
+			return nil
+		}
+
+		// Setup logging if PAW_DIR is available
+		if pawDir := os.Getenv("PAW_DIR"); pawDir != "" {
+			_, cleanup := setupLogger(filepath.Join(pawDir, constants.LogFileName), os.Getenv("PAW_DEBUG") == "1", "ask-user-question-pre-hook", taskName)
+			defer cleanup()
+		}
+
+		logging.Debug("-> askUserQuestionPreHookCmd(session=%s, windowID=%s, task=%s)", sessionName, windowID, taskName)
+		defer logging.Debug("<- askUserQuestionPreHookCmd")
+
+		tm := tmux.New(sessionName)
+		paneID := windowID + ".0"
+		if !tm.HasPane(paneID) {
+			logging.Debug("askUserQuestionPreHookCmd: pane %s not found, skipping", paneID)
+			return nil
+		}
+
+		// Set window to waiting state (Claude is asking a question, waiting for user)
+		newName := constants.EmojiWaiting + constants.TruncateForWindowName(taskName)
+		if err := renameWindowCmd.RunE(renameWindowCmd, []string{windowID, newName}); err != nil {
+			logging.Warn("askUserQuestionPreHookCmd: failed to rename window: %v", err)
+			return nil
+		}
+
+		logging.Info("askUserQuestionPreHookCmd: status updated to waiting")
+		return nil
+	},
+}
+
 // askUserQuestionHookCmd handles the PostToolUse hook for AskUserQuestion.
 // This is triggered when the user responds to an AskUserQuestion tool call
 // (e.g., by selecting an option from the UI), which doesn't trigger UserPromptSubmit.
@@ -99,7 +147,7 @@ var askUserQuestionHookCmd = &cobra.Command{
 			return nil
 		}
 
-		logging.Debug("askUserQuestionHookCmd: status updated to working")
+		logging.Info("askUserQuestionHookCmd: status updated to working")
 		return nil
 	},
 }

@@ -12,14 +12,10 @@ import (
 )
 
 const (
-	waitMarker             = "PAW_WAITING"
-	waitCaptureLines       = 200
-	waitPollInterval       = 2 * time.Second
-	waitMarkerMaxDistance  = 8
-	waitAskUserMaxDistance = 32
-	doneMarkerMaxDistance  = 500 // Allow more distance since agent may continue talking after PAW_DONE
-	waitPopupWidth         = "70%"
-	waitPopupHeight        = "50%"
+	waitCaptureLines = 200
+	waitPollInterval = 2 * time.Second
+	waitPopupWidth   = "70%"
+	waitPopupHeight  = "50%"
 	// Maximum number of options for notification action buttons
 	notifyMaxActions = 5
 	// Timeout for waiting for notification response
@@ -33,6 +29,17 @@ var askUserQuestionUIMarkers = []string{
 	"Type something.",
 }
 
+// watchWaitCmd monitors the agent pane and sends notifications when user input is needed.
+// NOTE: This watcher does NOT change task status. Status transitions are handled by hooks:
+//   - PreToolUse (AskUserQuestion): WAITING
+//   - PostToolUse (AskUserQuestion): WORKING
+//   - UserPromptSubmit: WORKING
+//   - Stop: DONE/WORKING (via .status-signal or Claude classification)
+//
+// This watcher only:
+//   1. Detects when window is in WAITING state (set by hooks)
+//   2. Parses prompt content and sends notifications
+//   3. Handles notification action responses
 var watchWaitCmd = &cobra.Command{
 	Use:   "watch-wait [session] [window-id] [task-name]",
 	Short: "Watch agent output and notify when user input is needed",
@@ -66,7 +73,6 @@ var watchWaitCmd = &cobra.Command{
 				return nil
 			}
 
-			isFinal := false
 			windowName, err := getWindowName(tm, windowID)
 			if err != nil {
 				// Window doesn't exist anymore, stop watcher
@@ -84,50 +90,35 @@ var watchWaitCmd = &cobra.Command{
 				}
 			}
 
-			isFinal = isFinalWindow(windowName)
+			isWaiting := isWaitingWindow(windowName)
+
 			// Reset notified flag when window leaves waiting state
 			// This allows re-notification when a new wait state begins
-			// Note: Actual notifications are handled in the content detection section below
-			if !isWaitingWindow(windowName) {
+			if !isWaiting {
 				notified = false
+				lastPromptKey = ""
 			}
 
-			content, err := tm.CapturePane(paneID, waitCaptureLines)
-			if err != nil {
-				errStr := err.Error()
-				// Check if the error indicates the window/pane is gone (expected during cleanup)
-				if strings.Contains(errStr, "can't find window") || strings.Contains(errStr, "can't find pane") {
-					logging.Debug("Window/pane no longer exists (capture failed), stopping wait watcher: %v", err)
-					return nil
-				}
-				// Other unexpected errors - log as warning and continue
-				logging.Warn("Failed to capture pane: %v", err)
-				time.Sleep(waitPollInterval)
-				continue
-			}
-
-			contentChanged := content != lastContent
-			if contentChanged {
-				lastContent = content
-
-				// Check for done marker first (takes priority over wait detection)
-				doneDetected := detectDoneInContent(content)
-				if doneDetected && !isFinal {
-					logging.Debug("Done marker detected in pane content")
-					if err := ensureDoneWindow(tm, windowID, taskName, app.PawDir); err != nil {
-						logging.Trace("Failed to rename window to done: %v", err)
+			// Only process notifications when in WAITING state (set by hooks)
+			if isWaiting && !notified {
+				content, err := tm.CapturePane(paneID, waitCaptureLines)
+				if err != nil {
+					errStr := err.Error()
+					// Check if the error indicates the window/pane is gone (expected during cleanup)
+					if strings.Contains(errStr, "can't find window") || strings.Contains(errStr, "can't find pane") {
+						logging.Debug("Window/pane no longer exists (capture failed), stopping wait watcher: %v", err)
+						return nil
 					}
-					// Skip wait detection since task is done
+					// Other unexpected errors - log as warning and continue
+					logging.Warn("Failed to capture pane: %v", err)
 					time.Sleep(waitPollInterval)
 					continue
 				}
 
-				waitDetected, reason := detectWaitInContent(content)
+				contentChanged := content != lastContent
+				lastContent = content
 
-				if waitDetected && !isFinal {
-					if err := ensureWaitingWindow(tm, windowID, taskName, app.PawDir); err != nil {
-						logging.Trace("Failed to rename window: %v", err)
-					}
+				if contentChanged {
 					// Try to parse the prompt - first YAML format, then rendered UI format
 					prompt, ok := parseAskUserQuestion(content)
 					if !ok {
@@ -137,18 +128,14 @@ var watchWaitCmd = &cobra.Command{
 							logging.Trace("parseAskUserQuestionUI also failed, content length=%d", len(content))
 						}
 					}
+
 					if ok {
 						promptKey := prompt.key()
-						// Only notify if: prompt is valid, it's a new prompt, and we haven't notified yet
-						// The !notified check prevents notification spam when user types in the
-						// AskUserQuestion field - typing changes the captured content (and thus promptKey)
-						// but we don't want to re-notify for the same logical wait state
-						if promptKey != "" && promptKey != lastPromptKey && !notified {
+						// Only notify if: prompt is valid and it's a new prompt
+						if promptKey != "" && promptKey != lastPromptKey {
 							lastPromptKey = promptKey
-							// Try notification actions for simple prompts
-							// tryNotificationAction always shows a notification (either with actions
-							// or fallback to simple)
 							notified = true
+							// Try notification actions for simple prompts
 							choice := tryNotificationAction(taskName, prompt)
 							// If user selects an action from notification, send it to the agent
 							if choice != "" {
@@ -158,11 +145,11 @@ var watchWaitCmd = &cobra.Command{
 									logging.Debug("Sent prompt response: %s", choice)
 								}
 							}
-							// If dismissed/timeout, user will handle it directly in the UI
 						}
-					} else if !notified {
-						logging.Debug("Wait detected: %s", reason)
-						notifyWaitingWithDisplay(tm, taskName, reason)
+					} else {
+						// No parseable prompt, send simple notification
+						logging.Debug("Wait state detected, sending notification")
+						notifyWaitingWithDisplay(tm, taskName, "input needed")
 						notified = true
 					}
 				}
@@ -186,78 +173,5 @@ func isWaitingWindow(name string) bool {
 func isFinalWindow(name string) bool {
 	return strings.HasPrefix(name, constants.EmojiDone) ||
 		strings.HasPrefix(name, constants.EmojiWarning)
-}
-
-func ensureWaitingWindow(tm tmux.Client, windowID, taskName, pawDir string) error {
-	logging.Debug("-> ensureWaitingWindow(windowID=%s, task=%s)", windowID, taskName)
-	defer logging.Debug("<- ensureWaitingWindow")
-
-	windowName, err := getWindowName(tm, windowID)
-	if err != nil {
-		// Window doesn't exist, nothing to do
-		return nil
-	}
-
-	// Check if this window belongs to this task (prevents cross-task renaming)
-	extractedName, isTask := constants.ExtractTaskName(windowName)
-	if !isTask {
-		// Not a task window, don't rename
-		return nil
-	}
-
-	if !constants.MatchesWindowToken(extractedName, taskName) {
-		// Wrong task window, don't rename (prevents race condition)
-		return nil
-	}
-
-	// Already in final state, don't change
-	if isWaitingWindow(windowName) || isFinalWindow(windowName) {
-		return nil
-	}
-
-	newName := waitingWindowName(taskName)
-	logging.Trace("ensureWaitingWindow: renaming window from=%s to=%s", windowName, newName)
-	return renameWindowWithStatus(tm, windowID, newName, pawDir, taskName, "watch-wait")
-}
-
-func waitingWindowName(taskName string) string {
-	return constants.EmojiWaiting + constants.TruncateForWindowName(taskName)
-}
-
-func doneWindowName(taskName string) string {
-	return constants.EmojiDone + constants.TruncateForWindowName(taskName)
-}
-
-// ensureDoneWindow renames the window to done status if it belongs to the task.
-func ensureDoneWindow(tm tmux.Client, windowID, taskName, pawDir string) error {
-	logging.Debug("-> ensureDoneWindow(windowID=%s, task=%s)", windowID, taskName)
-	defer logging.Debug("<- ensureDoneWindow")
-
-	windowName, err := getWindowName(tm, windowID)
-	if err != nil {
-		// Window doesn't exist, nothing to do
-		return nil
-	}
-
-	// Check if this window belongs to this task (prevents cross-task renaming)
-	extractedName, isTask := constants.ExtractTaskName(windowName)
-	if !isTask {
-		// Not a task window, don't rename
-		return nil
-	}
-
-	if !constants.MatchesWindowToken(extractedName, taskName) {
-		// Wrong task window, don't rename (prevents race condition)
-		return nil
-	}
-
-	// Already in final state, don't change
-	if isFinalWindow(windowName) {
-		return nil
-	}
-
-	newName := doneWindowName(taskName)
-	logging.Trace("ensureDoneWindow: renaming window from=%s to=%s", windowName, newName)
-	return renameWindowWithStatus(tm, windowID, newName, pawDir, taskName, "watch-wait")
 }
 

@@ -61,6 +61,7 @@ func init() {
 	internalCmd.AddCommand(renameWindowCmd)
 	internalCmd.AddCommand(stopHookCmd)
 	internalCmd.AddCommand(userPromptSubmitHookCmd)
+	internalCmd.AddCommand(askUserQuestionPreHookCmd)
 	internalCmd.AddCommand(askUserQuestionHookCmd)
 	internalCmd.AddCommand(watchWaitCmd)
 

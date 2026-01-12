@@ -4,6 +4,13 @@ import (
 	"strings"
 )
 
+const (
+	waitMarker             = "PAW_WAITING"
+	waitMarkerMaxDistance  = 8
+	waitAskUserMaxDistance = 32
+	doneMarkerMaxDistance  = 500 // Allow more distance since agent may continue talking after PAW_DONE
+)
+
 // detectDoneInContent checks if the content contains the PAW_DONE marker.
 // Returns true if the marker is found within doneMarkerMaxDistance lines from the end
 // AND in the last segment (after the last ⏺ marker, which indicates a new Claude response).
