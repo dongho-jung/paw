@@ -296,3 +296,33 @@ func TestNotifyOptionsDefaults(t *testing.T) {
 		t.Errorf("Default Icon = %q, want %q (IconNone)", opts.Icon, IconNone)
 	}
 }
+
+func TestGetTmuxClientTTYsDoesNotPanic(t *testing.T) {
+	// Verify getTmuxClientTTYs doesn't panic even when not in tmux
+	// (it should return nil/empty when tmux is not available)
+	result := getTmuxClientTTYs()
+	// Result can be nil (not in tmux) or a list of ttys (in tmux)
+	// Either is fine, we just verify it doesn't panic
+	_ = result
+}
+
+func TestGetTmuxClientTTYsFiltersValidPaths(t *testing.T) {
+	// This test verifies that the function properly filters tty paths
+	// Since we can't easily mock exec.Command, we just verify the
+	// function returns paths starting with /dev/ when in tmux
+	result := getTmuxClientTTYs()
+	for _, tty := range result {
+		if tty != "" && tty[:5] != "/dev/" {
+			t.Errorf("getTmuxClientTTYs returned invalid path: %q", tty)
+		}
+	}
+}
+
+func TestUnixTime(t *testing.T) {
+	// Verify unixTime returns a reasonable timestamp
+	ts := unixTime()
+	// Should be after 2020-01-01 (timestamp 1577836800)
+	if ts < 1577836800 {
+		t.Errorf("unixTime() = %d, want > 1577836800", ts)
+	}
+}

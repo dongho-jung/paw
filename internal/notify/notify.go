@@ -19,6 +19,8 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/dongho-jung/paw/internal/logging"
 )
@@ -270,9 +272,27 @@ func sendOSC777(title, message string, inTmux bool) {
 	writeOSC(osc, inTmux)
 }
 
-// writeOSC writes an OSC sequence, wrapping for tmux passthrough if needed.
+// writeOSC writes an OSC sequence to the terminal.
+// When running inside tmux, writes directly to client tty devices since the calling
+// process may not have its stderr connected to any terminal (e.g., background processes).
 func writeOSC(osc string, inTmux bool) {
 	if inTmux {
+		// Write directly to tmux client ttys (no passthrough wrapping needed
+		// since we're writing at the terminal level, not through tmux pane)
+		ttys := getTmuxClientTTYs()
+		if len(ttys) > 0 {
+			for _, tty := range ttys {
+				if f, err := os.OpenFile(tty, os.O_WRONLY, 0); err == nil {
+					fmt.Fprint(f, osc)
+					f.Close()
+				} else {
+					logging.Trace("writeOSC: failed to open client tty=%s err=%v", tty, err)
+				}
+			}
+			return
+		}
+		// Fallback: try passthrough (may not work if stderr isn't connected)
+		logging.Trace("writeOSC: no client ttys found, falling back to passthrough")
 		osc = wrapTmuxPassthrough(osc)
 	}
 	fmt.Fprint(os.Stderr, osc)
@@ -285,6 +305,65 @@ func wrapTmuxPassthrough(osc string) string {
 	// Double all escape characters for tmux passthrough
 	escaped := strings.ReplaceAll(osc, ESC, ESC+ESC)
 	return fmt.Sprintf("%sPtmux;%s%s", ESC, escaped, ST)
+}
+
+// tmuxClientTTYs caches the list of tmux client ttys.
+// Refreshed periodically since clients can connect/disconnect.
+var (
+	tmuxClientTTYs      []string
+	tmuxClientTTYsMutex sync.RWMutex
+	tmuxClientTTYsTime  int64 // Unix timestamp of last refresh
+)
+
+const tmuxClientTTYsCacheSec = 5 // Refresh every 5 seconds
+
+// getTmuxClientTTYs returns the list of terminal devices for all tmux clients.
+// Results are cached briefly to avoid calling tmux on every notification.
+func getTmuxClientTTYs() []string {
+	tmuxClientTTYsMutex.RLock()
+	now := unixTime()
+	if now-tmuxClientTTYsTime < tmuxClientTTYsCacheSec && len(tmuxClientTTYs) > 0 {
+		result := tmuxClientTTYs
+		tmuxClientTTYsMutex.RUnlock()
+		return result
+	}
+	tmuxClientTTYsMutex.RUnlock()
+
+	// Refresh the cache
+	tmuxClientTTYsMutex.Lock()
+	defer tmuxClientTTYsMutex.Unlock()
+
+	// Double-check after acquiring write lock
+	now = unixTime()
+	if now-tmuxClientTTYsTime < tmuxClientTTYsCacheSec && len(tmuxClientTTYs) > 0 {
+		return tmuxClientTTYs
+	}
+
+	// Get all connected client ttys
+	out, err := exec.Command("tmux", "list-clients", "-F", "#{client_tty}").Output()
+	if err != nil {
+		logging.Trace("getTmuxClientTTYs: tmux list-clients failed err=%v", err)
+		return nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	var ttys []string
+	for _, line := range lines {
+		tty := strings.TrimSpace(line)
+		if tty != "" && strings.HasPrefix(tty, "/dev/") {
+			ttys = append(ttys, tty)
+		}
+	}
+
+	tmuxClientTTYs = ttys
+	tmuxClientTTYsTime = now
+	logging.Trace("getTmuxClientTTYs: found %d clients: %v", len(ttys), ttys)
+	return ttys
+}
+
+// unixTime returns the current Unix timestamp.
+func unixTime() int64 {
+	return time.Now().Unix()
 }
 
 // notifySendPath caches the path to notify-send binary.
