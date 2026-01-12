@@ -112,8 +112,8 @@ func SendWithUrgency(title, message string, urgency Urgency) error {
 
 // SendWithOptions shows a desktop notification with custom options.
 func SendWithOptions(title, message string, opts NotifyOptions) error {
-	logging.Debug("-> SendWithOptions(title=%q, message=%q, urgency=%d, icon=%q)", title, message, opts.Urgency, opts.Icon)
-	defer logging.Debug("<- SendWithOptions")
+	logging.Info("-> SendWithOptions(title=%q, message=%q, urgency=%d, icon=%q)", title, message, opts.Urgency, opts.Icon)
+	defer logging.Info("<- SendWithOptions")
 
 	sendTerminalNotification(title, message, opts)
 	return nil
@@ -355,8 +355,8 @@ func tryNotifySend(title, message string, opts NotifyOptions) bool {
 // PlaySound plays an alert sound.
 // On macOS, uses system sounds via afplay. On other platforms, uses terminal bell.
 func PlaySound(soundType SoundType) {
-	logging.Debug("-> PlaySound(soundType=%s)", soundType)
-	defer logging.Debug("<- PlaySound")
+	logging.Info("-> PlaySound(soundType=%s)", soundType)
+	defer logging.Info("<- PlaySound")
 
 	if runtime.GOOS == "darwin" {
 		soundPath := fmt.Sprintf("/System/Library/Sounds/%s.aiff", soundType)
@@ -381,8 +381,8 @@ func PlaySound(soundType SoundType) {
 // in terminal-based notifications, so this just sends a simple notification.
 // Always returns -1 (no action selected).
 func SendWithActions(title, message, iconPath string, actions []string, timeoutSec int) (int, error) {
-	logging.Debug("-> SendWithActions(title=%q, actions=%v)", title, actions)
-	defer logging.Debug("<- SendWithActions")
+	logging.Info("-> SendWithActions(title=%q, actions=%v)", title, actions)
+	defer logging.Info("<- SendWithActions")
 
 	if err := Send(title, message); err != nil {
 		return -1, err

@@ -223,7 +223,7 @@ func renameWindowWithStatus(tm tmux.Client, windowID, name, pawDir, taskName, so
 	if err != nil {
 		logging.Warn("Failed to save status: %v", err)
 	} else {
-		logging.Debug("Status saved: %s", status)
+		logging.Info("Status saved: %s", status)
 	}
 	if !valid {
 		logging.Warn("Invalid status transition: %s -> %s", prevStatus, status)
@@ -240,7 +240,7 @@ func renameWindowWithStatus(tm tmux.Client, windowID, name, pawDir, taskName, so
 	// NOTE: WAITING state is handled by watch-wait watcher (wait.go) which provides
 	// action buttons and prompt context. Warning states now also display as WAITING.
 	if prevStatus != status && status == task.StatusDone {
-		logging.Trace("renameWindowWithStatus: sending done notification for task=%s", taskName)
+		logging.Info("renameWindowWithStatus: sending done notification for task=%s", taskName)
 		notify.PlaySound(notify.SoundTaskCompleted)
 		_ = notify.Send("Task ready", fmt.Sprintf("✅ %s is ready for review", taskName))
 	}
