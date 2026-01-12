@@ -37,16 +37,16 @@ func DefaultInheritConfig() *InheritConfig {
 	}
 }
 
-// GlobalPawDir returns the global PAW directory path ($HOME/.paw).
+// GlobalPawDir returns the global PAW directory path ($HOME/.config/paw).
 func GlobalPawDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, constants.PawDirName)
+	return filepath.Join(home, ".config", "paw")
 }
 
-// LoadGlobal reads the global configuration from $HOME/.paw/config.
+// LoadGlobal reads the global configuration from $HOME/.config/paw/config.
 func LoadGlobal() (*Config, error) {
 	logging.Debug("-> config.LoadGlobal()")
 	defer logging.Debug("<- config.LoadGlobal")

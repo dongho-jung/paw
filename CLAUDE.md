@@ -167,7 +167,7 @@ paw/                           # This repository
         ├── .options.json      # Task options (model, ultrathink, depends_on, pre_worktree_hook)
         └── .pr                # PR number (when created)
 
-$HOME/.paw/                        # Global PAW config (shared across all projects)
+$HOME/.config/paw/                 # Global PAW config (shared across all projects)
 └── config                         # Global config (default settings for all projects)
 ```
 
@@ -175,7 +175,7 @@ $HOME/.paw/                        # Global PAW config (shared across all projec
 
 PAW supports both global and project-level settings:
 
-- **Global settings** (`$HOME/.paw/config`): Default settings applied to all projects
+- **Global settings** (`$HOME/.config/paw/config`): Default settings applied to all projects
 - **Project settings** (`.paw/config`): Project-specific overrides
 
 In the Settings UI (⌃P → Settings), press `⌥Tab` to toggle between Global and Project views.
