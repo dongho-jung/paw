@@ -604,3 +604,107 @@ func TestTaskSetupSymlinksOverwrite(t *testing.T) {
 		t.Errorf("Symlink target = %q, want %q", absTarget, absProject2)
 	}
 }
+
+func TestTaskSetupClaudeSymlink(t *testing.T) {
+	tempDir := t.TempDir()
+	agentDir := filepath.Join(tempDir, "agents", "test-task")
+	worktreeDir := filepath.Join(agentDir, "worktree")
+	pawDir := filepath.Join(tempDir, "paw")
+	claudeDir := filepath.Join(pawDir, ".claude")
+
+	// Create required directories
+	for _, dir := range []string{agentDir, worktreeDir, claudeDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("Failed to create dir: %v", err)
+		}
+	}
+
+	// Create a test settings file in source .claude
+	settingsPath := filepath.Join(claudeDir, "settings.local.json")
+	if err := os.WriteFile(settingsPath, []byte(`{"test": true}`), 0644); err != nil {
+		t.Fatalf("Failed to write settings: %v", err)
+	}
+
+	task := New("test-task", agentDir)
+	task.WorktreeDir = worktreeDir
+
+	if err := task.SetupClaudeSymlink(pawDir); err != nil {
+		t.Fatalf("SetupClaudeSymlink() error = %v", err)
+	}
+
+	// Check symlink exists in worktree
+	claudeTargetPath := filepath.Join(worktreeDir, ".claude")
+	info, err := os.Lstat(claudeTargetPath)
+	if err != nil {
+		t.Fatalf("Claude symlink not created: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Error("Claude path is not a symlink")
+	}
+
+	// Verify symlink points to correct location
+	target, err := os.Readlink(claudeTargetPath)
+	if err != nil {
+		t.Fatalf("Failed to read symlink: %v", err)
+	}
+
+	// Resolve and verify the target
+	resolvedTarget := filepath.Join(worktreeDir, target)
+	absTarget, _ := filepath.Abs(resolvedTarget)
+	absClaudeDir, _ := filepath.Abs(claudeDir)
+
+	if absTarget != absClaudeDir {
+		t.Errorf("Symlink target = %q, want %q", absTarget, absClaudeDir)
+	}
+
+	// Verify settings file is accessible through symlink
+	symlinkSettings := filepath.Join(claudeTargetPath, "settings.local.json")
+	if _, err := os.Stat(symlinkSettings); err != nil {
+		t.Errorf("Settings file not accessible through symlink: %v", err)
+	}
+}
+
+func TestTaskSetupClaudeSymlinkNoWorktree(t *testing.T) {
+	tempDir := t.TempDir()
+	agentDir := filepath.Join(tempDir, "agents", "test-task")
+
+	if err := os.MkdirAll(agentDir, 0755); err != nil {
+		t.Fatalf("Failed to create dir: %v", err)
+	}
+
+	task := New("test-task", agentDir)
+	// Don't set WorktreeDir and don't create worktree directory
+
+	// Should not error - just return nil
+	if err := task.SetupClaudeSymlink(tempDir); err != nil {
+		t.Errorf("SetupClaudeSymlink() should not error without worktree: %v", err)
+	}
+}
+
+func TestTaskSetupClaudeSymlinkNoSource(t *testing.T) {
+	tempDir := t.TempDir()
+	agentDir := filepath.Join(tempDir, "agents", "test-task")
+	worktreeDir := filepath.Join(agentDir, "worktree")
+	pawDir := filepath.Join(tempDir, "paw")
+
+	// Create worktree but NOT .claude source
+	for _, dir := range []string{agentDir, worktreeDir, pawDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("Failed to create dir: %v", err)
+		}
+	}
+
+	task := New("test-task", agentDir)
+	task.WorktreeDir = worktreeDir
+
+	// Should not error - just return nil when source doesn't exist
+	if err := task.SetupClaudeSymlink(pawDir); err != nil {
+		t.Errorf("SetupClaudeSymlink() should not error without source: %v", err)
+	}
+
+	// Verify no symlink was created
+	claudeTargetPath := filepath.Join(worktreeDir, ".claude")
+	if _, err := os.Lstat(claudeTargetPath); !os.IsNotExist(err) {
+		t.Error("Symlink should not be created when source doesn't exist")
+	}
+}

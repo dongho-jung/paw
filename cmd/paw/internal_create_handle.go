@@ -121,6 +121,12 @@ var handleTaskCmd = &cobra.Command{
 			logging.Warn("Failed to setup symlinks: %v", err)
 		}
 
+		// Setup .claude symlink in worktree for stop-hook support
+		// This must be done after worktree setup so the directory exists
+		if err := t.SetupClaudeSymlink(appCtx.PawDir); err != nil {
+			logging.Warn("Failed to setup claude symlink: %v", err)
+		}
+
 		// Create tmux window
 		tm := tmux.New(sessionName)
 		workDir := mgr.GetWorkingDirectory(t)
