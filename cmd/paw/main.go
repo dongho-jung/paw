@@ -48,6 +48,7 @@ func init() {
 	rootCmd.AddCommand(cleanCmd)
 	rootCmd.AddCommand(killCmd)
 	rootCmd.AddCommand(killAllCmd)
+	rootCmd.AddCommand(locationCmd)
 	rootCmd.AddCommand(setupCmd)
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(historyCmd)

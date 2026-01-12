@@ -87,6 +87,16 @@ func (a *App) Initialize() error {
 		return fmt.Errorf("failed to create memory file: %w", err)
 	}
 
+	// Write project path file for global workspaces
+	// This allows getAppFromSession to find the correct project directory
+	// when PAW_DIR points to a global workspace path
+	if a.IsGlobalWorkspace() {
+		projectPathFile := filepath.Join(a.PawDir, constants.ProjectPathFileName)
+		if err := os.WriteFile(projectPathFile, []byte(a.ProjectDir), 0644); err != nil {
+			return fmt.Errorf("failed to write project path file: %w", err)
+		}
+	}
+
 	return nil
 }
 

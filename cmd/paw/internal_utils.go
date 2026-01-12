@@ -256,10 +256,9 @@ func getAppFromSession(sessionName string) (*app.App, error) {
 	// Session name is the project directory name
 	// We need to find the project directory
 
-	// First, try to get it from environment
-	if pawDir := os.Getenv("PAW_DIR"); pawDir != "" {
-		projectDir := filepath.Dir(pawDir)
-		logging.Debug("getAppFromSession: found PAW_DIR=%s, projectDir=%s", pawDir, projectDir)
+	// First, try PROJECT_DIR environment variable (most reliable)
+	if projectDir := os.Getenv("PROJECT_DIR"); projectDir != "" {
+		logging.Debug("getAppFromSession: found PROJECT_DIR=%s", projectDir)
 		application, err := app.New(projectDir)
 		if err != nil {
 			logging.Debug("getAppFromSession: app.New failed: %v", err)
@@ -268,16 +267,56 @@ func getAppFromSession(sessionName string) (*app.App, error) {
 		return loadAppConfig(application)
 	}
 
-	// Try current directory
+	// Try PAW_DIR environment variable
+	// Note: For global workspaces, PAW_DIR is not at {project}/.paw but at
+	// ~/.local/share/paw/workspaces/{project-id}, so filepath.Dir won't work.
+	// We need to read the project path from the workspace itself.
+	if pawDir := os.Getenv("PAW_DIR"); pawDir != "" {
+		logging.Debug("getAppFromSession: found PAW_DIR=%s", pawDir)
+
+		// Check if PAW_DIR is a global workspace by looking for project-path file
+		projectPathFile := filepath.Join(pawDir, ".project-path")
+		if data, err := os.ReadFile(projectPathFile); err == nil {
+			projectDir := strings.TrimSpace(string(data))
+			logging.Debug("getAppFromSession: found project-path=%s", projectDir)
+			application, err := app.New(projectDir)
+			if err != nil {
+				logging.Debug("getAppFromSession: app.New failed: %v", err)
+				return nil, err
+			}
+			return loadAppConfig(application)
+		}
+
+		// Fallback: assume PAW_DIR is at {project}/.paw (local workspace)
+		projectDir := filepath.Dir(pawDir)
+		logging.Debug("getAppFromSession: assuming local workspace, projectDir=%s", projectDir)
+		application, err := app.New(projectDir)
+		if err != nil {
+			logging.Debug("getAppFromSession: app.New failed: %v", err)
+			return nil, err
+		}
+		return loadAppConfig(application)
+	}
+
+	// Try current directory - walk up to find .paw but stop at home directory
+	// to avoid finding unrelated .paw directories in parent paths
 	cwd, err := os.Getwd()
 	if err != nil {
 		logging.Debug("getAppFromSession: os.Getwd failed: %v", err)
 		return nil, err
 	}
 
+	homeDir, _ := os.UserHomeDir()
+
 	// Walk up to find .paw directory
 	dir := cwd
 	for {
+		// Stop at home directory to avoid finding unrelated .paw
+		if homeDir != "" && dir == homeDir {
+			logging.Debug("getAppFromSession: reached home directory, stopping search")
+			break
+		}
+
 		pawDir := filepath.Join(dir, ".paw")
 		if _, err := os.Stat(pawDir); err == nil {
 			logging.Debug("getAppFromSession: found .paw at %s", pawDir)
@@ -296,8 +335,23 @@ func getAppFromSession(sessionName string) (*app.App, error) {
 		dir = parent
 	}
 
-	logging.Debug("getAppFromSession: could not find project directory")
-	return nil, fmt.Errorf("could not find project directory for session %s", sessionName)
+	// No local .paw found - try using cwd directly
+	// This handles the case where paw_in_project is false (global workspace)
+	// app.New will resolve to the correct global workspace path
+	logging.Debug("getAppFromSession: no local .paw found, trying cwd=%s", cwd)
+	application, err := app.New(cwd)
+	if err != nil {
+		logging.Debug("getAppFromSession: app.New(cwd) failed: %v", err)
+		return nil, fmt.Errorf("could not find project directory for session %s", sessionName)
+	}
+
+	// Verify that the workspace exists (was initialized)
+	if !application.IsInitialized() {
+		logging.Debug("getAppFromSession: workspace not initialized at %s", application.PawDir)
+		return nil, fmt.Errorf("could not find project directory for session %s", sessionName)
+	}
+
+	return loadAppConfig(application)
 }
 
 func loadAppConfig(application *app.App) (*app.App, error) {

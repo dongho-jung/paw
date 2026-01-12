@@ -223,6 +223,7 @@ const (
 	HistorySelectionFile   = ".history-selection" // Temp file for Ctrl+R history selection
 	StatusSignalFileName   = ".status-signal"     // Temp file for Claude to signal status directly
 	ProjectSwitchFileName  = ".project-switch"    // Temp file for project picker to signal switch target
+	ProjectPathFileName    = ".project-path"      // Stores project path for global workspaces
 )
 
 // Tmux related constants
