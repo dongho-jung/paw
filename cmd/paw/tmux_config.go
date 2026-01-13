@@ -18,7 +18,13 @@ func reapplyTmuxConfig(appCtx *app.App, tm tmux.Client) error {
 	}
 
 	// Re-apply keybindings (in case session name changed or for consistency)
-	bindings := buildKeybindings(pawBin, appCtx.SessionName)
+	bindings := buildKeybindings(KeybindingsContext{
+		PawBin:      pawBin,
+		SessionName: appCtx.SessionName,
+		PawDir:      appCtx.PawDir,
+		ProjectDir:  appCtx.ProjectDir,
+		DisplayName: appCtx.GetDisplayName(),
+	})
 	for _, b := range bindings {
 		if err := tm.Bind(b); err != nil {
 			logging.Debug("Failed to bind %s: %v", b.Key, err)
@@ -52,14 +58,15 @@ func setupTmuxConfig(appCtx *app.App, tm tmux.Client) error {
 
 	// Setup terminal title (for iTerm2 tab naming)
 	// This makes tmux set the terminal title, which works better than OSC sequences
-	// because iTerm otherwise shows the running command (tmux -f /var/...)
+	// because iTerm otherwise shows the running command (tmux /var/...)
 	_ = tm.SetOption("set-titles", "on", true)
-	_ = tm.SetOption("set-titles-string", "[paw] "+appCtx.SessionName, true)
+	_ = tm.SetOption("set-titles-string", "[paw] "+appCtx.GetDisplayName(), true)
 
 	// Setup status bar
+	// Use DisplayName for user-friendly display (e.g., "repo/subdir" format)
 	_ = tm.SetOption("status", "on", true)
 	_ = tm.SetOption("status-position", "bottom", true)
-	_ = tm.SetOption("status-left", " "+appCtx.SessionName+" ", true)
+	_ = tm.SetOption("status-left", " "+appCtx.GetDisplayName()+" ", true)
 	_ = tm.SetOption("status-left-length", "30", true)
 	_ = tm.SetOption("status-right", " ⌥←→:windows ⌥Tab:panes ^/:help ", true)
 	_ = tm.SetOption("status-right-length", "100", true)
@@ -106,7 +113,13 @@ func setupTmuxConfig(appCtx *app.App, tm tmux.Client) error {
 	_ = tm.Run("unbind-key", "-T", "root", "C-b")
 
 	// Setup keybindings (English + Korean layouts)
-	bindings := buildKeybindings(pawBin, appCtx.SessionName)
+	bindings := buildKeybindings(KeybindingsContext{
+		PawBin:      pawBin,
+		SessionName: appCtx.SessionName,
+		PawDir:      appCtx.PawDir,
+		ProjectDir:  appCtx.ProjectDir,
+		DisplayName: appCtx.GetDisplayName(),
+	})
 	for _, b := range bindings {
 		if err := tm.Bind(b); err != nil {
 			logging.Debug("Failed to bind %s: %v", b.Key, err)

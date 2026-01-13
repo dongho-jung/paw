@@ -135,7 +135,12 @@ func runMain(cmd *cobra.Command, args []string) error {
 	projectDir := cwd
 	if isGitRepo {
 		if repoRoot, err := gitClient.GetRepoRoot(cwd); err == nil {
+			if repoRoot != cwd {
+				logging.Debug("Running from subdirectory: cwd=%s, repoRoot=%s", cwd, repoRoot)
+			}
 			projectDir = repoRoot
+		} else {
+			logging.Warn("Failed to get repo root, using cwd: %v", err)
 		}
 	}
 
@@ -144,6 +149,11 @@ func runMain(cmd *cobra.Command, args []string) error {
 	application, err := app.NewWithGitInfo(projectDir, isGitRepo)
 	if err != nil {
 		return fmt.Errorf("failed to create app: %w", err)
+	}
+
+	// Set display name context for subdirectory runs
+	if isGitRepo {
+		application.SetSubdirectoryContext(cwd, projectDir)
 	}
 
 	// Set PAW home

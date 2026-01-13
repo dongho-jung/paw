@@ -238,7 +238,9 @@ func jumpToTask(task *service.DiscoveredTask) tea.Cmd {
 		}
 
 		// Check if we need to jump to a different project
-		if task.Session != ProjectName {
+		// Use SessionName (tmux session name) for comparison, not ProjectName (display name)
+		// In subdirectory context: SessionName="repo-subdir", ProjectName="repo/subdir"
+		if task.Session != SessionName {
 			// Different project - return jump target for parent to handle
 			// Cross-socket jumps require replacing the current process with tmux attach
 			return jumpToTaskMsg{

@@ -6,6 +6,15 @@ import (
 	"github.com/dongho-jung/paw/internal/tmux"
 )
 
+// KeybindingsContext contains the context needed for building keybindings.
+type KeybindingsContext struct {
+	PawBin      string
+	SessionName string
+	PawDir      string
+	ProjectDir  string
+	DisplayName string
+}
+
 // buildKeybindings creates tmux keybindings for PAW.
 // Keyboard shortcuts:
 //   - Ctrl+N: New task
@@ -21,17 +30,22 @@ import (
 //   - Alt+Left/Right: Move window
 //   - Alt+Tab: Cycle pane forward (in task windows) / Cycle options (in new task window)
 //   - Alt+Shift+Tab: Cycle pane backward (in task windows) / Cycle options backward (in new task window)
-func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
-	// Command shortcuts
-	cmdNewTask := fmt.Sprintf("run-shell '%s internal toggle-new %s'", pawBin, sessionName)
-	cmdDoneTask := fmt.Sprintf("run-shell '%s internal done-task %s'", pawBin, sessionName)
+func buildKeybindings(ctx KeybindingsContext) []tmux.BindOpts {
+	// Environment variables for proper context resolution in subdirectory sessions
+	// These are embedded directly in the keybindings (not tmux format variables)
+	envPrefix := fmt.Sprintf(`PAW_DIR="%s" PROJECT_DIR="%s" DISPLAY_NAME="%s" `,
+		ctx.PawDir, ctx.ProjectDir, ctx.DisplayName)
+
+	// Command shortcuts - all commands include env vars for proper context resolution
+	cmdNewTask := fmt.Sprintf("run-shell '%s%s internal toggle-new %s'", envPrefix, ctx.PawBin, ctx.SessionName)
+	cmdDoneTask := fmt.Sprintf("run-shell '%s%s internal done-task %s'", envPrefix, ctx.PawBin, ctx.SessionName)
 	cmdQuit := "detach-client"
-	cmdToggleLogs := fmt.Sprintf("run-shell '%s internal toggle-log %s'", pawBin, sessionName)
-	cmdToggleGitStatus := fmt.Sprintf("run-shell '%s internal toggle-git-status %s'", pawBin, sessionName)
-	cmdToggleBottom := fmt.Sprintf("run-shell '%s internal popup-shell %s'", pawBin, sessionName)
-	cmdToggleHelp := fmt.Sprintf("run-shell '%s internal toggle-help %s'", pawBin, sessionName)
-	cmdToggleCmdPalette := fmt.Sprintf("run-shell '%s internal toggle-cmd-palette %s'", pawBin, sessionName)
-	cmdToggleProjectPicker := fmt.Sprintf("run-shell '%s internal toggle-project-picker %s'", pawBin, sessionName)
+	cmdToggleLogs := fmt.Sprintf("run-shell '%s%s internal toggle-log %s'", envPrefix, ctx.PawBin, ctx.SessionName)
+	cmdToggleGitStatus := fmt.Sprintf("run-shell '%s%s internal toggle-git-status %s'", envPrefix, ctx.PawBin, ctx.SessionName)
+	cmdToggleBottom := fmt.Sprintf("run-shell '%s%s internal popup-shell %s'", envPrefix, ctx.PawBin, ctx.SessionName)
+	cmdToggleHelp := fmt.Sprintf("run-shell '%s%s internal toggle-help %s'", envPrefix, ctx.PawBin, ctx.SessionName)
+	cmdToggleCmdPalette := fmt.Sprintf("run-shell '%s%s internal toggle-cmd-palette %s'", envPrefix, ctx.PawBin, ctx.SessionName)
+	cmdToggleProjectPicker := fmt.Sprintf("run-shell '%s%s internal toggle-project-picker %s'", envPrefix, ctx.PawBin, ctx.SessionName)
 
 	// Alt+Tab: context-aware - pass through to TUI in new task window, cycle panes otherwise
 	// #{m:pattern,string} checks if string matches pattern (⭐️* = starts with ⭐️)
@@ -43,7 +57,7 @@ func buildKeybindings(pawBin, sessionName string) []tmux.BindOpts {
 
 	// Ctrl+R: context-aware - show history picker only in new task window (⭐️)
 	// In other windows, pass through Ctrl+R for normal reverse search
-	cmdCtrlR := fmt.Sprintf(`if -F "#{m:⭐️*,#{window_name}}" "run-shell '%s internal toggle-history %s'" "send-keys C-r"`, pawBin, sessionName)
+	cmdCtrlR := fmt.Sprintf(`if -F "#{m:⭐️*,#{window_name}}" "run-shell '%s%s internal toggle-history %s'" "send-keys C-r"`, envPrefix, ctx.PawBin, ctx.SessionName)
 
 	return []tmux.BindOpts{
 		// Navigation (Alt-based)

@@ -175,6 +175,7 @@ paw/                           # This repository
     │   └── YYMMDD_HHMMSS_task-name  # Task + summary + pane capture at task end
     └── agents/{task-name}/    # Per-task workspace
         ├── task               # Task contents
+        ├── log                # Task-specific progress log (for agent progress updates)
         ├── end-task           # Per-task end-task script (called for auto-merge)
         ├── origin             # -> Project root (symlink)
         ├── worktree/          # Git worktree (auto-created in git mode)

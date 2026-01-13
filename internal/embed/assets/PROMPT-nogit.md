@@ -21,10 +21,9 @@ You are in `$PAW_DIR/agents/$TASK_NAME/`. **Access project files via the `origin
 ```
 $PAW_DIR/agents/$TASK_NAME/
 ├── task           # Your task description (READ THIS FIRST)
+├── log            # Task-specific log file (write progress here)
 ├── origin/        # -> PROJECT_DIR (symlink to project root)
 └── .claude/       # Claude settings (stop-hook config)
-
-$PAW_DIR/log        # Unified log file (all tasks write here)
 ```
 
 ## ⚠️ CRITICAL: Working Directory
@@ -196,7 +195,7 @@ Code change: Add --verbose flag to CLI
 
 **Log major milestones immediately (≤32 chars per line):**
 ```bash
-echo "Short progress summary" >> $PAW_DIR/log
+echo "Short progress summary" >> $PAW_DIR/agents/$TASK_NAME/log
 ```
 
 **When to log:**
