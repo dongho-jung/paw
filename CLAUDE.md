@@ -121,6 +121,8 @@ paw/                           # This repository
 │   │       ├── PROMPT-nogit.md # System prompt (non-git mode)
 │   │       ├── tmux.conf      # Base tmux configuration
 │   │       └── claude/        # Claude settings
+│   │           ├── CLAUDE.md  # Default CLAUDE.md for new workspaces
+│   │           └── settings.local.json # Claude Code local settings
 │   ├── git/                   # Git/worktree management
 │   ├── github/                # GitHub API client
 │   ├── logging/               # Logging (L0-L5 levels)
