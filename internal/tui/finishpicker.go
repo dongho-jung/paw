@@ -30,12 +30,13 @@ type FinishOption struct {
 
 // FinishPicker is a TUI for selecting how to finish a task.
 type FinishPicker struct {
-	options      []FinishOption
-	cursor       int
-	selected     FinishAction
-	confirming   bool // True when showing confirmation for drop action
-	isDark       bool
-	colors       ThemeColors
+	options       []FinishOption
+	cursor        int
+	selected      FinishAction
+	confirming    bool // True when showing confirmation for drop action
+	confirmCursor int  // 0=No, 1=Yes for confirmation dialog
+	isDark        bool
+	colors        ThemeColors
 }
 
 // gitOptions returns the options for git mode.
@@ -97,11 +98,33 @@ func (m *FinishPicker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle confirmation mode
 		if m.confirming {
 			switch msg.String() {
-			case "y", "Y", "enter":
+			case "y", "Y":
+				// Direct yes selection
 				m.selected = FinishActionDrop
 				return m, tea.Quit
 			case "n", "N", "esc", "ctrl+c", "ctrl+f":
+				// Direct no selection or cancel
 				m.confirming = false
+				m.confirmCursor = 0
+				return m, nil
+			case "enter", " ":
+				// Select based on cursor position
+				if m.confirmCursor == 1 {
+					m.selected = FinishActionDrop
+					return m, tea.Quit
+				}
+				m.confirming = false
+				m.confirmCursor = 0
+				return m, nil
+			case "up", "k":
+				if m.confirmCursor > 0 {
+					m.confirmCursor--
+				}
+				return m, nil
+			case "down", "j":
+				if m.confirmCursor < 1 {
+					m.confirmCursor++
+				}
 				return m, nil
 			}
 			return m, nil
@@ -118,6 +141,7 @@ func (m *FinishPicker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if opt.Warning {
 				// Show confirmation for warning actions
 				m.confirming = true
+				m.confirmCursor = 0 // Default to "No"
 				return m, nil
 			}
 			m.selected = opt.Action
@@ -157,6 +181,7 @@ func (m *FinishPicker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if opt.Action == FinishActionDrop {
 					m.cursor = i
 					m.confirming = true
+					m.confirmCursor = 0 // Default to "No"
 					return m, nil
 				}
 			}
@@ -189,7 +214,7 @@ func (m *FinishPicker) View() tea.View {
 
 	selectedDescStyle := lipgloss.NewStyle().
 		Foreground(c.Accent).
-		PaddingLeft(2)
+		PaddingLeft(4)
 
 	warningStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("203")). // Red
@@ -207,7 +232,25 @@ func (m *FinishPicker) View() tea.View {
 		sb.WriteString("\n\n")
 		sb.WriteString(lipgloss.NewStyle().Foreground(c.TextDim).Render("This will discard all uncommitted work."))
 		sb.WriteString("\n\n")
-		sb.WriteString(helpStyle.Render("y: Yes, drop  n/Esc: No, go back"))
+
+		// Render confirmation options (No, Yes order)
+		confirmOptions := []struct {
+			name string
+			key  string
+		}{
+			{"No, go back", "n"},
+			{"Yes, drop", "y"},
+		}
+		for i, opt := range confirmOptions {
+			if i == m.confirmCursor {
+				sb.WriteString(selectedStyle.Render("> " + opt.name))
+			} else {
+				sb.WriteString(itemStyle.Render(opt.name))
+			}
+			sb.WriteString("\n")
+		}
+
+		sb.WriteString(helpStyle.Render("↑/↓: Navigate  Enter: Select  n/y: Quick select"))
 		return tea.NewView(sb.String())
 	}
 
