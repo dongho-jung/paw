@@ -170,33 +170,38 @@ paw/                           # This repository
 $HOME/.config/paw/                 # Global PAW config (shared across all projects)
 └── config                         # Global config (default settings for all projects)
 
-$HOME/.local/share/paw/            # Global PAW data (when paw_in_project is false)
+$HOME/.local/share/paw/            # Global PAW data (when paw_in_project is global or auto+git)
 └── workspaces/                    # Workspaces for all projects
     └── {project-name}-{hash}/     # Per-project workspace (same structure as .paw above)
 ```
 
 ### Workspace Location
 
-By default, PAW stores workspaces in `$HOME/.local/share/paw/workspaces/` to avoid modifying project `.gitignore` files. This behavior is controlled by the `paw_in_project` global setting.
+PAW can store workspaces either globally or locally. This behavior is controlled by the `paw_in_project` global setting.
 
 **Global config (`$HOME/.config/paw/config`):**
 ```yaml
-# Workspace location (default: false)
-# - false: Store in ~/.local/share/paw/workspaces/{project-id}/ (recommended)
-# - true: Store in project/.paw/ (requires .gitignore modification)
-paw_in_project: false
+# Workspace location (default: auto)
+# - auto: Git repo -> global, non-git -> local (recommended)
+# - global: Store in ~/.local/share/paw/workspaces/{project-id}/
+# - local: Store in project/.paw/ (requires .gitignore modification)
+paw_in_project: auto
 ```
 
 **Priority rules:**
 1. If a local `.paw/` directory already exists in the project, it takes priority (for backward compatibility)
 2. Otherwise, the `paw_in_project` global setting determines the location
 
-**Benefits of global workspace (paw_in_project: false):**
+**Auto mode (default):**
+- **Git repositories**: Uses global workspace (no `.gitignore` modification needed)
+- **Non-git directories**: Uses local workspace (convenient for standalone projects)
+
+**Benefits of global workspace (paw_in_project: global):**
 - No need to modify project `.gitignore`
 - Cleaner project directory
 - Workspaces persist even if project is deleted and re-cloned
 
-**When to use local workspace (paw_in_project: true):**
+**When to use local workspace (paw_in_project: local):**
 - When you want PAW data to be project-specific
 - When you need `.paw/config` and `.paw/memory` tracked in version control
 

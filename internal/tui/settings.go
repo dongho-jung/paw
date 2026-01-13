@@ -66,7 +66,7 @@ type SettingsUI struct {
 	// For fields with inherit option, index 0 = "inherit"
 	workModeIdx     int // 0=inherit, 1=worktree, 2=main (project scope) or 0=worktree, 1=main (global scope)
 	themeIdx        int // 0=auto, 1...N=presets (no inherit option)
-	pawInProjectIdx int // 0=global workspace, 1=in project (global scope only, no inherit)
+	pawInProjectIdx int // 0=auto, 1=global, 2=local (global scope only, no inherit)
 	selfImproveIdx  int // 0=inherit, 1=on, 2=off (project scope) or 0=on, 1=off (global scope)
 }
 
@@ -160,11 +160,14 @@ func (m *SettingsUI) initFieldIndices() {
 		}
 	}
 
-	// PawInProject: global scope only, no inherit option (0=global workspace, 1=in project)
-	if cfg.PawInProject {
-		m.pawInProjectIdx = 1
-	} else {
-		m.pawInProjectIdx = 0
+	// PawInProject: global scope only, no inherit option (0=auto, 1=global, 2=local)
+	modes := config.ValidPawInProjectModes()
+	m.pawInProjectIdx = 0 // default to auto
+	for i, mode := range modes {
+		if mode == cfg.PawInProject {
+			m.pawInProjectIdx = i
+			break
+		}
 	}
 
 	// SelfImprove: For project scope, index 0 = inherit
@@ -310,8 +313,9 @@ func (m *SettingsUI) handleRight() {
 			m.themeIdx++
 		}
 	case SettingsFieldPawInProject:
-		// Only editable in global scope (0=global, 1=in project)
-		if m.scope == SettingsScopeGlobal && m.pawInProjectIdx < 1 {
+		// Only editable in global scope (0=auto, 1=global, 2=local)
+		maxIdx := len(config.ValidPawInProjectModes()) - 1
+		if m.scope == SettingsScopeGlobal && m.pawInProjectIdx < maxIdx {
 			m.pawInProjectIdx++
 		}
 	case SettingsFieldSelfImprove:
@@ -359,7 +363,10 @@ func (m *SettingsUI) applyChanges() {
 
 	// Apply PawInProject (global scope only, no inherit option)
 	if m.scope == SettingsScopeGlobal {
-		m.config.PawInProject = (m.pawInProjectIdx == 1)
+		modes := config.ValidPawInProjectModes()
+		if m.pawInProjectIdx < len(modes) {
+			m.config.PawInProject = modes[m.pawInProjectIdx]
+		}
 	}
 
 	// Apply SelfImprove
@@ -553,20 +560,34 @@ func (m *SettingsUI) renderGeneralTab(sb *strings.Builder, labelStyle, selectedL
 		var hint string
 
 		if m.scope == SettingsScopeGlobal {
-			if m.pawInProjectIdx == 0 {
-				currentValue = "global"
-				hint = "(~/.local/share/paw/workspaces)"
-			} else {
-				currentValue = "in project"
-				hint = "(.paw in project dir)"
+			modes := config.ValidPawInProjectModes()
+			if m.pawInProjectIdx < len(modes) {
+				switch modes[m.pawInProjectIdx] {
+				case config.PawInProjectAuto:
+					currentValue = "auto"
+					hint = "(git→global, non-git→local)"
+				case config.PawInProjectGlobal:
+					currentValue = "global"
+					hint = "(~/.local/share/paw/workspaces)"
+				case config.PawInProjectLocal:
+					currentValue = "local"
+					hint = "(.paw in project dir)"
+				}
 			}
 		} else {
 			// Project scope - show read-only inherited value
-			if m.globalConfig.PawInProject {
-				currentValue = "in project"
+			switch m.globalConfig.PawInProject {
+			case config.PawInProjectAuto:
+				currentValue = "auto"
 				hint = "(set in global config)"
-			} else {
+			case config.PawInProjectGlobal:
 				currentValue = "global"
+				hint = "(set in global config)"
+			case config.PawInProjectLocal:
+				currentValue = "local"
+				hint = "(set in global config)"
+			default:
+				currentValue = "auto"
 				hint = "(set in global config)"
 			}
 		}

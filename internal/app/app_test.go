@@ -47,10 +47,10 @@ func TestNew(t *testing.T) {
 func TestNewWithGlobalWorkspace(t *testing.T) {
 	tempDir := t.TempDir()
 
-	// Without local .paw, should use global workspace location (default paw_in_project: false)
-	app, err := New(tempDir)
+	// With auto mode (default) + isGitRepo=true, should use global workspace location
+	app, err := NewWithGitInfo(tempDir, true)
 	if err != nil {
-		t.Fatalf("New() error = %v", err)
+		t.Fatalf("NewWithGitInfo() error = %v", err)
 	}
 
 	if app.ProjectDir != tempDir {
@@ -67,6 +67,26 @@ func TestNewWithGlobalWorkspace(t *testing.T) {
 	expectedAgentsDir := filepath.Join(app.PawDir, constants.AgentsDirName)
 	if app.AgentsDir != expectedAgentsDir {
 		t.Errorf("AgentsDir = %q, want %q", app.AgentsDir, expectedAgentsDir)
+	}
+}
+
+func TestNewWithLocalWorkspaceForNonGit(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// With auto mode (default) + isGitRepo=false, should use local workspace location
+	app, err := NewWithGitInfo(tempDir, false)
+	if err != nil {
+		t.Fatalf("NewWithGitInfo() error = %v", err)
+	}
+
+	if app.ProjectDir != tempDir {
+		t.Errorf("ProjectDir = %q, want %q", app.ProjectDir, tempDir)
+	}
+
+	// PawDir should be local (.paw in project dir)
+	expectedPawDir := filepath.Join(tempDir, constants.PawDirName)
+	if app.PawDir != expectedPawDir {
+		t.Errorf("PawDir = %q, expected local %q for non-git project with auto mode", app.PawDir, expectedPawDir)
 	}
 }
 

@@ -41,14 +41,14 @@ func runLocation(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create app context to get workspace path
-	application, err := app.New(projectDir)
+	application, err := app.NewWithGitInfo(projectDir, isGitRepo)
 	if err != nil {
 		return fmt.Errorf("failed to create app: %w", err)
 	}
 
 	// Load global config to show paw_in_project setting
 	globalCfg, _ := config.LoadGlobal()
-	pawInProject := false
+	pawInProject := config.PawInProjectAuto
 	if globalCfg != nil {
 		pawInProject = globalCfg.PawInProject
 	}
@@ -62,7 +62,7 @@ func runLocation(cmd *cobra.Command, args []string) error {
 	}
 
 	if application.IsGlobalWorkspace() {
-		fmt.Fprintf(os.Stderr, "(global workspace, paw_in_project=%v)\n", pawInProject)
+		fmt.Fprintf(os.Stderr, "(global workspace, paw_in_project=%s)\n", pawInProject)
 	} else {
 		fmt.Fprintf(os.Stderr, "(local workspace in project directory)\n")
 	}

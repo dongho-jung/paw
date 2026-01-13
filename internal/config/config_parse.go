@@ -104,8 +104,16 @@ func parseConfig(content string) (*Config, error) {
 				cfg.SelfImprove = parsed
 			}
 		case "paw_in_project":
-			if parsed, err := strconv.ParseBool(value); err == nil {
-				cfg.PawInProject = parsed
+			// Support both string values (auto, global, local) and legacy bool values (true, false)
+			switch strings.ToLower(value) {
+			case "auto":
+				cfg.PawInProject = PawInProjectAuto
+			case "global", "false":
+				cfg.PawInProject = PawInProjectGlobal
+			case "local", "true":
+				cfg.PawInProject = PawInProjectLocal
+			default:
+				cfg.PawInProject = PawInProjectAuto // default
 			}
 		}
 	}

@@ -34,8 +34,14 @@ type App struct {
 // New creates a new App instance for the given project directory.
 // It resolves the PawDir based on:
 // 1. Local .paw directory if it exists (takes priority for backward compatibility)
-// 2. Global config's paw_in_project setting (false = global workspace, true = local)
+// 2. Global config's paw_in_project setting (auto = based on git, global = always global, local = always local)
 func New(projectDir string) (*App, error) {
+	return NewWithGitInfo(projectDir, false)
+}
+
+// NewWithGitInfo creates a new App instance with explicit git repo information.
+// This is used when the caller already knows if the project is a git repo.
+func NewWithGitInfo(projectDir string, isGitRepo bool) (*App, error) {
 	absPath, err := filepath.Abs(projectDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve project path: %w", err)
@@ -49,13 +55,13 @@ func New(projectDir string) (*App, error) {
 
 	// Load global config to check paw_in_project setting
 	globalCfg, _ := config.LoadGlobal()
-	pawInProject := false
+	pawInProject := config.PawInProjectAuto
 	if globalCfg != nil {
 		pawInProject = globalCfg.PawInProject
 	}
 
 	// Resolve workspace directory (local .paw takes priority if exists)
-	pawDir := config.GetWorkspaceDir(absPath, pawInProject)
+	pawDir := config.GetWorkspaceDir(absPath, pawInProject, isGitRepo)
 	agentsDir := filepath.Join(pawDir, constants.AgentsDirName)
 
 	app := &App{
@@ -64,6 +70,7 @@ func New(projectDir string) (*App, error) {
 		AgentsDir:   agentsDir,
 		SessionName: sessionName,
 		Debug:       debug,
+		IsGitRepo:   isGitRepo,
 	}
 
 	return app, nil

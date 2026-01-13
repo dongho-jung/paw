@@ -89,15 +89,30 @@ func ProjectWorkspaceID(projectDir string) string {
 // GetWorkspaceDir returns the workspace directory for a project.
 // If localPawDir exists, it takes priority (for backward compatibility).
 // Otherwise, uses global workspace location based on pawInProject setting.
-func GetWorkspaceDir(projectDir string, pawInProject bool) string {
+// isGitRepo is used when pawInProject is "auto": git -> global, non-git -> local.
+func GetWorkspaceDir(projectDir string, pawInProject PawInProject, isGitRepo bool) string {
 	// Local .paw takes priority if it exists
 	localPawDir := filepath.Join(projectDir, constants.PawDirName)
 	if _, err := os.Stat(localPawDir); err == nil {
 		return localPawDir
 	}
 
-	// Use global or local based on setting
-	if pawInProject {
+	// Resolve auto mode
+	useLocal := false
+	switch pawInProject {
+	case PawInProjectLocal:
+		useLocal = true
+	case PawInProjectGlobal:
+		useLocal = false
+	case PawInProjectAuto:
+		// Auto: git repo -> global, non-git -> local
+		useLocal = !isGitRepo
+	default:
+		// Default to auto behavior for empty or unknown values
+		useLocal = !isGitRepo
+	}
+
+	if useLocal {
 		return localPawDir
 	}
 
@@ -109,6 +124,11 @@ func GetWorkspaceDir(projectDir string, pawInProject bool) string {
 	}
 
 	return filepath.Join(globalDir, ProjectWorkspaceID(projectDir))
+}
+
+// ValidPawInProjectModes returns all valid paw_in_project modes.
+func ValidPawInProjectModes() []PawInProject {
+	return []PawInProject{PawInProjectAuto, PawInProjectGlobal, PawInProjectLocal}
 }
 
 // LoadGlobal reads the global configuration from $HOME/.config/paw/config.
@@ -142,11 +162,20 @@ const (
 	WorkModeMain     WorkMode = "main"     // All tasks work on current branch
 )
 
+// PawInProject defines where the workspace is stored.
+type PawInProject string
+
+const (
+	PawInProjectAuto   PawInProject = "auto"   // Git repo -> global, non-git -> local
+	PawInProjectGlobal PawInProject = "global" // Always use global workspace
+	PawInProjectLocal  PawInProject = "local"  // Always use local workspace
+)
+
 // Config represents the PAW project configuration.
 type Config struct {
 	WorkMode        WorkMode `yaml:"work_mode"`
 	Theme           string   `yaml:"theme"` // Theme preset: auto, dark, dark-blue, light, light-blue, etc.
-	PawInProject    bool     `yaml:"paw_in_project"` // If true, store .paw in project dir; if false, use global workspace
+	PawInProject    PawInProject `yaml:"paw_in_project"` // Workspace location: auto, global, or local
 	PreWorktreeHook string   `yaml:"pre_worktree_hook"`
 	PreTaskHook     string   `yaml:"pre_task_hook"`
 	PostTaskHook    string   `yaml:"post_task_hook"`
@@ -204,6 +233,7 @@ func (c *Config) Normalize() []string {
 func DefaultConfig() *Config {
 	return &Config{
 		WorkMode:      WorkModeWorktree,
+		PawInProject:  PawInProjectAuto,
 		LogFormat:     "text",
 		LogMaxSizeMB:  10,
 		LogMaxBackups: 3,
@@ -300,10 +330,11 @@ func (c *Config) Save(pawDir string) error {
 # - main: All tasks work on the current branch
 work_mode: %s
 
-# Workspace location: true or false (default: false)
-# - true: Store .paw directory inside the project (requires .gitignore)
-# - false: Store workspace in $HOME/.local/share/paw/workspaces/ (no .gitignore needed)
-paw_in_project: %t
+# Workspace location: auto, global, or local (default: auto)
+# - auto: Git repo -> global, non-git -> local (recommended)
+# - global: Store workspace in $HOME/.local/share/paw/workspaces/ (no .gitignore needed)
+# - local: Store .paw directory inside the project (requires .gitignore)
+paw_in_project: %s
 
 # Log format: text or jsonl
 log_format: %s

@@ -295,22 +295,37 @@ func TestParseConfig_PawInProject(t *testing.T) {
 	tests := []struct {
 		name     string
 		content  string
-		expected bool
+		expected PawInProject
 	}{
 		{
-			name:     "paw_in_project true",
-			content:  "work_mode: worktree\npaw_in_project: true\n",
-			expected: true,
+			name:     "paw_in_project auto",
+			content:  "work_mode: worktree\npaw_in_project: auto\n",
+			expected: PawInProjectAuto,
 		},
 		{
-			name:     "paw_in_project false",
+			name:     "paw_in_project global",
+			content:  "work_mode: worktree\npaw_in_project: global\n",
+			expected: PawInProjectGlobal,
+		},
+		{
+			name:     "paw_in_project local",
+			content:  "work_mode: worktree\npaw_in_project: local\n",
+			expected: PawInProjectLocal,
+		},
+		{
+			name:     "paw_in_project true (legacy)",
+			content:  "work_mode: worktree\npaw_in_project: true\n",
+			expected: PawInProjectLocal, // legacy true = local
+		},
+		{
+			name:     "paw_in_project false (legacy)",
 			content:  "work_mode: worktree\npaw_in_project: false\n",
-			expected: false,
+			expected: PawInProjectGlobal, // legacy false = global
 		},
 		{
 			name:     "paw_in_project not set",
 			content:  "work_mode: worktree\n",
-			expected: false, // default
+			expected: PawInProjectAuto, // default is auto
 		},
 	}
 
@@ -386,8 +401,8 @@ func TestGetWorkspaceDir_LocalPriority(t *testing.T) {
 		t.Fatalf("Failed to create local .paw: %v", err)
 	}
 
-	// Even with pawInProject=false, local should take priority
-	result := GetWorkspaceDir(tempDir, false)
+	// Even with pawInProject=global, local should take priority if exists
+	result := GetWorkspaceDir(tempDir, PawInProjectGlobal, true)
 	if result != localPawDir {
 		t.Errorf("GetWorkspaceDir() = %q, want %q (local should take priority)", result, localPawDir)
 	}
@@ -396,8 +411,8 @@ func TestGetWorkspaceDir_LocalPriority(t *testing.T) {
 func TestGetWorkspaceDir_GlobalLocation(t *testing.T) {
 	tempDir := t.TempDir()
 
-	// No local .paw, pawInProject=false -> global workspace
-	result := GetWorkspaceDir(tempDir, false)
+	// No local .paw, pawInProject=global -> global workspace
+	result := GetWorkspaceDir(tempDir, PawInProjectGlobal, true)
 
 	globalDir := GlobalWorkspacesDir()
 	if !strings.HasPrefix(result, globalDir) {
@@ -408,8 +423,8 @@ func TestGetWorkspaceDir_GlobalLocation(t *testing.T) {
 func TestGetWorkspaceDir_LocalLocation(t *testing.T) {
 	tempDir := t.TempDir()
 
-	// No local .paw, but pawInProject=true -> local
-	result := GetWorkspaceDir(tempDir, true)
+	// No local .paw, but pawInProject=local -> local
+	result := GetWorkspaceDir(tempDir, PawInProjectLocal, true)
 
 	expectedLocal := filepath.Join(tempDir, constants.PawDirName)
 	if result != expectedLocal {
@@ -417,25 +432,62 @@ func TestGetWorkspaceDir_LocalLocation(t *testing.T) {
 	}
 }
 
-func TestSave_PawInProject(t *testing.T) {
+func TestGetWorkspaceDir_AutoGitRepo(t *testing.T) {
 	tempDir := t.TempDir()
 
-	cfg := &Config{
-		WorkMode:     WorkModeWorktree,
-		PawInProject: true,
+	// No local .paw, pawInProject=auto, isGitRepo=true -> global workspace
+	result := GetWorkspaceDir(tempDir, PawInProjectAuto, true)
+
+	globalDir := GlobalWorkspacesDir()
+	if !strings.HasPrefix(result, globalDir) {
+		t.Errorf("GetWorkspaceDir() = %q, expected to be under %q for git repo with auto mode", result, globalDir)
+	}
+}
+
+func TestGetWorkspaceDir_AutoNonGit(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// No local .paw, pawInProject=auto, isGitRepo=false -> local workspace
+	result := GetWorkspaceDir(tempDir, PawInProjectAuto, false)
+
+	expectedLocal := filepath.Join(tempDir, constants.PawDirName)
+	if result != expectedLocal {
+		t.Errorf("GetWorkspaceDir() = %q, want %q for non-git with auto mode", result, expectedLocal)
+	}
+}
+
+func TestSave_PawInProject(t *testing.T) {
+	tests := []struct {
+		name     string
+		mode     PawInProject
+	}{
+		{"auto", PawInProjectAuto},
+		{"global", PawInProjectGlobal},
+		{"local", PawInProjectLocal},
 	}
 
-	if err := cfg.Save(tempDir); err != nil {
-		t.Fatalf("Save() error = %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
 
-	// Load and verify
-	loaded, err := Load(tempDir)
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
+			cfg := &Config{
+				WorkMode:     WorkModeWorktree,
+				PawInProject: tt.mode,
+			}
 
-	if loaded.PawInProject != cfg.PawInProject {
-		t.Errorf("PawInProject = %v, want %v", loaded.PawInProject, cfg.PawInProject)
+			if err := cfg.Save(tempDir); err != nil {
+				t.Fatalf("Save() error = %v", err)
+			}
+
+			// Load and verify
+			loaded, err := Load(tempDir)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+
+			if loaded.PawInProject != cfg.PawInProject {
+				t.Errorf("PawInProject = %v, want %v", loaded.PawInProject, cfg.PawInProject)
+			}
+		})
 	}
 }
