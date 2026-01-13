@@ -1,8 +1,2 @@
-.claude
-.paw/
-/paw
-!.paw/config
-!.paw/memory
-problems-to-solve.history
-coverage.out
 .DS_Store
+/paw
