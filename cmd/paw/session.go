@@ -293,6 +293,7 @@ func attachToSession(appCtx *app.App, tm tmux.Client) error {
 }
 
 // respawnMainWindow respawns the main window (⭐️main) with the new paw binary.
+// If the main window doesn't exist, it creates a new one.
 func respawnMainWindow(appCtx *app.App, tm tmux.Client) error {
 	// Find the main window (starts with ⭐️)
 	windows, err := tm.ListWindows()
@@ -308,21 +309,46 @@ func respawnMainWindow(appCtx *app.App, tm tmux.Client) error {
 		}
 	}
 
-	if mainWindowID == "" {
-		logging.Debug("Main window not found, nothing to respawn")
-		return nil
-	}
-
-	logging.Log("Respawning main window %s with new binary", mainWindowID)
-
 	// Get the new paw binary path
 	pawBin, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	// Respawn the pane with the new-task command using the new binary
 	newTaskCmd := fmt.Sprintf("%s internal new-task %s", pawBin, appCtx.SessionName)
+
+	if mainWindowID == "" {
+		// Main window doesn't exist - create it
+		logging.Log("Main window not found, creating new one")
+		windowID, err := tm.NewWindow(tmux.WindowOpts{
+			Name:     constants.NewWindowName,
+			StartDir: appCtx.ProjectDir,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create main window: %w", err)
+		}
+
+		// Wait for shell to be ready before sending keys
+		paneID := windowID + ".0"
+		if err := tm.WaitForPane(paneID, 5*time.Second, 1); err != nil {
+			logging.Warn("WaitForPane timed out, continuing anyway: %v", err)
+		}
+
+		// Send new-task command to the new window
+		if err := tm.SendKeysLiteral(windowID, newTaskCmd); err != nil {
+			return fmt.Errorf("failed to send keys: %w", err)
+		}
+		if err := tm.SendKeys(windowID, "Enter"); err != nil {
+			return fmt.Errorf("failed to send Enter: %w", err)
+		}
+
+		logging.Log("Main window created successfully: %s", windowID)
+		return nil
+	}
+
+	logging.Log("Respawning main window %s with new binary", mainWindowID)
+
+	// Respawn the pane with the new-task command using the new binary
 	if err := tm.RespawnPane(mainWindowID+".0", appCtx.ProjectDir, newTaskCmd); err != nil {
 		return fmt.Errorf("failed to respawn main window: %w", err)
 	}

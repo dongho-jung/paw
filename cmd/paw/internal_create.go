@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -132,33 +131,33 @@ var newTaskCmd = &cobra.Command{
 				target := result.JumpTarget
 				logging.Debug("Cross-project jump requested: session=%s, window=%s", target.Session, target.WindowID)
 
-				// Create tmux client for target session and select the window first
+				// Ensure main window exists in target session (recovery)
+				// This is needed because we're bypassing PAW's normal attach flow
+				if err := ensureMainWindowInSession(target.Session); err != nil {
+					logging.Warn("Failed to ensure main window in target session: %v", err)
+				}
+
+				// Select the task window in target session
 				targetTm := tmux.New(target.Session)
 				if err := targetTm.SelectWindow(target.WindowID); err != nil {
 					logging.Warn("Failed to select target window: %v", err)
 				}
 
-				// Replace current process with tmux attach to target session
-				// This switches the terminal from current project's socket to target project's socket
-				socket := constants.TmuxSocketPrefix + target.Session
-				tmuxPath, err := exec.LookPath("tmux")
-				if err != nil {
-					logging.Error("tmux not found: %v", err)
-					fmt.Printf("Failed to find tmux: %v\n", err)
-					continue
-				}
+				// Use detach-client -E to replace the current client with a new attachment
+				// to the target session. This works across different tmux sockets and
+				// prevents nesting (unlike syscall.Exec which would create nested tmux).
+				targetSocket := constants.TmuxSocketPrefix + target.Session
+				switchCmd := fmt.Sprintf("tmux -L %s attach-session -t %s", targetSocket, target.Session)
+				logging.Debug("Switching to session via detach-client -E: %s", switchCmd)
 
-				logging.Debug("Exec'ing into tmux attach: socket=%s, session=%s", socket, target.Session)
-				err = syscall.Exec(tmuxPath,
-					[]string{"tmux", "-L", socket, "attach-session", "-t", target.Session},
-					os.Environ())
-				if err != nil {
-					// If exec fails (shouldn't normally happen), continue the loop
-					logging.Error("Failed to exec tmux attach: %v", err)
+				tm := tmux.New(sessionName)
+				if err := tm.Run("detach-client", "-E", switchCmd); err != nil {
+					logging.Error("Failed to switch session: %v", err)
 					fmt.Printf("Failed to switch to session %s: %v\n", target.Session, err)
 					continue
 				}
-				// If exec succeeds, this line is never reached (process is replaced)
+				// detach-client -E replaces the client, so this line may not be reached
+				return nil
 			}
 
 			if result.Content == "" {
@@ -370,4 +369,78 @@ var spawnTaskCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// ensureMainWindowInSession ensures the main window (⭐️main) exists in the given session.
+// If it doesn't exist, it creates one. This is used when jumping to another project
+// to ensure the target session has a properly functioning main window.
+func ensureMainWindowInSession(sessionName string) error {
+	tm := tmux.New(sessionName)
+
+	// Check if main window exists
+	windows, err := tm.ListWindows()
+	if err != nil {
+		return fmt.Errorf("failed to list windows: %w", err)
+	}
+
+	for _, w := range windows {
+		if strings.HasPrefix(w.Name, constants.EmojiNew) {
+			// Main window exists - check if it needs respawning
+			// (might have exited command, showing just shell prompt)
+			logging.Debug("Main window already exists in session %s: %s", sessionName, w.ID)
+
+			// Get app context to respawn with correct command
+			appCtx, err := getAppFromSession(sessionName)
+			if err != nil {
+				logging.Warn("Failed to get app context for respawn: %v", err)
+				return nil
+			}
+
+			// Get paw binary path
+			pawBin, err := os.Executable()
+			if err != nil {
+				logging.Warn("Failed to get executable for respawn: %v", err)
+				return nil
+			}
+
+			// Respawn the pane to ensure new-task is running
+			newTaskCmd := fmt.Sprintf("%s internal new-task %s", pawBin, sessionName)
+			if err := tm.RespawnPane(w.ID+".0", appCtx.ProjectDir, newTaskCmd); err != nil {
+				logging.Warn("Failed to respawn main window: %v", err)
+			}
+			return nil
+		}
+	}
+
+	// Main window doesn't exist - create it
+	logging.Log("Main window not found in session %s, creating...", sessionName)
+
+	// Get app context for the target session
+	appCtx, err := getAppFromSession(sessionName)
+	if err != nil {
+		return fmt.Errorf("failed to get app context: %w", err)
+	}
+
+	// Get paw binary path
+	pawBin, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable: %w", err)
+	}
+
+	// Build the new-task command
+	newTaskCmd := fmt.Sprintf("%s internal new-task %s", pawBin, sessionName)
+
+	// Create new window with command directly (more reliable than sending keys)
+	// Using Command option ensures the command runs immediately without race conditions
+	windowID, err := tm.NewWindow(tmux.WindowOpts{
+		Name:     constants.NewWindowName,
+		StartDir: appCtx.ProjectDir,
+		Command:  newTaskCmd,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create main window: %w", err)
+	}
+
+	logging.Log("Main window created in session %s: %s", sessionName, windowID)
+	return nil
 }
