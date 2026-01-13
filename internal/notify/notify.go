@@ -283,8 +283,8 @@ func writeOSC(osc string, inTmux bool) {
 		if len(ttys) > 0 {
 			for _, tty := range ttys {
 				if f, err := os.OpenFile(tty, os.O_WRONLY, 0); err == nil {
-					fmt.Fprint(f, osc)
-					f.Close()
+					_, _ = fmt.Fprint(f, osc)
+					_ = f.Close()
 				} else {
 					logging.Trace("writeOSC: failed to open client tty=%s err=%v", tty, err)
 				}
