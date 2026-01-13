@@ -708,3 +708,135 @@ func TestTaskSetupClaudeSymlinkNoSource(t *testing.T) {
 		t.Error("Symlink should not be created when source doesn't exist")
 	}
 }
+
+func TestRecoverStatusSignal(t *testing.T) {
+	tests := []struct {
+		name           string
+		signalContent  string
+		initialStatus  Status
+		wantStatus     Status
+		wantSignalGone bool
+	}{
+		{
+			name:           "recover done signal",
+			signalContent:  "done",
+			initialStatus:  StatusWorking,
+			wantStatus:     StatusDone,
+			wantSignalGone: true,
+		},
+		{
+			name:           "recover waiting signal",
+			signalContent:  "waiting",
+			initialStatus:  StatusWorking,
+			wantStatus:     StatusWaiting,
+			wantSignalGone: true,
+		},
+		{
+			name:           "recover working signal",
+			signalContent:  "working",
+			initialStatus:  StatusWaiting,
+			wantStatus:     StatusWorking,
+			wantSignalGone: true,
+		},
+		{
+			name:           "signal with whitespace",
+			signalContent:  "  done\n",
+			initialStatus:  StatusWorking,
+			wantStatus:     StatusDone,
+			wantSignalGone: true,
+		},
+		{
+			name:           "invalid signal content deleted",
+			signalContent:  "invalid-status",
+			initialStatus:  StatusWorking,
+			wantStatus:     StatusWorking, // unchanged
+			wantSignalGone: true,          // invalid signals are deleted
+		},
+		{
+			name:           "empty signal content deleted",
+			signalContent:  "",
+			initialStatus:  StatusWorking,
+			wantStatus:     StatusWorking, // unchanged
+			wantSignalGone: true,          // empty signals are deleted
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			agentDir := filepath.Join(tempDir, "test-task")
+			if err := os.MkdirAll(agentDir, 0755); err != nil {
+				t.Fatalf("Failed to create agent dir: %v", err)
+			}
+
+			task := New("test-task", agentDir)
+
+			// Set initial status
+			if err := task.SaveStatus(tt.initialStatus); err != nil {
+				t.Fatalf("Failed to save initial status: %v", err)
+			}
+
+			// Create signal file
+			signalPath := task.GetStatusSignalPath()
+			if err := os.WriteFile(signalPath, []byte(tt.signalContent), 0644); err != nil {
+				t.Fatalf("Failed to write signal file: %v", err)
+			}
+
+			// Load status (should trigger recovery)
+			status, err := task.LoadStatus()
+			if err != nil {
+				t.Fatalf("LoadStatus() error = %v", err)
+			}
+
+			// Check status
+			if status != tt.wantStatus {
+				t.Errorf("LoadStatus() = %q, want %q", status, tt.wantStatus)
+			}
+
+			// Check signal file was deleted
+			_, err = os.Stat(signalPath)
+			signalGone := os.IsNotExist(err)
+			if signalGone != tt.wantSignalGone {
+				t.Errorf("Signal file gone = %v, want %v", signalGone, tt.wantSignalGone)
+			}
+		})
+	}
+}
+
+func TestRecoverStatusSignalNoFile(t *testing.T) {
+	tempDir := t.TempDir()
+	agentDir := filepath.Join(tempDir, "test-task")
+	if err := os.MkdirAll(agentDir, 0755); err != nil {
+		t.Fatalf("Failed to create agent dir: %v", err)
+	}
+
+	task := New("test-task", agentDir)
+
+	// Set initial status
+	if err := task.SaveStatus(StatusWorking); err != nil {
+		t.Fatalf("Failed to save initial status: %v", err)
+	}
+
+	// No signal file exists
+
+	// Load status
+	status, err := task.LoadStatus()
+	if err != nil {
+		t.Fatalf("LoadStatus() error = %v", err)
+	}
+
+	// Status should remain unchanged
+	if status != StatusWorking {
+		t.Errorf("LoadStatus() = %q, want %q", status, StatusWorking)
+	}
+}
+
+func TestGetStatusSignalPath(t *testing.T) {
+	agentDir := "/path/to/agents/test-task"
+	task := New("test-task", agentDir)
+
+	expectedPath := filepath.Join(agentDir, constants.StatusSignalFileName)
+	if task.GetStatusSignalPath() != expectedPath {
+		t.Errorf("GetStatusSignalPath() = %q, want %q", task.GetStatusSignalPath(), expectedPath)
+	}
+}

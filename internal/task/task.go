@@ -156,6 +156,12 @@ func (t *Task) GetStatusFilePath() string {
 	return filepath.Join(t.AgentDir, ".status")
 }
 
+// GetStatusSignalPath returns the path to the status signal file.
+// This is a temp file that Claude writes to signal status changes directly.
+func (t *Task) GetStatusSignalPath() string {
+	return filepath.Join(t.AgentDir, constants.StatusSignalFileName)
+}
+
 // SaveStatus saves the task status to the status file.
 func (t *Task) SaveStatus(status Status) error {
 	t.Status = status
@@ -163,7 +169,12 @@ func (t *Task) SaveStatus(status Status) error {
 }
 
 // LoadStatus loads the task status from the status file.
+// It first checks for a stale status signal file and recovers it if present.
+// This handles the case where the stop hook didn't run (e.g., session killed).
 func (t *Task) LoadStatus() (Status, error) {
+	// Recover any stale status signal before loading
+	t.recoverStatusSignal()
+
 	data, err := os.ReadFile(t.GetStatusFilePath())
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -174,6 +185,36 @@ func (t *Task) LoadStatus() (Status, error) {
 	status := Status(strings.TrimSpace(string(data)))
 	t.Status = status
 	return status, nil
+}
+
+// recoverStatusSignal checks for a stale .status-signal file and applies it.
+// This is a recovery mechanism for when the stop hook didn't run
+// (e.g., tmux session killed, Claude forcefully terminated).
+// If a valid signal file exists, it updates .status and deletes the signal file.
+func (t *Task) recoverStatusSignal() {
+	signalPath := t.GetStatusSignalPath()
+	data, err := os.ReadFile(signalPath)
+	if err != nil {
+		return // No signal file or read error - nothing to recover
+	}
+
+	statusStr := strings.TrimSpace(string(data))
+	status := Status(statusStr)
+
+	// Validate the status
+	switch status {
+	case StatusWorking, StatusWaiting, StatusDone:
+		// Valid status - apply it
+		if saveErr := t.SaveStatus(status); saveErr != nil {
+			// Failed to save, keep signal file for next attempt
+			return
+		}
+		// Successfully recovered - delete the signal file
+		_ = os.Remove(signalPath)
+	default:
+		// Invalid status - delete the corrupt signal file
+		_ = os.Remove(signalPath)
+	}
 }
 
 // TransitionStatus updates task status and validates the transition.
