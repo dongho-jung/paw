@@ -140,7 +140,8 @@ func runMain(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create app context with appropriate project directory
-	application, err := app.New(projectDir)
+	// Pass isGitRepo to ensure correct workspace location in auto mode
+	application, err := app.NewWithGitInfo(projectDir, isGitRepo)
 	if err != nil {
 		return fmt.Errorf("failed to create app: %w", err)
 	}
@@ -151,9 +152,6 @@ func runMain(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get PAW home: %w", err)
 	}
 	application.SetPawHome(pawHome)
-
-	// Set git repo state
-	application.SetGitRepo(isGitRepo)
 
 	// Initialize .paw directory
 	if err := application.Initialize(); err != nil {
