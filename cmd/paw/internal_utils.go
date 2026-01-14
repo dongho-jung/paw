@@ -251,11 +251,20 @@ func getAppFromSession(sessionName string) (*app.App, error) {
 
 	// No local .paw found - try using cwd directly
 	// This handles the case where paw_in_project is false (global workspace)
-	// app.New will resolve to the correct global workspace path
+	// We need to check if it's a git repo to resolve the correct workspace path
 	logging.Debug("getAppFromSession: no local .paw found, trying cwd=%s", cwd)
-	application, err := app.New(cwd)
+	gitClient := git.New()
+	isGitRepo := gitClient.IsGitRepo(cwd)
+	projectDir := cwd
+	if isGitRepo {
+		if repoRoot, err := gitClient.GetRepoRoot(cwd); err == nil {
+			projectDir = repoRoot
+		}
+	}
+	logging.Debug("getAppFromSession: isGitRepo=%v, projectDir=%s", isGitRepo, projectDir)
+	application, err := app.NewWithGitInfo(projectDir, isGitRepo)
 	if err != nil {
-		logging.Debug("getAppFromSession: app.New(cwd) failed: %v", err)
+		logging.Debug("getAppFromSession: app.NewWithGitInfo failed: %v", err)
 		return nil, fmt.Errorf("could not find project directory for session %s", sessionName)
 	}
 
