@@ -173,9 +173,13 @@ func getAppFromSession(sessionName string) (*app.App, error) {
 	// First, try PROJECT_DIR environment variable (most reliable)
 	if projectDir := os.Getenv("PROJECT_DIR"); projectDir != "" {
 		logging.Debug("getAppFromSession: found PROJECT_DIR=%s", projectDir)
-		application, err := app.New(projectDir)
+		// Detect git repo to resolve correct workspace
+		gitClient := git.New()
+		isGitRepo := gitClient.IsGitRepo(projectDir)
+		logging.Debug("getAppFromSession: isGitRepo=%v", isGitRepo)
+		application, err := app.NewWithGitInfo(projectDir, isGitRepo)
 		if err != nil {
-			logging.Debug("getAppFromSession: app.New failed: %v", err)
+			logging.Debug("getAppFromSession: app.NewWithGitInfo failed: %v", err)
 			return nil, err
 		}
 		return loadAppConfig(application)
@@ -193,9 +197,14 @@ func getAppFromSession(sessionName string) (*app.App, error) {
 		if data, err := os.ReadFile(projectPathFile); err == nil {
 			projectDir := strings.TrimSpace(string(data))
 			logging.Debug("getAppFromSession: found project-path=%s", projectDir)
-			application, err := app.New(projectDir)
+			// Check for git repo marker to determine git mode
+			gitMarkerPath := filepath.Join(pawDir, constants.GitRepoMarker)
+			_, markerErr := os.Stat(gitMarkerPath)
+			isGitRepo := markerErr == nil
+			logging.Debug("getAppFromSession: isGitRepo=%v (from marker)", isGitRepo)
+			application, err := app.NewWithGitInfo(projectDir, isGitRepo)
 			if err != nil {
-				logging.Debug("getAppFromSession: app.New failed: %v", err)
+				logging.Debug("getAppFromSession: app.NewWithGitInfo failed: %v", err)
 				return nil, err
 			}
 			return loadAppConfig(application)
@@ -204,9 +213,14 @@ func getAppFromSession(sessionName string) (*app.App, error) {
 		// Fallback: assume PAW_DIR is at {project}/.paw (local workspace)
 		projectDir := filepath.Dir(pawDir)
 		logging.Debug("getAppFromSession: assuming local workspace, projectDir=%s", projectDir)
-		application, err := app.New(projectDir)
+		// Check for git repo marker to determine git mode
+		gitMarkerPath := filepath.Join(pawDir, constants.GitRepoMarker)
+		_, markerErr := os.Stat(gitMarkerPath)
+		isGitRepo := markerErr == nil
+		logging.Debug("getAppFromSession: isGitRepo=%v (from marker)", isGitRepo)
+		application, err := app.NewWithGitInfo(projectDir, isGitRepo)
 		if err != nil {
-			logging.Debug("getAppFromSession: app.New failed: %v", err)
+			logging.Debug("getAppFromSession: app.NewWithGitInfo failed: %v", err)
 			return nil, err
 		}
 		return loadAppConfig(application)
@@ -234,9 +248,14 @@ func getAppFromSession(sessionName string) (*app.App, error) {
 		pawDir := filepath.Join(dir, ".paw")
 		if _, err := os.Stat(pawDir); err == nil {
 			logging.Debug("getAppFromSession: found .paw at %s", pawDir)
-			application, err := app.New(dir)
+			// Check for git repo marker to determine git mode
+			gitMarkerPath := filepath.Join(pawDir, constants.GitRepoMarker)
+			_, markerErr := os.Stat(gitMarkerPath)
+			isGitRepo := markerErr == nil
+			logging.Debug("getAppFromSession: isGitRepo=%v (from marker)", isGitRepo)
+			application, err := app.NewWithGitInfo(dir, isGitRepo)
 			if err != nil {
-				logging.Debug("getAppFromSession: app.New failed: %v", err)
+				logging.Debug("getAppFromSession: app.NewWithGitInfo failed: %v", err)
 				return nil, err
 			}
 			return loadAppConfig(application)
