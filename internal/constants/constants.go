@@ -251,6 +251,11 @@ const (
 	CommitMessageAutoCommitPush  = "chore: auto-commit before push"
 )
 
+// Stash message for merge operations
+const (
+	MergeStashMessage = "paw-merge-temp"
+)
+
 // commitTypeMapping defines the mapping from task name patterns to commit types.
 type commitTypeMapping struct {
 	prefix     string

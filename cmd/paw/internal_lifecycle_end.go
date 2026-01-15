@@ -393,7 +393,7 @@ func runAutoMerge(appCtx *app.App, targetTask *task.Task, windowID, workDir stri
 	hasLocalChanges := gitClient.HasChanges(appCtx.ProjectDir)
 	if hasLocalChanges {
 		logging.Debug("Stashing local changes...")
-		if err := gitClient.StashPush(appCtx.ProjectDir, "paw-merge-temp"); err != nil {
+		if err := gitClient.StashPush(appCtx.ProjectDir, constants.MergeStashMessage); err != nil {
 			logging.Warn("Failed to stash changes: %v", err)
 		}
 	}
@@ -404,10 +404,10 @@ func runAutoMerge(appCtx *app.App, targetTask *task.Task, windowID, workDir stri
 	// Perform the actual merge
 	mergeSuccess := performMerge(appCtx, targetTask, windowID, workDir, mainBranch, currentBranch, hasLocalChanges, gitClient, mergeTimer)
 
-	// Restore stashed changes
+	// Restore stashed changes by message (not blind pop)
 	if hasLocalChanges {
 		logging.Debug("Restoring stashed changes...")
-		if err := gitClient.StashPop(appCtx.ProjectDir); err != nil {
+		if err := gitClient.StashPopByMessage(appCtx.ProjectDir, constants.MergeStashMessage); err != nil {
 			logging.Warn("Failed to restore stashed changes: %v", err)
 		}
 	}

@@ -202,7 +202,7 @@ var mergeTaskCmd = &cobra.Command{
 		// Stash local changes in project dir
 		hasLocalChanges := gitClient.HasChanges(appCtx.ProjectDir)
 		if hasLocalChanges {
-			if err := gitClient.StashPush(appCtx.ProjectDir, "paw-merge-temp"); err != nil {
+			if err := gitClient.StashPush(appCtx.ProjectDir, constants.MergeStashMessage); err != nil {
 				logging.Warn("Failed to stash changes: %v", err)
 			}
 		}
@@ -351,9 +351,11 @@ var mergeTaskCmd = &cobra.Command{
 			}
 		}
 
-		// Restore stashed changes
+		// Restore stashed changes by message (not blind pop)
 		if hasLocalChanges {
-			_ = gitClient.StashPop(appCtx.ProjectDir)
+			if err := gitClient.StashPopByMessage(appCtx.ProjectDir, constants.MergeStashMessage); err != nil {
+				logging.Warn("Failed to restore stashed changes: %v", err)
+			}
 		}
 
 		if mergeSuccess && appCtx.Config != nil && appCtx.Config.PostMergeHook != "" {
