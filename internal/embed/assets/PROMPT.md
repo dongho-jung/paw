@@ -110,7 +110,7 @@ AskUserQuestion:
       options:
         - label: "Redis (Recommended)"
           description: "Distributed, requires separate server"
-        - label: "In-memory"
+        - label: "Local cache"
           description: "Simple, resets on restart"
         - label: "File-based"
           description: "Persistent, not for distributed setups"
@@ -303,16 +303,6 @@ Tests passing (3 added)
 PR #42 created
 ------
 ```
-
----
-
-## Project Memory (claude-mem)
-
-PAW uses claude-mem for shared, durable memory across tasks/workspaces.
-
-- Memory is stored automatically by claude-mem.
-- Use mem-search or the MCP tools (`search`, `timeline`, `get_observations`) when you need prior context.
-- Use `<private>` tags to exclude sensitive info from memory.
 
 ---
 

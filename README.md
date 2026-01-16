@@ -154,7 +154,6 @@ log_max_backups: 3
 
 - System prompt: Embedded in binary (copied to `.paw/.claude/` on first run)
 - `.paw/PROMPT.md`: Project-specific prompt (per project)
-- `claude-mem`: Shared memory across tasks/workspaces (see Memory section)
 </details>
 
 ## Dependencies
@@ -165,25 +164,10 @@ Use `paw check` to verify prerequisites.
 |------------|----------|---------|
 | tmux | Yes | Terminal multiplexer for managing task windows |
 | claude | Yes | Claude Code CLI for running agents |
-| claude-mem (plugin) | Recommended | Shared memory across tasks/workspaces |
 | git | Optional | Needed for worktree mode in git repositories |
 | gh | Optional | PR creation for `auto-pr` mode |
 
 Install tmux/gh via Homebrew: `brew install tmux gh`. Install the Claude Code CLI from https://claude.ai/claude-code.
-
-## Memory (claude-mem)
-
-PAW uses claude-mem for shared, durable memory across tasks/workspaces in the same project.
-
-Install once inside Claude Code:
-
-```
-> /plugin marketplace add thedotmack/claude-mem
-
-> /plugin install claude-mem
-```
-
-Restart Claude Code after installation. Memory is stored in `~/.claude-mem` and scoped by project name.
 
 ## Keyboard Shortcuts
 

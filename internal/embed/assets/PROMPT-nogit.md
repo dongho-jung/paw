@@ -219,16 +219,6 @@ Work complete
 
 ---
 
-## Project Memory (claude-mem)
-
-PAW uses claude-mem for shared, durable memory across tasks/workspaces.
-
-- Memory is stored automatically by claude-mem.
-- Use mem-search or the MCP tools (`search`, `timeline`, `get_observations`) when you need prior context.
-- Use `<private>` tags to exclude sensitive info from memory.
-
----
-
 ## Window Status
 
 Window status is managed automatically by PAW (wait watcher + stop hook). Do not rename windows manually.

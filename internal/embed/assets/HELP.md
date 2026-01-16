@@ -46,13 +46,6 @@ Claude Code-based autonomous agent work environment
       ├── origin/            Project root (symlink)
       └── {project-name}-{hash}/ git worktree (auto-created)
 
-## Memory (claude-mem)
-
-Shared memory is handled by claude-mem and stored in `~/.claude-mem`.
-Install inside Claude Code:
-  /plugin marketplace add thedotmack/claude-mem
-  /plugin install claude-mem
-
 ## Window Status Icons
 
   ⭐️  New task input window

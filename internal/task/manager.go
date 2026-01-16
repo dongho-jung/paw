@@ -70,7 +70,7 @@ func (m *Manager) resolveWorktreeDir(task *Task) string {
 func (m *Manager) projectWorktreeName() string {
 	base := sanitizeWorktreeBase(filepath.Base(m.projectDir))
 	hashSuffix := m.projectDirHashSuffix()
-	// Use a short hash suffix to keep claude-mem project keys stable and unique.
+	// Use a short hash suffix to keep project workspace names stable and unique.
 	return base + "-" + hashSuffix
 }
 

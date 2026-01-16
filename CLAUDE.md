@@ -194,10 +194,6 @@ $HOME/.local/share/paw/            # Global PAW data (auto mode for git projects
     └── {project-name}-{hash}/     # Per-project workspace (same structure as .paw above)
 ```
 
-PAW uses claude-mem for shared memory across tasks/workspaces. Memory is stored
-globally in `~/.claude-mem` and scoped by project directory name; in worktree
-mode PAW appends a short hash suffix to avoid collisions.
-
 ### Workspace Location
 
 PAW uses auto mode for workspaces:
