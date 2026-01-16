@@ -11,6 +11,8 @@ import (
 const (
 	EmojiWorking = "🤖"
 	EmojiWaiting = "💬"
+	EmojiReview  = "👀"
+	EmojiWarning = "⚠️"
 	EmojiDone    = "✅"
 	EmojiNew     = "⭐️"
 )
@@ -19,6 +21,8 @@ const (
 var TaskEmojis = []string{
 	EmojiWorking,
 	EmojiWaiting,
+	EmojiReview,
+	EmojiWarning,
 	EmojiDone,
 }
 
@@ -137,6 +141,11 @@ const (
 const (
 	WorktreeTimeout       = 30 * time.Second
 	WindowCreationTimeout = 30 * time.Second
+)
+
+// PR watch interval
+const (
+	PRWatchInterval = 1 * time.Minute
 )
 
 // Hook execution timeout
@@ -383,4 +392,8 @@ const (
 	// Small size for finish picker (3-4 options + title + help)
 	PopupWidthFinishPicker  = "50"
 	PopupHeightFinishPicker = "14"
+
+	// Medium size for PR popup (link + open prompt)
+	PopupWidthPR  = "70"
+	PopupHeightPR = "16"
 )

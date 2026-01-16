@@ -17,7 +17,7 @@ type Client interface {
 	IsInstalled() bool
 
 	// CreatePR creates a pull request and returns the PR number.
-	CreatePR(dir, title, body, base string) (int, error)
+	CreatePR(dir, title, body, base string) (int, string, error)
 
 	// GetPRStatus gets the status of a pull request.
 	GetPRStatus(dir string, prNumber int) (*PRStatus, error)
@@ -93,7 +93,7 @@ func (c *ghClient) IsInstalled() bool {
 }
 
 // CreatePR creates a pull request and returns the PR number.
-func (c *ghClient) CreatePR(dir, title, body, base string) (int, error) {
+func (c *ghClient) CreatePR(dir, title, body, base string) (int, string, error) {
 	args := []string{"pr", "create", "--title", title, "--body", body}
 	if base != "" {
 		args = append(args, "--base", base)
@@ -101,22 +101,23 @@ func (c *ghClient) CreatePR(dir, title, body, base string) (int, error) {
 
 	output, err := c.runOutput(dir, args...)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create PR: %w", err)
+		return 0, "", fmt.Errorf("failed to create PR: %w", err)
 	}
 
 	// The output is the PR URL, extract the number
 	// Format: https://github.com/owner/repo/pull/123
-	parts := strings.Split(output, "/")
+	prURL := strings.TrimSpace(output)
+	parts := strings.Split(prURL, "/")
 	if len(parts) < 1 {
-		return 0, fmt.Errorf("unexpected PR URL format: %s", output)
+		return 0, "", fmt.Errorf("unexpected PR URL format: %s", output)
 	}
 
 	var prNumber int
 	if _, err := fmt.Sscanf(parts[len(parts)-1], "%d", &prNumber); err != nil {
-		return 0, fmt.Errorf("failed to parse PR number from %s: %w", output, err)
+		return 0, "", fmt.Errorf("failed to parse PR number from %s: %w", output, err)
 	}
 
-	return prNumber, nil
+	return prNumber, prURL, nil
 }
 
 // GetPRStatus gets the status of a pull request.

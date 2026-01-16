@@ -30,6 +30,18 @@ func TestExtractTaskName(t *testing.T) {
 			wantFound:    true,
 		},
 		{
+			name:         "review emoji prefix",
+			windowName:   "👀" + WindowToken("my-task"),
+			wantTaskName: WindowToken("my-task"),
+			wantFound:    true,
+		},
+		{
+			name:         "warning emoji prefix",
+			windowName:   "⚠️" + WindowToken("my-task"),
+			wantTaskName: WindowToken("my-task"),
+			wantFound:    true,
+		},
+		{
 			name:         "no emoji prefix",
 			windowName:   "my-task",
 			wantTaskName: "",
@@ -96,6 +108,16 @@ func TestIsTaskWindow(t *testing.T) {
 			want:       true,
 		},
 		{
+			name:       "review emoji prefix",
+			windowName: "👀my-task",
+			want:       true,
+		},
+		{
+			name:       "warning emoji prefix",
+			windowName: "⚠️my-task",
+			want:       true,
+		},
+		{
 			name:       "no emoji prefix",
 			windowName: "my-task",
 			want:       false,
@@ -125,6 +147,8 @@ func TestTaskEmojis(t *testing.T) {
 	expectedEmojis := []string{
 		EmojiWorking,
 		EmojiWaiting,
+		EmojiReview,
+		EmojiWarning,
 		EmojiDone,
 	}
 
@@ -433,6 +457,8 @@ func TestEmojiConstants(t *testing.T) {
 	emojis := map[string]string{
 		"EmojiWorking": EmojiWorking,
 		"EmojiWaiting": EmojiWaiting,
+		"EmojiReview":  EmojiReview,
+		"EmojiWarning": EmojiWarning,
 		"EmojiDone":    EmojiDone,
 		"EmojiNew":     EmojiNew,
 	}

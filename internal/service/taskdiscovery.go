@@ -20,6 +20,7 @@ type DiscoveredTask struct {
 	Name          string // Task name (without emoji)
 	Session       string // Session name (project name)
 	Status        DiscoveredStatus
+	StatusEmoji   string    // Emoji prefix from the window name
 	WindowID      string    // Tmux window ID
 	Preview       string    // Last 3 lines from agent pane
 	CurrentAction string    // Agent's current action (extracted from ⏺ spinner line)
@@ -148,11 +149,12 @@ func (s *TaskDiscoveryService) discoverFromSocket(socketName string) []*Discover
 		taskName := resolveTaskName(taskToken, tokenMap)
 
 		task := &DiscoveredTask{
-			Name:      taskName,
-			Session:   sessionName,
-			Status:    status,
-			WindowID:  w.ID,
-			CreatedAt: time.Now(), // We don't have exact creation time
+			Name:        taskName,
+			Session:     sessionName,
+			Status:      status,
+			StatusEmoji: extractWindowEmoji(w.Name),
+			WindowID:    w.ID,
+			CreatedAt:   time.Now(), // We don't have exact creation time
 		}
 
 		// Only capture pane content for Working tasks (performance optimization)
@@ -244,11 +246,24 @@ func parseWindowName(windowName string) (string, DiscoveredStatus) {
 		return strings.TrimPrefix(windowName, constants.EmojiWorking), DiscoveredWorking
 	case strings.HasPrefix(windowName, constants.EmojiWaiting):
 		return strings.TrimPrefix(windowName, constants.EmojiWaiting), DiscoveredWaiting
+	case strings.HasPrefix(windowName, constants.EmojiReview):
+		return strings.TrimPrefix(windowName, constants.EmojiReview), DiscoveredWaiting
+	case strings.HasPrefix(windowName, constants.EmojiWarning):
+		return strings.TrimPrefix(windowName, constants.EmojiWarning), DiscoveredWaiting
 	case strings.HasPrefix(windowName, constants.EmojiDone):
 		return strings.TrimPrefix(windowName, constants.EmojiDone), DiscoveredDone
 	}
 
 	return "", ""
+}
+
+func extractWindowEmoji(windowName string) string {
+	for _, emoji := range constants.TaskEmojis {
+		if strings.HasPrefix(windowName, emoji) {
+			return emoji
+		}
+	}
+	return ""
 }
 
 // trimPreview cleans up the preview text.

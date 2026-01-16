@@ -76,6 +76,10 @@ func statusFromWindowName(name string) task.Status {
 		return task.StatusDone
 	case strings.HasPrefix(name, constants.EmojiWaiting):
 		return task.StatusWaiting
+	case strings.HasPrefix(name, constants.EmojiReview):
+		return task.StatusWaiting
+	case strings.HasPrefix(name, constants.EmojiWarning):
+		return task.StatusWaiting
 	case strings.HasPrefix(name, constants.EmojiWorking):
 		return task.StatusWorking
 	}

@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -11,6 +13,7 @@ import (
 	"github.com/dongho-jung/paw/internal/app"
 	"github.com/dongho-jung/paw/internal/constants"
 	"github.com/dongho-jung/paw/internal/git"
+	"github.com/dongho-jung/paw/internal/github"
 	"github.com/dongho-jung/paw/internal/logging"
 	"github.com/dongho-jung/paw/internal/notify"
 	"github.com/dongho-jung/paw/internal/service"
@@ -90,22 +93,89 @@ var endTaskCmd = &cobra.Command{
 				if !appCtx.IsWorktreeMode() {
 					logging.Warn("PR creation requested in non-worktree mode; skipping")
 					fmt.Println("  ⚠️  PR creation is only available in worktree mode")
+					if paneCaptureFile != "" {
+						_ = os.Remove(paneCaptureFile)
+					}
+					return nil
 				} else {
 					fallbackBranch := targetTask.Name
 					branchName, ok := resolvePushBranch(gitClient, workDir, fallbackBranch)
-					if ok {
-						pushSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Pushing %s to remote", branchName))
-						pushSpinner.Start()
-
-						pushTimer := logging.StartTimer("git push")
-						if err := gitClient.Push(workDir, "origin", branchName, true); err != nil {
-							pushTimer.StopWithResult(false, err.Error())
-							pushSpinner.Stop(false, err.Error())
-						} else {
-							pushTimer.StopWithResult(true, fmt.Sprintf("branch=%s", branchName))
-							pushSpinner.Stop(true, branchName)
+					if !ok {
+						fmt.Println("  ⚠️  Failed to determine branch for PR creation")
+						if paneCaptureFile != "" {
+							_ = os.Remove(paneCaptureFile)
 						}
+						return nil
 					}
+
+					pushSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Pushing %s to remote", branchName))
+					pushSpinner.Start()
+
+					pushTimer := logging.StartTimer("git push")
+					if err := gitClient.Push(workDir, "origin", branchName, true); err != nil {
+						pushTimer.StopWithResult(false, err.Error())
+						pushSpinner.Stop(false, err.Error())
+						fmt.Printf("  ⚠️  Failed to push branch: %v\n", err)
+						if paneCaptureFile != "" {
+							_ = os.Remove(paneCaptureFile)
+						}
+						return nil
+					}
+
+					pushTimer.StopWithResult(true, fmt.Sprintf("branch=%s", branchName))
+					pushSpinner.Stop(true, branchName)
+
+					ghClient := github.New()
+					if !ghClient.IsInstalled() {
+						fmt.Println("  ⚠️  gh CLI not found; cannot create PR")
+						if paneCaptureFile != "" {
+							_ = os.Remove(paneCaptureFile)
+						}
+						return nil
+					}
+
+					mainBranch := gitClient.GetMainBranch(appCtx.ProjectDir)
+					prTitle := buildPRTitle(targetTask.Name)
+					commits, err := gitClient.GetBranchCommits(workDir, branchName, mainBranch, 20)
+					if err != nil {
+						logging.Warn("Failed to read branch commits: %v", err)
+						commits = nil
+					}
+					prBody := buildPRBody(targetTask.Name, commits)
+
+					prSpinner := tui.NewSimpleSpinner("Creating pull request")
+					prSpinner.Start()
+					prTimer := logging.StartTimer("gh pr create")
+					prNumber, prURL, err := ghClient.CreatePR(workDir, prTitle, prBody, mainBranch)
+					if err != nil {
+						prTimer.StopWithResult(false, err.Error())
+						prSpinner.Stop(false, err.Error())
+						fmt.Printf("  ⚠️  Failed to create PR: %v\n", err)
+						if paneCaptureFile != "" {
+							_ = os.Remove(paneCaptureFile)
+						}
+						return nil
+					}
+					prTimer.StopWithResult(true, fmt.Sprintf("pr=%d", prNumber))
+					prSpinner.Stop(true, fmt.Sprintf("#%d", prNumber))
+					fmt.Printf("  ✓ PR created: %s\n", prURL)
+
+					if err := targetTask.SavePRNumber(prNumber); err != nil {
+						logging.Warn("Failed to save PR number: %v", err)
+					}
+
+					reviewName := constants.EmojiReview + constants.TruncateForWindowName(targetTask.Name)
+					if err := renameWindowWithStatus(tm, windowID, reviewName, appCtx.PawDir, targetTask.Name, "end-task", task.StatusWaiting); err != nil {
+						logging.Warn("Failed to rename window for PR review: %v", err)
+					}
+
+					startPRWatch(appCtx, sessionName, windowID, targetTask.Name, prNumber)
+					showPRPopup(tm, sessionName, prNumber, prURL)
+
+					if paneCaptureFile != "" {
+						_ = os.Remove(paneCaptureFile)
+					}
+					return nil
 				}
 
 			case "merge":
@@ -645,4 +715,75 @@ func handleMergeFailure(appCtx *app.App, targetTask *task.Task, windowID string,
 		logging.Trace("Failed to display message: %v", err)
 	}
 	return false
+}
+
+func buildPRTitle(taskName string) string {
+	commitType := constants.InferCommitType(taskName)
+	subject := constants.FormatTaskNameForCommit(taskName)
+	if subject == "" {
+		subject = taskName
+	}
+	return fmt.Sprintf("%s: %s", commitType, subject)
+}
+
+func buildPRBody(taskName string, commits []git.CommitInfo) string {
+	summary := constants.FormatTaskNameForCommit(taskName)
+	if summary == "" {
+		summary = taskName
+	}
+
+	var sb strings.Builder
+	sb.WriteString("## Summary\n")
+	sb.WriteString("- " + summary + "\n")
+
+	if len(commits) > 0 {
+		sb.WriteString("\n## Changes\n")
+		for _, commit := range commits {
+			subj := strings.TrimSpace(commit.Subject)
+			if subj == "" {
+				continue
+			}
+			if len(subj) > 72 {
+				subj = subj[:69] + "..."
+			}
+			sb.WriteString("- " + subj + "\n")
+		}
+	}
+
+	return strings.TrimSpace(sb.String())
+}
+
+func startPRWatch(appCtx *app.App, sessionName, windowID, taskName string, prNumber int) {
+	pawBin, err := os.Executable()
+	if err != nil {
+		pawBin = "paw"
+	}
+
+	watchCmd := exec.Command(pawBin, "internal", "watch-pr", sessionName, windowID, taskName, fmt.Sprintf("%d", prNumber))
+	watchCmd.Dir = appCtx.ProjectDir
+	watchCmd.Env = append(os.Environ(),
+		"PAW_DIR="+appCtx.PawDir,
+		"PROJECT_DIR="+appCtx.ProjectDir,
+	)
+	if err := watchCmd.Start(); err != nil {
+		logging.Warn("Failed to start PR watcher: %v", err)
+	} else {
+		logging.Debug("PR watcher started for windowID=%s pr=%d", windowID, prNumber)
+	}
+}
+
+func showPRPopup(tm tmux.Client, sessionName string, prNumber int, prURL string) {
+	pawBin, err := os.Executable()
+	if err != nil {
+		pawBin = "paw"
+	}
+
+	popupCmd := fmt.Sprintf("%s internal pr-popup-tui %s %d %q", pawBin, sessionName, prNumber, prURL)
+	_ = tm.DisplayPopup(tmux.PopupOpts{
+		Width:  constants.PopupWidthPR,
+		Height: constants.PopupHeightPR,
+		Title:  " PR Created ",
+		Close:  true,
+		Style:  "fg=terminal,bg=terminal",
+	}, popupCmd)
 }
