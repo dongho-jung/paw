@@ -15,6 +15,13 @@ import (
 	"github.com/dongho-jung/paw/internal/service"
 )
 
+const (
+	kanbanMinColumnWidth = 15
+	kanbanColumnGap      = 6
+	kanbanHeaderLines    = 2
+	kanbanTaskIndent     = 2
+)
+
 // KanbanView renders a Kanban-style task board.
 // The board has 3 columns: Working, Waiting, Done.
 type KanbanView struct {
@@ -55,8 +62,8 @@ func NewKanbanView(isDark bool) *KanbanView {
 	return &KanbanView{
 		isDark:          isDark,
 		service:         service.NewTaskDiscoveryService(),
-		focusedCol:      -1,              // No column focused initially
-		selectColumn:    -1,              // No column selected initially
+		focusedCol:      -1,                 // No column focused initially
+		selectColumn:    -1,                 // No column selected initially
 		selectedTaskIdx: [3]int{-1, -1, -1}, // No task selected in any column
 	}
 }
@@ -70,6 +77,38 @@ func (k *KanbanView) SetDarkMode(isDark bool) {
 func (k *KanbanView) SetSize(width, height int) {
 	k.width = width
 	k.height = height
+}
+
+func (k *KanbanView) baseColumnWidth() int {
+	if k.width < kanbanMinColumnWidth*3+kanbanColumnGap {
+		return 0
+	}
+	return (k.width - kanbanColumnGap) / 3
+}
+
+func (k *KanbanView) columnContentWidth() int {
+	columnWidth := k.baseColumnWidth()
+	if columnWidth <= 0 {
+		return 0
+	}
+	// columnWidth includes padding; subtract padding(2) + border(2) + indent(2).
+	width := columnWidth - 6
+	if width < 0 {
+		return 0
+	}
+	return width
+}
+
+func (k *KanbanView) taskAreaHeight() int {
+	if k.height <= 0 {
+		return 0
+	}
+	maxHeight := k.height - 2 // Reserve space for border only
+	contentHeight := maxHeight - kanbanHeaderLines
+	if contentHeight < 0 {
+		return 0
+	}
+	return contentHeight
 }
 
 // Refresh updates the cached task data by discovering all tasks.
@@ -110,16 +149,14 @@ func (k *KanbanView) Render() string {
 
 	// Calculate column width (3 columns with gaps)
 	// Minimum width per column
-	const minColumnWidth = 15
 	// columnGap accounts for borders only (padding is included in lipgloss Width):
 	// - In lipgloss v2, Width(X) sets content+padding width, then border is added
 	// - Borders: 3 columns × 2 chars = 6
 	// Note: Scrollbar (2 chars) is added separately after columns, not included here
-	const columnGap = 6
-	if k.width < minColumnWidth*3+columnGap {
+	columnWidth := k.baseColumnWidth()
+	if columnWidth == 0 {
 		return ""
 	}
-	columnWidth := (k.width - columnGap) / 3
 
 	// Build each column
 	// Colors are chosen to have good contrast on both light and dark backgrounds
@@ -141,6 +178,7 @@ func (k *KanbanView) Render() string {
 
 	var columnViews []string
 	maxHeight := k.height - 2 // Reserve space for border only (no title)
+	indent := strings.Repeat(" ", kanbanTaskIndent)
 
 	for colIdx, col := range columns {
 		// Determine border color for this column
@@ -163,18 +201,18 @@ func (k *KanbanView) Render() string {
 		content.WriteString("\n")
 
 		// Tasks (limited by height, with scroll offset applied)
-		// Each task shows: project/name (line 1), action with duration/tokens (line 2+)
-		// Action lines are calculated dynamically based on available height
-		linesUsed := 2    // header + separator
-		linesSkipped := 0 // Track lines skipped for scroll
+		// Each task shows: project/name (line 1), action/preview lines (line 2+)
+		linesUsed := 2 // header + separator
 
 		// Calculate available width for display
 		// columnWidth - 6 accounts for padding and borders
-		availableWidth := columnWidth - 6
+		availableWidth := k.columnContentWidth()
 
 		// Calculate dynamic action lines per task based on available height
-		contentHeight := maxHeight - 2 // Subtract header + separator
+		contentHeight := k.taskAreaHeight()
 		actionLinesPerTask := calculateActionLinesPerTask(contentHeight, len(col.tasks))
+
+		linesToSkip := k.scrollOffset
 
 		for taskIdx, task := range col.tasks {
 			if linesUsed >= maxHeight {
@@ -185,22 +223,6 @@ func (k *KanbanView) Render() string {
 			camelTaskName := constants.ToCamelCase(task.Name)
 			fullName := task.Session + "/" + camelTaskName
 
-			// Build metadata string from duration and tokens
-			metadata := buildMetadataString(task.Duration, task.Tokens)
-
-			// Calculate how many lines this task will use (for scroll offset)
-			// 1 line for name + dynamic action lines (capped by actionLinesPerTask)
-			taskLines := 1
-			if task.CurrentAction != "" || metadata != "" {
-				taskLines += min(actionLinesPerTask, 1) // At least 1 action line if there's content
-			}
-
-			// Apply scroll offset - skip lines until we've scrolled past them
-			if linesSkipped < k.scrollOffset {
-				linesSkipped += taskLines
-				continue
-			}
-
 			// Determine if this task is selected
 			isSelected := k.focused && k.focusedCol == colIdx && k.selectedTaskIdx[colIdx] == taskIdx
 
@@ -210,40 +232,35 @@ func (k *KanbanView) Render() string {
 				displayName = displayName[:availableWidth-1] + "…"
 			}
 
-			// Apply appropriate style
+			// Build task lines for scrolling (name + detail lines)
+			var taskLines []string
 			if isSelected {
-				content.WriteString(selectedTaskStyle.Render(displayName))
+				taskLines = append(taskLines, selectedTaskStyle.Render(displayName))
 			} else {
-				content.WriteString(taskNameStyle.Render(displayName))
+				taskLines = append(taskLines, taskNameStyle.Render(displayName))
 			}
-			content.WriteString("\n")
-			linesUsed++
 
-			// Show action line(s) with metadata appended to the last line
-			// Format: "  Action · duration · tokens"
-			if linesUsed < maxHeight && (task.CurrentAction != "" || metadata != "") {
-				// Build action line with metadata
-				actionLine := task.CurrentAction
-				if actionLine == "" && metadata != "" {
-					// No action but have metadata - show just metadata
-					actionLine = metadata
-				} else if actionLine != "" && metadata != "" {
-					// Have both action and metadata - combine them
-					actionLine = actionLine + " · " + metadata
-				}
+			detailLines := buildTaskDetailLines(task, actionLinesPerTask, availableWidth)
+			for _, line := range detailLines {
+				taskLines = append(taskLines, actionStyle.Render(indent+line))
+			}
 
-				// Truncate and display
-				// Leave room for indent (2 chars)
-				maxActionLen := availableWidth - 2
-				if maxActionLen > 0 && actionLine != "" {
-					displayAction := "  " + actionLine
-					if len(displayAction) > availableWidth {
-						displayAction = displayAction[:availableWidth-1] + "…"
-					}
-					content.WriteString(actionStyle.Render(displayAction))
-					content.WriteString("\n")
-					linesUsed++
-				}
+			// Apply scroll offset line-by-line
+			if linesToSkip >= len(taskLines) {
+				linesToSkip -= len(taskLines)
+				continue
+			}
+
+			startIdx := 0
+			if linesToSkip > 0 {
+				startIdx = linesToSkip
+				linesToSkip = 0
+			}
+
+			for i := startIdx; i < len(taskLines) && linesUsed < maxHeight; i++ {
+				content.WriteString(taskLines[i])
+				content.WriteString("\n")
+				linesUsed++
 			}
 		}
 
@@ -431,17 +448,9 @@ func (k *KanbanView) GetSelectedTask() *service.DiscoveredTask {
 // ColumnWidth returns the width of each column (including border and padding).
 func (k *KanbanView) ColumnWidth() int {
 	// Must match the calculation in Render()
-	const minColumnWidth = 15
-	// columnGap accounts for borders only (padding is included in lipgloss Width):
-	// - In lipgloss v2, Width(X) sets content+padding width, then border is added
-	// - Borders: 3 columns × 2 chars = 6
-	const columnGap = 6
-	if k.width < minColumnWidth*3+columnGap {
+	columnWidth := k.baseColumnWidth()
+	if columnWidth == 0 {
 		return 0
-	}
-	columnWidth := (k.width - columnGap) / 3
-	if columnWidth < minColumnWidth {
-		columnWidth = minColumnWidth
 	}
 	return columnWidth + 2 // +2 for border only (padding is included in Width)
 }
@@ -471,8 +480,8 @@ func (k *KanbanView) ScrollOffset() int {
 // maxScrollOffset returns the maximum scroll offset.
 func (k *KanbanView) maxScrollOffset() int {
 	contentHeight := k.maxTaskLinesInAnyColumn()
-	visibleHeight := k.height - 2 // Reserve for borders only (no title)
-	if contentHeight <= visibleHeight {
+	visibleHeight := k.taskAreaHeight()
+	if visibleHeight <= 0 || contentHeight <= visibleHeight {
 		return 0
 	}
 	return contentHeight - visibleHeight
@@ -480,17 +489,22 @@ func (k *KanbanView) maxScrollOffset() int {
 
 // maxTaskLinesInAnyColumn returns the max number of lines needed across all columns.
 func (k *KanbanView) maxTaskLinesInAnyColumn() int {
+	if k.baseColumnWidth() == 0 {
+		return 0
+	}
+	contentHeight := k.taskAreaHeight()
+	if contentHeight <= 0 {
+		return 0
+	}
+	availableWidth := k.columnContentWidth()
 	columns := [][]*service.DiscoveredTask{k.working, k.waiting, k.done}
 	maxLines := 0
 	for _, tasks := range columns {
 		lines := 0
+		actionLinesPerTask := calculateActionLinesPerTask(contentHeight, len(tasks))
 		for _, task := range tasks {
-			lines++ // Task name
-
-			// Action line (with metadata appended) - 1 line if either exists
-			if task.CurrentAction != "" || task.Duration != "" || task.Tokens != "" {
-				lines++
-			}
+			detailLines := buildTaskDetailLines(task, actionLinesPerTask, availableWidth)
+			lines += 1 + len(detailLines)
 		}
 		if lines > maxLines {
 			maxLines = lines
@@ -506,7 +520,7 @@ func (k *KanbanView) NeedsScrollbar() bool {
 
 // VisibleHeight returns the visible height of the kanban content area.
 func (k *KanbanView) VisibleHeight() int {
-	return k.height - 2
+	return k.taskAreaHeight()
 }
 
 // ContentHeight returns the total content height (max lines across columns).
@@ -844,6 +858,9 @@ func (k *KanbanView) GetTaskAtPosition(col, row int) *service.DiscoveredTask {
 		return nil
 	}
 
+	contentHeight := k.taskAreaHeight()
+	availableWidth := k.columnContentWidth()
+
 	// Get the task list for the column
 	var tasks []*service.DiscoveredTask
 	switch col {
@@ -865,8 +882,8 @@ func (k *KanbanView) GetTaskAtPosition(col, row int) *service.DiscoveredTask {
 	// Row 0: top border
 	// Row 1: header (emoji + title + count)
 	// Row 2: separator (───)
-	// Row 3+: tasks (each task takes 1-2 lines)
-	taskStartRow := 3
+	// Row 3+: tasks (each task takes 1+ lines)
+	taskStartRow := 1 + kanbanHeaderLines
 
 	// Adjust for scroll offset
 	adjustedRow := row - taskStartRow + k.scrollOffset
@@ -876,15 +893,12 @@ func (k *KanbanView) GetTaskAtPosition(col, row int) *service.DiscoveredTask {
 	}
 
 	// Find which task is at the adjusted row
-	// Each task takes 1 line (name) + 1 line (action with metadata) if either exists
+	// Each task takes 1 line (name) + N detail lines
+	actionLinesPerTask := calculateActionLinesPerTask(contentHeight, len(tasks))
 	currentLine := 0
 	for _, task := range tasks {
-		taskLines := 1 // Task name
-
-		// Action line (with metadata appended) - 1 line if either exists
-		if task.CurrentAction != "" || task.Duration != "" || task.Tokens != "" {
-			taskLines++
-		}
+		detailLines := buildTaskDetailLines(task, actionLinesPerTask, availableWidth)
+		taskLines := 1 + len(detailLines)
 
 		if adjustedRow >= currentLine && adjustedRow < currentLine+taskLines {
 			return task
@@ -908,6 +922,124 @@ func buildMetadataString(duration, tokens string) string {
 		return duration
 	}
 	return duration + " · " + tokens
+}
+
+func buildTaskDetailLines(task *service.DiscoveredTask, maxLines, availableWidth int) []string {
+	if maxLines <= 0 || availableWidth <= kanbanTaskIndent {
+		return nil
+	}
+
+	metadata := buildMetadataString(task.Duration, task.Tokens)
+	var baseLines []string
+
+	if task.Preview != "" {
+		for _, line := range strings.Split(task.Preview, "\n") {
+			cleaned := normalizePreviewLine(line)
+			if cleaned != "" {
+				baseLines = append(baseLines, cleaned)
+			}
+		}
+	}
+
+	if task.CurrentAction != "" {
+		action := strings.TrimSpace(task.CurrentAction)
+		if action != "" {
+			found := false
+			for _, line := range baseLines {
+				if line == action || strings.Contains(line, action) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				baseLines = append(baseLines, action)
+			}
+		}
+	}
+
+	if metadata != "" {
+		for _, line := range baseLines {
+			if strings.Contains(line, metadata) {
+				metadata = ""
+				break
+			}
+		}
+	}
+
+	if len(baseLines) == 0 && metadata != "" {
+		baseLines = append(baseLines, metadata)
+	}
+
+	if len(baseLines) == 0 {
+		return nil
+	}
+
+	hasOnlyMetadata := len(baseLines) == 1 && baseLines[0] == metadata &&
+		task.CurrentAction == "" && task.Preview == ""
+	if metadata != "" && !hasOnlyMetadata {
+		baseLines[len(baseLines)-1] = baseLines[len(baseLines)-1] + " · " + metadata
+	}
+
+	wrapWidth := availableWidth - kanbanTaskIndent
+	if wrapWidth <= 0 {
+		return nil
+	}
+
+	var wrapped []string
+	for _, line := range baseLines {
+		if line == "" {
+			continue
+		}
+		for _, segment := range wrapByWidth(line, wrapWidth) {
+			if segment != "" {
+				wrapped = append(wrapped, segment)
+			}
+		}
+	}
+
+	if len(wrapped) == 0 {
+		return nil
+	}
+
+	if len(wrapped) > maxLines {
+		wrapped = wrapped[len(wrapped)-maxLines:]
+	}
+
+	return wrapped
+}
+
+func normalizePreviewLine(line string) string {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.HasPrefix(trimmed, "⏺") {
+		trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "⏺"))
+	}
+	if strings.HasPrefix(trimmed, "✻") {
+		trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "✻"))
+	}
+	return strings.TrimSpace(trimmed)
+}
+
+func wrapByWidth(text string, width int) []string {
+	if width <= 0 || text == "" {
+		return nil
+	}
+	textWidth := ansi.StringWidth(text)
+	if textWidth <= width {
+		return []string{text}
+	}
+
+	var lines []string
+	for start := 0; start < textWidth; start += width {
+		end := start + width
+		if end > textWidth {
+			end = textWidth
+		}
+		lines = append(lines, ansi.Cut(text, start, end))
+	}
+	return lines
 }
 
 // calculateActionLinesPerTask calculates how many action lines to show per task
