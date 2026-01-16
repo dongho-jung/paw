@@ -34,8 +34,8 @@ func parseConfig(content string) (*Config, error) {
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
 
-		// Skip nested blocks (inherit:) from older configs
-		if key == "inherit" && value == "" {
+		// Skip unsupported nested blocks to avoid mis-parsing indented content.
+		if value == "" && hasIndentedBlock(lines, i) {
 			skipIndentedBlock(lines, &i)
 			continue
 		}
@@ -77,8 +77,6 @@ func parseConfig(content string) (*Config, error) {
 		}
 
 		switch key {
-		case "work_mode":
-			// work_mode is deprecated and ignored - PAW always uses worktree mode
 		case "pre_worktree_hook":
 			cfg.PreWorktreeHook = value
 		case "pre_task_hook":
@@ -113,6 +111,17 @@ func getIndentLevel(lines []string, index int) int {
 	return countLeadingSpaces(lines[index])
 }
 
+func hasIndentedBlock(lines []string, index int) bool {
+	baseIndent := getIndentLevel(lines, index)
+	for i := index + 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == "" {
+			continue
+		}
+		return getIndentLevel(lines, i) > baseIndent
+	}
+	return false
+}
+
 // countLeadingSpaces counts the number of leading spaces/tabs in a string.
 // Tabs are counted as 2 spaces.
 func countLeadingSpaces(s string) int {
@@ -130,7 +139,7 @@ func countLeadingSpaces(s string) int {
 	return count
 }
 
-// skipIndentedBlock skips a nested YAML-like block (e.g., inherit:).
+// skipIndentedBlock skips a nested YAML-like block.
 func skipIndentedBlock(lines []string, i *int) {
 	*i++ // Move past the parent line
 	baseIndent := getIndentLevel(lines, *i-1)
