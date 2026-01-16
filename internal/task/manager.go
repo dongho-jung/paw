@@ -2,10 +2,13 @@
 package task
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/dongho-jung/paw/internal/claude"
 	"github.com/dongho-jung/paw/internal/config"
@@ -57,24 +60,57 @@ func (m *Manager) shouldUseWorktree() bool {
 }
 
 func (m *Manager) preferredWorktreeDir(task *Task) string {
-	projectBase := filepath.Base(m.projectDir)
-	if projectBase == "" || projectBase == "." || projectBase == string(filepath.Separator) {
-		projectBase = "worktree"
-	}
-	// Use project base name to keep claude-mem project keys consistent across tasks.
-	return filepath.Join(task.AgentDir, projectBase)
+	return filepath.Join(task.AgentDir, m.projectWorktreeName())
 }
 
 func (m *Manager) resolveWorktreeDir(task *Task) string {
-	preferred := m.preferredWorktreeDir(task)
-	legacy := filepath.Join(task.AgentDir, "worktree")
-	if _, err := os.Stat(preferred); err == nil {
-		return preferred
+	return m.preferredWorktreeDir(task)
+}
+
+func (m *Manager) projectWorktreeName() string {
+	base := sanitizeWorktreeBase(filepath.Base(m.projectDir))
+	hashSuffix := m.projectDirHashSuffix()
+	// Use a short hash suffix to keep claude-mem project keys stable and unique.
+	return base + "-" + hashSuffix
+}
+
+func sanitizeWorktreeBase(base string) string {
+	if base == "" || base == "." || base == string(filepath.Separator) {
+		return "worktree"
 	}
-	if _, err := os.Stat(legacy); err == nil {
-		return legacy
+	clean := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == '-' || r == '_':
+			return r
+		default:
+			return '-'
+		}
+	}, base)
+	if clean == "" {
+		return "worktree"
 	}
-	return preferred
+	if len(clean) > 32 {
+		clean = clean[:32]
+	}
+	return clean
+}
+
+func (m *Manager) projectDirHashSuffix() string {
+	path := m.projectDir
+	if resolved, err := filepath.EvalSymlinks(path); err == nil && resolved != "" {
+		path = resolved
+	}
+	if abs, err := filepath.Abs(path); err == nil && abs != "" {
+		path = abs
+	}
+	sum := sha256.Sum256([]byte(path))
+	return hex.EncodeToString(sum[:])[:5]
 }
 
 // CreateTask creates a new task with the given content.
