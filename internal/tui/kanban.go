@@ -228,9 +228,11 @@ func (k *KanbanView) Render() string {
 
 			// Build the display name (no metadata on name line anymore)
 			displayName := fullName
-			if len(displayName) > availableWidth {
-				displayName = displayName[:availableWidth-1] + "…"
+			if task.Status == service.DiscoveredWaiting &&
+				(task.StatusEmoji == constants.EmojiReview || task.StatusEmoji == constants.EmojiWarning) {
+				displayName = task.StatusEmoji + " " + displayName
 			}
+			displayName = truncateWithEllipsis(displayName, availableWidth)
 
 			// Build task lines for scrolling (name + detail lines)
 			var taskLines []string

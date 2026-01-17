@@ -98,6 +98,12 @@ func startNewSession(appCtx *app.App, tm tmux.Client) error {
 			logging.Log("Reopening incomplete task: %s", t.Name)
 			_ = t.RemoveTabLock()
 			handleCmd := exec.Command(pawBin, "internal", "handle-task", appCtx.SessionName, t.AgentDir)
+			// Pass PAW_DIR and PROJECT_DIR so getAppFromSession can find the project
+			// (required for global workspaces where there's no local .paw directory)
+			handleCmd.Env = append(os.Environ(),
+				"PAW_DIR="+appCtx.PawDir,
+				"PROJECT_DIR="+appCtx.ProjectDir,
+			)
 			if err := handleCmd.Start(); err != nil {
 				logging.Warn("Failed to reopen task %s: %v", t.Name, err)
 			} else {
@@ -113,12 +119,18 @@ func startNewSession(appCtx *app.App, tm tmux.Client) error {
 	}
 
 	// Send new-task command to the _ window
-	newTaskCmd := fmt.Sprintf("%s internal new-task %s", pawBin, appCtx.SessionName)
+	// Include PAW_DIR, PROJECT_DIR, and DISPLAY_NAME so getAppFromSession can find the project
+	// (required for global workspaces where there's no local .paw directory)
+	newTaskCmd := fmt.Sprintf("PAW_DIR='%s' PROJECT_DIR='%s' DISPLAY_NAME='%s' %s internal new-task %s",
+		appCtx.PawDir, appCtx.ProjectDir, appCtx.GetDisplayName(), pawBin, appCtx.SessionName)
 	_ = tm.SendKeysLiteral(appCtx.SessionName+":"+constants.NewWindowName, newTaskCmd)
 	_ = tm.SendKeys(appCtx.SessionName+":"+constants.NewWindowName, "Enter")
 
 	// Attach to session
-	return tm.AttachSession(appCtx.SessionName)
+	if err := tm.AttachSession(appCtx.SessionName); err != nil {
+		return fmt.Errorf("failed to attach to newly created session %q: %w (workspace: %s)", appCtx.SessionName, err, appCtx.PawDir)
+	}
+	return nil
 }
 
 // attachToSession attaches to an existing session
@@ -229,6 +241,12 @@ func attachToSession(appCtx *app.App, tm tmux.Client) error {
 			logging.Log("Reopening incomplete task: %s (reason: window not found)", t.Name)
 			_ = t.RemoveTabLock()
 			handleCmd := exec.Command(pawBin, "internal", "handle-task", appCtx.SessionName, t.AgentDir)
+			// Pass PAW_DIR and PROJECT_DIR so getAppFromSession can find the project
+			// (required for global workspaces where there's no local .paw directory)
+			handleCmd.Env = append(os.Environ(),
+				"PAW_DIR="+appCtx.PawDir,
+				"PROJECT_DIR="+appCtx.ProjectDir,
+			)
 			if err := handleCmd.Start(); err != nil {
 				logging.Warn("Failed to reopen task %s: %v", t.Name, err)
 			} else {
@@ -278,11 +296,22 @@ func attachToSession(appCtx *app.App, tm tmux.Client) error {
 	}
 
 	// Also set terminal title option on re-attach
+	// Use DisplayName for user-friendly display (e.g., "repo/subdir" format)
 	_ = tm.SetOption("set-titles", "on", true)
-	_ = tm.SetOption("set-titles-string", "[paw] "+appCtx.SessionName, true)
+	_ = tm.SetOption("set-titles-string", "[paw] "+appCtx.GetDisplayName(), true)
+
+	// Verify session still exists before attaching
+	// (cleanup operations might have killed all windows, destroying the session)
+	if !tm.HasSession(appCtx.SessionName) {
+		logging.Warn("Session no longer exists after cleanup, creating new session")
+		return startNewSession(appCtx, tm)
+	}
 
 	// Attach to session
-	return tm.AttachSession(appCtx.SessionName)
+	if err := tm.AttachSession(appCtx.SessionName); err != nil {
+		return fmt.Errorf("failed to attach to session %q: %w (workspace: %s)", appCtx.SessionName, err, appCtx.PawDir)
+	}
+	return nil
 }
 
 // respawnMainWindow respawns the main window (⭐️main) with the new paw binary.
@@ -308,7 +337,10 @@ func respawnMainWindow(appCtx *app.App, tm tmux.Client) error {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	newTaskCmd := fmt.Sprintf("%s internal new-task %s", pawBin, appCtx.SessionName)
+	// Include PAW_DIR, PROJECT_DIR, and DISPLAY_NAME so getAppFromSession can find the project
+	// (required for global workspaces where there's no local .paw directory)
+	newTaskCmd := fmt.Sprintf("PAW_DIR='%s' PROJECT_DIR='%s' DISPLAY_NAME='%s' %s internal new-task %s",
+		appCtx.PawDir, appCtx.ProjectDir, appCtx.GetDisplayName(), pawBin, appCtx.SessionName)
 
 	if mainWindowID == "" {
 		// Main window doesn't exist - create it

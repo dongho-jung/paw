@@ -159,12 +159,19 @@ func (m *Manager) CreateTask(content string) (*Task, error) {
 }
 
 // createTaskDirectory creates a task directory atomically.
-// If the name already exists, it appends a number.
+// If the name already exists (directory or git branch), it appends a number.
 func (m *Manager) createTaskDirectory(baseName string) (string, error) {
 	for i := 0; i <= 100; i++ {
 		name := baseName
 		if i > 0 {
 			name = fmt.Sprintf("%s-%d", baseName, i)
+		}
+
+		// For git repos, also check if a branch with this name already exists
+		// to avoid worktree creation failures later
+		if m.isGitRepo && m.gitClient.BranchExists(m.projectDir, name) {
+			logging.Debug("Branch already exists, trying next suffix: %s", name)
+			continue
 		}
 
 		dir := filepath.Join(m.agentsDir, name)

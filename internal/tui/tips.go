@@ -9,8 +9,11 @@ import (
 // Version is the PAW version string, set from main package.
 var Version = "dev"
 
-// ProjectName is the project name (tmux session name), set from main package.
+// ProjectName is the display name for UI (may include subdir like "repo/subdir").
 var ProjectName = ""
+
+// SessionName is the tmux session name (safe chars, no slashes like "repo-subdir").
+var SessionName = ""
 
 // tips contains usage tips shown to users.
 var tips = []string{
@@ -68,7 +71,12 @@ func SetVersion(v string) {
 	Version = versionHashRegex.ReplaceAllString(v, "")
 }
 
-// SetProjectName sets the project name (tmux session name).
+// SetProjectName sets the display name for UI.
 func SetProjectName(name string) {
 	ProjectName = name
+}
+
+// SetSessionName sets the tmux session name.
+func SetSessionName(name string) {
+	SessionName = name
 }

@@ -22,10 +22,9 @@ You are in `$WORKTREE_DIR` on branch `$TASK_NAME`. Changes are isolated from mai
 ```
 $PAW_DIR/agents/$TASK_NAME/
 ├── task           # Your task description (READ THIS FIRST)
+├── log            # Task-specific log file (write progress here)
 ├── origin/        # -> PROJECT_DIR (symlink)
-└── {project-name}-{hash}/  # Your working directory (git worktree, hash avoids name collisions)
-
-$PAW_DIR/log        # Unified log file (all tasks write here)
+└── {project-name}-{hash}/  # Your working directory (git worktree)
 ```
 
 ---
@@ -282,7 +281,7 @@ Code change: Add --verbose flag to CLI
 
 **Log major milestones immediately (≤32 chars per line):**
 ```bash
-echo "Short progress summary" >> $PAW_DIR/log
+echo "Short progress summary" >> $PAW_DIR/agents/$TASK_NAME/log
 ```
 
 **When to log:**

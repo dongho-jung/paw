@@ -94,8 +94,9 @@ paw logs --task my-task
 paw logs --since 2d --task my-task
 ```
 
-### Log File Location
-- `.paw/log` - unified log file for all tasks
+### Log File Locations
+- `.paw/log` - PAW system log (internal commands, task lifecycle events)
+- `.paw/agents/{task}/log` - Task-specific progress log (for agent progress updates)
 
 ## Common User Requests
 

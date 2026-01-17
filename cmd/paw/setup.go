@@ -143,12 +143,16 @@ func runClean(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	application, err := app.New(projectDir)
+	// Use NewWithGitInfo to correctly resolve global workspace path
+	application, err := app.NewWithGitInfo(projectDir, isGitRepo)
 	if err != nil {
 		return err
 	}
 
-	application.SetGitRepo(isGitRepo)
+	// Set subdirectory context for correct session name (e.g., finops-treemap)
+	if isGitRepo {
+		application.SetSubdirectoryContext(cwd, projectDir)
+	}
 
 	if err := application.LoadConfig(); err != nil {
 		// Config might not exist, continue anyway

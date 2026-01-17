@@ -22,6 +22,7 @@ type App struct {
 
 	// Session
 	SessionName string // tmux session name
+	DisplayName string // Display name for UI (may include subdir context like "repo/subdir")
 
 	// State
 	IsGitRepo bool           // Whether the project is a git repository
@@ -190,6 +191,37 @@ func (a *App) UpdateSessionNameForGitRepo(repoRoot string) {
 		// At repo root, just use the repo name
 		a.SessionName = repoName
 	}
+}
+
+// SetSubdirectoryContext sets the display name and session name when running
+// from a subdirectory of a git repository.
+// DisplayName format: {repo-name}/{subdir-name} (for UI display)
+// SessionName format: {repo-name}-{subdir-name} (tmux-safe, no special chars)
+// When at repo root, both use just {repo-name}.
+func (a *App) SetSubdirectoryContext(originalCwd, repoRoot string) {
+	repoName := filepath.Base(repoRoot)
+
+	// If original cwd is different from repo root, show context
+	if originalCwd != repoRoot {
+		subdirName := filepath.Base(originalCwd)
+		// DisplayName with slash (for UI display)
+		a.DisplayName = repoName + "/" + subdirName
+		// SessionName with dash (for tmux - no special chars like / or :)
+		a.SessionName = repoName + "-" + subdirName
+	} else {
+		// At repo root, just use the repo name
+		a.DisplayName = repoName
+		// SessionName stays as repo name (already set in NewWithGitInfo)
+	}
+}
+
+// GetDisplayName returns the display name for UI.
+// Falls back to SessionName if DisplayName is not set.
+func (a *App) GetDisplayName() string {
+	if a.DisplayName != "" {
+		return a.DisplayName
+	}
+	return a.SessionName
 }
 
 // pawEnvVars lists environment variables managed by PAW.

@@ -76,6 +76,10 @@ func statusFromWindowName(name string) task.Status {
 		return task.StatusDone
 	case strings.HasPrefix(name, constants.EmojiWaiting):
 		return task.StatusWaiting
+	case strings.HasPrefix(name, constants.EmojiReview):
+		return task.StatusWaiting
+	case strings.HasPrefix(name, constants.EmojiWarning):
+		return task.StatusWaiting
 	case strings.HasPrefix(name, constants.EmojiWorking):
 		return task.StatusWorking
 	}
@@ -171,59 +175,74 @@ func getAppFromSession(sessionName string) (*app.App, error) {
 	// Session name is the project directory name
 	// We need to find the project directory
 
+	gitClient := git.New()
+
+	// Get environment variables - both may be set
+	projectDirEnv := os.Getenv("PROJECT_DIR")
+	pawDirEnv := os.Getenv("PAW_DIR")
+	if pawDirEnv != "" {
+		// Clean the path to remove any trailing slashes
+		// This is important because filepath.Dir("/a/b/c/") returns "/a/b/c" instead of "/a/b"
+		pawDirEnv = filepath.Clean(pawDirEnv)
+	}
+
 	// First, try PROJECT_DIR environment variable (most reliable)
-	if projectDir := os.Getenv("PROJECT_DIR"); projectDir != "" {
-		logging.Debug("getAppFromSession: found PROJECT_DIR=%s", projectDir)
-		// Detect git repo to resolve correct workspace
-		gitClient := git.New()
-		isGitRepo := gitClient.IsGitRepo(projectDir)
+	if projectDirEnv != "" {
+		logging.Debug("getAppFromSession: found PROJECT_DIR=%s", projectDirEnv)
+		// Check if project is a git repo (needed for correct workspace location)
+		isGitRepo := gitClient.IsGitRepo(projectDirEnv)
 		logging.Debug("getAppFromSession: isGitRepo=%v", isGitRepo)
-		application, err := app.NewWithGitInfo(projectDir, isGitRepo)
+		application, err := app.NewWithGitInfo(projectDirEnv, isGitRepo)
 		if err != nil {
 			logging.Debug("getAppFromSession: app.NewWithGitInfo failed: %v", err)
 			return nil, err
 		}
+		// If PAW_DIR is also set, use it directly instead of recalculating
+		// This ensures we use the exact workspace path that was passed to us
+		if pawDirEnv != "" {
+			logging.Debug("getAppFromSession: overriding PawDir with PAW_DIR=%s", pawDirEnv)
+			application.PawDir = pawDirEnv
+			application.AgentsDir = filepath.Join(pawDirEnv, constants.AgentsDirName)
+		}
 		return loadAppConfig(application)
 	}
 
-	// Try PAW_DIR environment variable
+	// Try PAW_DIR environment variable only
 	// Note: For global workspaces, PAW_DIR is not at {project}/.paw but at
 	// ~/.local/share/paw/workspaces/{project-id}, so filepath.Dir won't work.
 	// We need to read the project path from the workspace itself.
-	if pawDir := os.Getenv("PAW_DIR"); pawDir != "" {
-		logging.Debug("getAppFromSession: found PAW_DIR=%s", pawDir)
+	if pawDirEnv != "" {
+		logging.Debug("getAppFromSession: found PAW_DIR=%s (no PROJECT_DIR)", pawDirEnv)
 
 		// Check if PAW_DIR is a global workspace by looking for project-path file
-		projectPathFile := filepath.Join(pawDir, ".project-path")
+		projectPathFile := filepath.Join(pawDirEnv, ".project-path")
 		if data, err := os.ReadFile(projectPathFile); err == nil {
 			projectDir := strings.TrimSpace(string(data))
 			logging.Debug("getAppFromSession: found project-path=%s", projectDir)
-			// Check for git repo marker to determine git mode
-			gitMarkerPath := filepath.Join(pawDir, constants.GitRepoMarker)
-			_, markerErr := os.Stat(gitMarkerPath)
-			isGitRepo := markerErr == nil
-			logging.Debug("getAppFromSession: isGitRepo=%v (from marker)", isGitRepo)
+			isGitRepo := gitClient.IsGitRepo(projectDir)
 			application, err := app.NewWithGitInfo(projectDir, isGitRepo)
 			if err != nil {
 				logging.Debug("getAppFromSession: app.NewWithGitInfo failed: %v", err)
 				return nil, err
 			}
+			// Use the PAW_DIR directly
+			application.PawDir = pawDirEnv
+			application.AgentsDir = filepath.Join(pawDirEnv, constants.AgentsDirName)
 			return loadAppConfig(application)
 		}
 
 		// Fallback: assume PAW_DIR is at {project}/.paw (local workspace)
-		projectDir := filepath.Dir(pawDir)
+		projectDir := filepath.Dir(pawDirEnv)
 		logging.Debug("getAppFromSession: assuming local workspace, projectDir=%s", projectDir)
-		// Check for git repo marker to determine git mode
-		gitMarkerPath := filepath.Join(pawDir, constants.GitRepoMarker)
-		_, markerErr := os.Stat(gitMarkerPath)
-		isGitRepo := markerErr == nil
-		logging.Debug("getAppFromSession: isGitRepo=%v (from marker)", isGitRepo)
+		isGitRepo := gitClient.IsGitRepo(projectDir)
 		application, err := app.NewWithGitInfo(projectDir, isGitRepo)
 		if err != nil {
 			logging.Debug("getAppFromSession: app.NewWithGitInfo failed: %v", err)
 			return nil, err
 		}
+		// Use the PAW_DIR directly
+		application.PawDir = pawDirEnv
+		application.AgentsDir = filepath.Join(pawDirEnv, constants.AgentsDirName)
 		return loadAppConfig(application)
 	}
 
@@ -249,11 +268,7 @@ func getAppFromSession(sessionName string) (*app.App, error) {
 		pawDir := filepath.Join(dir, ".paw")
 		if _, err := os.Stat(pawDir); err == nil {
 			logging.Debug("getAppFromSession: found .paw at %s", pawDir)
-			// Check for git repo marker to determine git mode
-			gitMarkerPath := filepath.Join(pawDir, constants.GitRepoMarker)
-			_, markerErr := os.Stat(gitMarkerPath)
-			isGitRepo := markerErr == nil
-			logging.Debug("getAppFromSession: isGitRepo=%v (from marker)", isGitRepo)
+			isGitRepo := gitClient.IsGitRepo(dir)
 			application, err := app.NewWithGitInfo(dir, isGitRepo)
 			if err != nil {
 				logging.Debug("getAppFromSession: app.NewWithGitInfo failed: %v", err)
@@ -273,7 +288,6 @@ func getAppFromSession(sessionName string) (*app.App, error) {
 	// This handles the case where the workspace is stored globally (auto mode for git repos)
 	// We need to check if it's a git repo to resolve the correct workspace path
 	logging.Debug("getAppFromSession: no local .paw found, trying cwd=%s", cwd)
-	gitClient := git.New()
 	isGitRepo := gitClient.IsGitRepo(cwd)
 	projectDir := cwd
 	if isGitRepo {

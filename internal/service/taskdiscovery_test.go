@@ -257,6 +257,18 @@ func TestParseWindowName(t *testing.T) {
 			expectedStatus: DiscoveredDone,
 		},
 		{
+			name:           "review task",
+			windowName:     "👀my-task",
+			expectedTask:   "my-task",
+			expectedStatus: DiscoveredWaiting,
+		},
+		{
+			name:           "warning task",
+			windowName:     "⚠️my-task",
+			expectedTask:   "my-task",
+			expectedStatus: DiscoveredWaiting,
+		},
+		{
 			name:           "non-task window",
 			windowName:     "regular-window",
 			expectedTask:   "",

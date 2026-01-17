@@ -1117,7 +1117,7 @@ func (m *Model) repositionView() {
 	// Limit maximum scroll offset to prevent last line from reaching the top
 	// Maximum offset = max(0, totalLines - viewportHeight)
 	// This ensures the last line stays at the bottom of the viewport
-	totalLines := len(m.value)
+	totalLines := m.TotalVisualLines()
 	maxOffset := max(0, totalLines-m.viewport.Height())
 	if m.viewport.YOffset > maxOffset {
 		// Adjust offset to keep last line at bottom
@@ -1954,12 +1954,25 @@ func wrap(runes []rune, width int) [][]rune {
 				word = nil
 			}
 		} else {
-			// If the last character is a double-width rune, then we may not be able to add it to this line
-			// as it might cause us to go past the width.
-			lastCharLen := rw.RuneWidth(word[len(word)-1])
-			if uniseg.StringWidth(string(word))+lastCharLen > width {
+			if len(word) == 0 {
+				continue
+			}
+			wordWidth := uniseg.StringWidth(string(word))
+			if wordWidth > width {
 				// If the current line has any content, let's move to the next
 				// line because the current word fills up the entire line.
+				if len(lines[row]) > 0 {
+					row++
+					lines = append(lines, []rune{})
+				}
+				head, tail := splitRunesByWidth(word, width)
+				lines[row] = append(lines[row], head...)
+				word = tail
+				if len(word) > 0 {
+					row++
+					lines = append(lines, []rune{})
+				}
+			} else if wordWidth == width {
 				if len(lines[row]) > 0 {
 					row++
 					lines = append(lines, []rune{})
@@ -1986,6 +1999,24 @@ func wrap(runes []rune, width int) [][]rune {
 	}
 
 	return lines
+}
+
+func splitRunesByWidth(runes []rune, width int) ([]rune, []rune) {
+	if width <= 0 || len(runes) == 0 {
+		return runes, nil
+	}
+
+	w := 0
+	for i, r := range runes {
+		w += rw.RuneWidth(r)
+		if w > width {
+			if i == 0 {
+				return runes[:1], runes[1:]
+			}
+			return runes[:i], runes[i:]
+		}
+	}
+	return runes, nil
 }
 
 func repeatSpaces(n int) []rune {

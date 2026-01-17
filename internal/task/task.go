@@ -50,6 +50,7 @@ var statusTransitions = map[Status]map[Status]bool{
 	StatusDone: {
 		StatusDone:    true,
 		StatusWorking: true, // Allow resuming work on a completed task
+		StatusWaiting: true, // Allow moving back to waiting (e.g., PR review)
 	},
 }
 

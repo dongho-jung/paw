@@ -73,8 +73,10 @@ var toggleNewCmd = &cobra.Command{
 		}
 
 		// Send new-task command to the new window
+		// Include PAW_DIR, PROJECT_DIR, and DISPLAY_NAME so getAppFromSession can find the project
 		pawBin, _ := os.Executable()
-		newTaskCmdStr := fmt.Sprintf("%s internal new-task %s", pawBin, sessionName)
+		newTaskCmdStr := fmt.Sprintf("PAW_DIR='%s' PROJECT_DIR='%s' DISPLAY_NAME='%s' %s internal new-task %s",
+			appCtx.PawDir, appCtx.ProjectDir, appCtx.GetDisplayName(), pawBin, sessionName)
 		if err := tm.SendKeysLiteral(windowID, newTaskCmdStr); err != nil {
 			return fmt.Errorf("failed to send keys: %w", err)
 		}
@@ -106,7 +108,13 @@ var newTaskCmd = &cobra.Command{
 		defer cleanup()
 
 		// Set project name for TUI display
-		tui.SetProjectName(sessionName)
+		// Use DISPLAY_NAME env var if set (for subdirectory context like "repo/subdir")
+		displayName := os.Getenv("DISPLAY_NAME")
+		if displayName == "" {
+			displayName = sessionName
+		}
+		tui.SetProjectName(displayName)
+		tui.SetSessionName(sessionName)
 
 		// Initialize input history service (used for saving history after task creation)
 		inputHistorySvc := service.NewInputHistoryService(appCtx.PawDir)
@@ -354,6 +362,12 @@ var spawnTaskCmd = &cobra.Command{
 
 		// Handle task (creates actual window, starts Claude)
 		handleCmd := exec.Command(pawBin, "internal", "handle-task", sessionName, newTask.AgentDir)
+		// Pass PAW_DIR and PROJECT_DIR so getAppFromSession can find the project
+		// (required for global workspaces where there's no local .paw directory)
+		handleCmd.Env = append(os.Environ(),
+			"PAW_DIR="+appCtx.PawDir,
+			"PROJECT_DIR="+appCtx.ProjectDir,
+		)
 		if err := handleCmd.Start(); err != nil {
 			logging.Warn("Failed to start handle-task: %v", err)
 			return fmt.Errorf("failed to start task handler: %w", err)
@@ -407,7 +421,9 @@ func ensureMainWindowInSession(sessionName string) error {
 			}
 
 			// Respawn the pane to ensure new-task is running
-			newTaskCmd := fmt.Sprintf("%s internal new-task %s", pawBin, sessionName)
+			// Include PAW_DIR, PROJECT_DIR, and DISPLAY_NAME so getAppFromSession can find the project
+			newTaskCmd := fmt.Sprintf("PAW_DIR='%s' PROJECT_DIR='%s' DISPLAY_NAME='%s' %s internal new-task %s",
+				appCtx.PawDir, appCtx.ProjectDir, appCtx.GetDisplayName(), pawBin, sessionName)
 			if err := tm.RespawnPane(w.ID+".0", appCtx.ProjectDir, newTaskCmd); err != nil {
 				logging.Warn("Failed to respawn main window: %v", err)
 			}
@@ -431,7 +447,9 @@ func ensureMainWindowInSession(sessionName string) error {
 	}
 
 	// Build the new-task command
-	newTaskCmd := fmt.Sprintf("%s internal new-task %s", pawBin, sessionName)
+	// Include PAW_DIR, PROJECT_DIR, and DISPLAY_NAME so getAppFromSession can find the project
+	newTaskCmd := fmt.Sprintf("PAW_DIR='%s' PROJECT_DIR='%s' DISPLAY_NAME='%s' %s internal new-task %s",
+		appCtx.PawDir, appCtx.ProjectDir, appCtx.GetDisplayName(), pawBin, sessionName)
 
 	// Create new window with command directly (more reliable than sending keys)
 	// Using Command option ensures the command runs immediately without race conditions

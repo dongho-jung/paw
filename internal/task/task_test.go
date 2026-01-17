@@ -510,6 +510,28 @@ func TestTransitionStatus(t *testing.T) {
 	if !valid {
 		t.Fatalf("Expected valid transition done->working (allows resuming completed tasks)")
 	}
+
+	prev, valid, err = task.TransitionStatus(StatusDone)
+	if err != nil {
+		t.Fatalf("TransitionStatus working->done failed: %v", err)
+	}
+	if prev != StatusWorking {
+		t.Fatalf("Expected previous status working, got %s", prev)
+	}
+	if !valid {
+		t.Fatalf("Expected valid transition working->done")
+	}
+
+	prev, valid, err = task.TransitionStatus(StatusWaiting)
+	if err != nil {
+		t.Fatalf("TransitionStatus done->waiting failed: %v", err)
+	}
+	if prev != StatusDone {
+		t.Fatalf("Expected previous status done, got %s", prev)
+	}
+	if !valid {
+		t.Fatalf("Expected valid transition done->waiting")
+	}
 }
 
 func TestTaskGetSystemPromptPath(t *testing.T) {

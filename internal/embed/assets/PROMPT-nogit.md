@@ -25,9 +25,9 @@ $PROJECT_DIR/
 
 $PAW_DIR/agents/$TASK_NAME/
 ├── task           # Your task description (READ THIS FIRST)
-└── origin/        # -> PROJECT_DIR (symlink to project root)
-
-$PAW_DIR/log       # Unified log file (all tasks write here)
+├── log            # Task-specific log file (write progress here)
+├── origin/        # -> PROJECT_DIR (symlink to project root)
+└── .claude/       # Claude settings (stop-hook config)
 ```
 
 ## ⚠️ CRITICAL: Working Directory
@@ -187,7 +187,7 @@ Code change: Add --verbose flag to CLI
 
 **Log major milestones immediately (≤32 chars per line):**
 ```bash
-echo "Short progress summary" >> $PAW_DIR/log
+echo "Short progress summary" >> $PAW_DIR/agents/$TASK_NAME/log
 ```
 
 **When to log:**
