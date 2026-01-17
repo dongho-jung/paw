@@ -109,3 +109,151 @@ func TestBuildMetadataString(t *testing.T) {
 		})
 	}
 }
+
+func TestIsKeyboardHintLine(t *testing.T) {
+	tests := []struct {
+		name     string
+		line     string
+		expected bool
+	}{
+		// Lines that should be filtered
+		{
+			name:     "option toggle with triangle",
+			line:     "⏵⏵ bypass permissions on (shift+tab to cycle)",
+			expected: true,
+		},
+		{
+			name:     "single triangle option",
+			line:     "⏵ auto-accept edits",
+			expected: true,
+		},
+		{
+			name:     "shift+tab hint",
+			line:     "some option (shift+tab to cycle)",
+			expected: true,
+		},
+		{
+			name:     "shift-tab hint",
+			line:     "some option (shift-tab to cycle)",
+			expected: true,
+		},
+		{
+			name:     "tab to cycle hint",
+			line:     "option (tab to cycle)",
+			expected: true,
+		},
+		{
+			name:     "ctrl+c to interrupt",
+			line:     "processing (ctrl+c to interrupt)",
+			expected: true,
+		},
+		{
+			name:     "esc to cancel",
+			line:     "doing stuff (esc to cancel)",
+			expected: true,
+		},
+		{
+			name:     "to interrupt suffix",
+			line:     "waiting (press to interrupt)",
+			expected: true,
+		},
+		{
+			name:     "to cancel suffix",
+			line:     "running (press to cancel)",
+			expected: true,
+		},
+		// Lines that should NOT be filtered
+		{
+			name:     "normal action text",
+			line:     "Reading file /path/to/file.go",
+			expected: false,
+		},
+		{
+			name:     "normal status",
+			line:     "Running tests...",
+			expected: false,
+		},
+		{
+			name:     "metadata line",
+			line:     "1m 36s · ↓ 5.9k",
+			expected: false,
+		},
+		{
+			name:     "empty line",
+			line:     "",
+			expected: false,
+		},
+		{
+			name:     "regular text with parentheses",
+			line:     "Analyzing (main.go)",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isKeyboardHintLine(tt.line)
+			if result != tt.expected {
+				t.Errorf("isKeyboardHintLine(%q) = %v, want %v", tt.line, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNormalizePreviewLine(t *testing.T) {
+	tests := []struct {
+		name     string
+		line     string
+		expected string
+	}{
+		{
+			name:     "normal line",
+			line:     "Reading file.go",
+			expected: "Reading file.go",
+		},
+		{
+			name:     "empty line",
+			line:     "",
+			expected: "",
+		},
+		{
+			name:     "whitespace only",
+			line:     "   ",
+			expected: "",
+		},
+		{
+			name:     "line with spinner prefix",
+			line:     "⏺ Running tests",
+			expected: "Running tests",
+		},
+		{
+			name:     "line with alternative spinner",
+			line:     "✻ Processing",
+			expected: "Processing",
+		},
+		{
+			name:     "keyboard hint line filtered",
+			line:     "⏵⏵ bypass permissions on (shift+tab to cycle)",
+			expected: "",
+		},
+		{
+			name:     "option toggle filtered",
+			line:     "⏵ auto-accept edits",
+			expected: "",
+		},
+		{
+			name:     "ctrl+c hint filtered",
+			line:     "waiting (ctrl+c to interrupt)",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := normalizePreviewLine(tt.line)
+			if result != tt.expected {
+				t.Errorf("normalizePreviewLine(%q) = %q, want %q", tt.line, result, tt.expected)
+			}
+		})
+	}
+}

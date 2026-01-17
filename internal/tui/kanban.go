@@ -1021,7 +1021,39 @@ func normalizePreviewLine(line string) string {
 	if strings.HasPrefix(trimmed, "✻") {
 		trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "✻"))
 	}
+	// Filter out Claude Code keyboard hints and option toggle lines
+	if isKeyboardHintLine(trimmed) {
+		return ""
+	}
 	return strings.TrimSpace(trimmed)
+}
+
+// isKeyboardHintLine checks if a line is a Claude Code keyboard hint or option toggle.
+// These lines typically contain keyboard shortcuts or UI hints that aren't useful in Kanban view.
+func isKeyboardHintLine(line string) bool {
+	// Option toggle lines start with ⏵ (triangle indicators)
+	if strings.HasPrefix(line, "⏵") {
+		return true
+	}
+	// Lines containing keyboard hint patterns
+	hintPatterns := []string{
+		"(shift+tab",      // Cycle options hint
+		"(shift-tab",      // Alternative format
+		"(tab to cycle",   // Tab hint
+		"(esc to",         // Escape key hint
+		"(ctrl+c to",      // Ctrl+C hint
+		"(ctrl-c to",      // Alternative format
+		"(⌃c to",          // macOS ctrl notation
+		"to interrupt)",   // Common suffix
+		"to cancel)",      // Common suffix
+	}
+	lower := strings.ToLower(line)
+	for _, pattern := range hintPatterns {
+		if strings.Contains(lower, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 func wrapByWidth(text string, width int) []string {
