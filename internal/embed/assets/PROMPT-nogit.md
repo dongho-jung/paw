@@ -111,10 +111,12 @@ If the task is simple, skip Phase 1 and start Phase 2 after reading the task.
    - **Update documentation if the change affects it** (see Documentation Sync)
    - Log progress
 
-### Phase 3: Complete
+### Phase 3: Verify & Complete
 1. Ensure all tests pass (if applicable)
 2. Log: "Work complete - ready to finish"
-3. Print `PAW_DONE` on its own line to update window status to ✅.
+3. Signal done state:
+   - Preferred: `echo "done" > "$PAW_DIR/agents/$TASK_NAME/.status-signal"`
+   - Fallback: print `PAW_DONE` on its own line
 4. Message the user: "Please press `⌃F` to finish."
 
 ---
@@ -129,16 +131,6 @@ Change → run tests → fix failures → log success
 - Test framework detection: package.json (npm test), pytest, go test, make test
 - On test failure: analyze error → attempt fix → rerun (up to 3 attempts)
 - On success: log progress
-
-### On task completion
-```
-Final tests → log completion → user finishes
-```
-
-1. Verify all changes
-2. Write the completion log
-3. Print `PAW_DONE` on its own line to update window status to ✅.
-4. Message the user: "Please press `⌃F` to finish."
 
 ### Automatic handling on errors
 - **Build error**: Analyze the message → attempt a fix
