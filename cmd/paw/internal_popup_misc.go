@@ -60,11 +60,12 @@ var toggleCmdPaletteCmd = &cobra.Command{
 
 		// Ignore error - popup returns non-zero when closed with Esc/Ctrl+C
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:  constants.PopupWidthPalette,
-			Height: constants.PopupHeightPalette,
-			Title:  "",
-			Close:  true,
-			Style:  "fg=terminal,bg=terminal",
+			Width:    constants.PopupWidthPalette,
+			Height:   constants.PopupHeightPalette,
+			Title:    "",
+			Close:    true,
+			NoBorder: true,
+			Style:    "fg=terminal,bg=terminal",
 		}, paletteCmd)
 		return nil
 	},

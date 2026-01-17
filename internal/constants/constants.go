@@ -358,29 +358,29 @@ const (
 
 // Popup sizes (percentage-based for compatibility)
 const (
-	// Full size for content viewers (log, git, diff)
-	PopupWidthFull  = "94%"
-	PopupHeightFull = "90%"
+	// Full-screen size for popups.
+	PopupWidthFull  = "100%"
+	PopupHeightFull = "100%"
 
-	// Compact size for help viewer
-	PopupWidthHelp  = "80"
-	PopupHeightHelp = "80%"
+	// Full-screen size for help viewer.
+	PopupWidthHelp  = PopupWidthFull
+	PopupHeightHelp = PopupHeightFull
 
-	// Small size for command palette (fits 3 items + input + help)
-	PopupWidthPalette  = "60"
-	PopupHeightPalette = "18"
+	// Full-screen size for command palette.
+	PopupWidthPalette  = PopupWidthFull
+	PopupHeightPalette = PopupHeightFull
 
-	// Medium size for history picker
-	PopupWidthHistory   = "80%"
-	PopupHeightHistory  = "70%"
-	PopupWidthTemplate  = "80%"
-	PopupHeightTemplate = "70%"
+	// Full-screen size for history/template pickers.
+	PopupWidthHistory   = PopupWidthFull
+	PopupHeightHistory  = PopupHeightFull
+	PopupWidthTemplate  = PopupWidthFull
+	PopupHeightTemplate = PopupHeightFull
 
-	// Medium size for project picker
-	PopupWidthProjectPicker  = "60"
-	PopupHeightProjectPicker = "50%"
+	// Full-screen size for project picker.
+	PopupWidthProjectPicker  = PopupWidthFull
+	PopupHeightProjectPicker = PopupHeightFull
 
-	// Small size for finish picker (3-4 options + title + help)
-	PopupWidthFinishPicker  = "50"
-	PopupHeightFinishPicker = "14"
+	// Full-screen size for finish picker.
+	PopupWidthFinishPicker  = PopupWidthFull
+	PopupHeightFinishPicker = PopupHeightFull
 )

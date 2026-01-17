@@ -60,11 +60,12 @@ var doneTaskCmd = &cobra.Command{
 
 		// Display popup - if user presses Ctrl+F again, popup closes automatically
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:  constants.PopupWidthFinishPicker,
-			Height: constants.PopupHeightFinishPicker,
-			Title:  " Finish Task ",
-			Close:  true,
-			Style:  "fg=terminal,bg=terminal",
+			Width:    constants.PopupWidthFinishPicker,
+			Height:   constants.PopupHeightFinishPicker,
+			Title:    " Finish Task ",
+			Close:    true,
+			NoBorder: true,
+			Style:    "fg=terminal,bg=terminal",
 		}, finishCmd)
 
 		return nil

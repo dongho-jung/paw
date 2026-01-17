@@ -117,7 +117,8 @@ type PopupOpts struct {
 	Title       string
 	Style       string
 	Close       bool // -E flag: close on exit
-	BorderStyle string
+	NoBorder    bool   // -B flag: no border
+	BorderStyle string // -b flag: border lines
 	Directory   string            // -d flag: working directory
 	Env         map[string]string // -e flag: environment variables
 }
@@ -496,6 +497,9 @@ func (c *tmuxClient) DisplayPopup(opts PopupOpts, command string) error {
 
 	args := []string{"display-popup"}
 
+	if opts.NoBorder {
+		args = append(args, "-B")
+	}
 	if opts.Close {
 		args = append(args, "-E")
 	}

@@ -48,6 +48,9 @@ func TestPopupOptsDefaults(t *testing.T) {
 	if opts.Close != false {
 		t.Errorf("PopupOpts.Close should default to false")
 	}
+	if opts.NoBorder != false {
+		t.Errorf("PopupOpts.NoBorder should default to false")
+	}
 	if opts.Env != nil {
 		t.Errorf("PopupOpts.Env should default to nil")
 	}

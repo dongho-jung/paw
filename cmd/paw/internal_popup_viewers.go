@@ -45,11 +45,12 @@ var toggleLogCmd = &cobra.Command{
 		logCmd := fmt.Sprintf("%s internal log-viewer %s", pawBin, logPath)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:  constants.PopupWidthFull,
-			Height: constants.PopupHeightFull,
-			Title:  " Log Viewer ",
-			Close:  true,
-			Style:  "fg=terminal,bg=terminal",
+			Width:    constants.PopupWidthFull,
+			Height:   constants.PopupHeightFull,
+			Title:    " Log Viewer ",
+			Close:    true,
+			NoBorder: true,
+			Style:    "fg=terminal,bg=terminal",
 		}, logCmd)
 		return nil
 	},
@@ -83,11 +84,12 @@ var toggleHelpCmd = &cobra.Command{
 		helpCmd := fmt.Sprintf("%s internal help-viewer", pawBin)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:  constants.PopupWidthHelp,
-			Height: constants.PopupHeightHelp,
-			Title:  " Help ",
-			Close:  true,
-			Style:  "fg=terminal,bg=terminal",
+			Width:    constants.PopupWidthHelp,
+			Height:   constants.PopupHeightHelp,
+			Title:    " Help ",
+			Close:    true,
+			NoBorder: true,
+			Style:    "fg=terminal,bg=terminal",
 		}, helpCmd)
 		return nil
 	},
@@ -164,6 +166,7 @@ var toggleGitStatusCmd = &cobra.Command{
 			Height:    constants.PopupHeightFull,
 			Title:     " Git ",
 			Close:     true,
+			NoBorder:  true,
 			Style:     "fg=terminal,bg=terminal",
 			Directory: panePath,
 		}, gitCmd)
@@ -214,6 +217,7 @@ var toggleShowDiffCmd = &cobra.Command{
 			Height:    constants.PopupHeightFull,
 			Title:     fmt.Sprintf(" Diff (%s...HEAD) ", mainBranch),
 			Close:     true,
+			NoBorder:  true,
 			Style:     "fg=terminal,bg=terminal",
 			Directory: panePath,
 		}, diffCmd)
@@ -259,6 +263,7 @@ var toggleHistoryCmd = &cobra.Command{
 			Height:    constants.PopupHeightHistory,
 			Title:     " Task History (⌃R) ",
 			Close:     true,
+			NoBorder:  true,
 			Style:     "fg=terminal,bg=terminal",
 			Directory: appCtx.ProjectDir,
 		}, historyCmd)
@@ -355,6 +360,7 @@ var toggleTemplateCmd = &cobra.Command{
 			Height:    constants.PopupHeightTemplate,
 			Title:     " Templates (⌃T) ",
 			Close:     true,
+			NoBorder:  true,
 			Style:     "fg=terminal,bg=terminal",
 			Directory: appCtx.ProjectDir,
 		}, templateCmd)
@@ -454,11 +460,12 @@ var toggleProjectPickerCmd = &cobra.Command{
 		pickerCmd := fmt.Sprintf("%s internal project-picker %s", pawBin, sessionName)
 
 		_ = tm.DisplayPopup(tmux.PopupOpts{
-			Width:  constants.PopupWidthProjectPicker,
-			Height: constants.PopupHeightProjectPicker,
-			Title:  " Switch Project (⌃J) ",
-			Close:  true,
-			Style:  "fg=terminal,bg=terminal",
+			Width:    constants.PopupWidthProjectPicker,
+			Height:   constants.PopupHeightProjectPicker,
+			Title:    " Switch Project (⌃J) ",
+			Close:    true,
+			NoBorder: true,
+			Style:    "fg=terminal,bg=terminal",
 		}, pickerCmd)
 
 		// Check if a switch target was written by the project picker
