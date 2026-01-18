@@ -21,8 +21,9 @@ const (
 	// TopPaneSize is the maximum height for top panes (40% of window)
 	TopPaneSize = "40%"
 	// tmux option keys for tracking top pane state
-	topPaneIDKey   = "@paw_top_pane_id"
-	topPaneTypeKey = "@paw_top_pane_type"
+	topPaneIDKey     = "@paw_top_pane_id"
+	topPaneTypeKey   = "@paw_top_pane_type"
+	topPaneWindowKey = "@paw_top_pane_window"
 )
 
 // topPaneShortcuts maps pane types to their toggle shortcuts for user feedback
@@ -34,6 +35,7 @@ var topPaneShortcuts = map[string]string{
 	"history":  "⌃R",
 	"template": "⌃T",
 	"project":  "⌃J",
+	"finish":   "⌃F",
 }
 
 // TopPaneResult represents the result of displayTopPane operation
@@ -60,12 +62,24 @@ func displayTopPane(tm tmux.Client, paneType, command, workDir string) (TopPaneR
 	logging.Debug("-> displayTopPane(type=%s, cmd=%s)", paneType, command)
 	defer logging.Debug("<- displayTopPane")
 
+	// Get current window ID to verify pane ownership
+	currentWindowID, _ := tm.Display("#{window_id}")
+	currentWindowID = strings.TrimSpace(currentWindowID)
+
 	// Check if a top pane already exists
 	existingPaneID, _ := tm.GetOption(topPaneIDKey)
 	existingPaneID = strings.TrimSpace(existingPaneID)
+	existingWindowID, _ := tm.GetOption(topPaneWindowKey)
+	existingWindowID = strings.TrimSpace(existingWindowID)
 
-	if existingPaneID != "" && tm.HasPane(existingPaneID) {
-		// Top pane exists - check if it's the same type
+	// Verify the pane exists AND belongs to the current window
+	// This prevents false positives from tmux reusing pane IDs
+	paneValid := existingPaneID != "" &&
+		tm.HasPane(existingPaneID) &&
+		existingWindowID == currentWindowID
+
+	if paneValid {
+		// Top pane exists in current window - check if it's the same type
 		existingType, _ := tm.GetOption(topPaneTypeKey)
 		existingType = strings.TrimSpace(existingType)
 
@@ -75,6 +89,7 @@ func displayTopPane(tm tmux.Client, paneType, command, workDir string) (TopPaneR
 			_ = tm.KillPane(existingPaneID)
 			_ = tm.SetOption(topPaneIDKey, "", true)
 			_ = tm.SetOption(topPaneTypeKey, "", true)
+			_ = tm.SetOption(topPaneWindowKey, "", true)
 			return TopPaneClosed, nil
 		}
 
@@ -90,10 +105,13 @@ func displayTopPane(tm tmux.Client, paneType, command, workDir string) (TopPaneR
 		return TopPaneBlocked, nil
 	}
 
-	// Clean up stale options if pane doesn't exist
+	// Clean up stale options if pane doesn't exist or is in a different window
 	if existingPaneID != "" {
+		logging.Debug("displayTopPane: cleaning up stale options (paneID=%s, window=%s, currentWindow=%s)",
+			existingPaneID, existingWindowID, currentWindowID)
 		_ = tm.SetOption(topPaneIDKey, "", true)
 		_ = tm.SetOption(topPaneTypeKey, "", true)
+		_ = tm.SetOption(topPaneWindowKey, "", true)
 	}
 
 	// Create new top pane
@@ -109,12 +127,13 @@ func displayTopPane(tm tmux.Client, paneType, command, workDir string) (TopPaneR
 		return TopPaneBlocked, fmt.Errorf("failed to create top pane: %w", err)
 	}
 
-	// Store pane info for toggle/blocking
+	// Store pane info for toggle/blocking (including window ID for validation)
 	newPaneID = strings.TrimSpace(newPaneID)
 	_ = tm.SetOption(topPaneIDKey, newPaneID, true)
 	_ = tm.SetOption(topPaneTypeKey, paneType, true)
+	_ = tm.SetOption(topPaneWindowKey, currentWindowID, true)
 
-	logging.Debug("displayTopPane: created pane %s for type %s", newPaneID, paneType)
+	logging.Debug("displayTopPane: created pane %s for type %s in window %s", newPaneID, paneType, currentWindowID)
 	return TopPaneCreated, nil
 }
 
