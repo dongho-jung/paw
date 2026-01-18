@@ -2,8 +2,6 @@
 package task
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -68,10 +66,7 @@ func (m *Manager) resolveWorktreeDir(task *Task) string {
 }
 
 func (m *Manager) projectWorktreeName() string {
-	base := sanitizeWorktreeBase(filepath.Base(m.projectDir))
-	hashSuffix := m.projectDirHashSuffix()
-	// Use a short hash suffix to keep project workspace names stable and unique.
-	return base + "-" + hashSuffix
+	return sanitizeWorktreeBase(filepath.Base(m.projectDir))
 }
 
 func sanitizeWorktreeBase(base string) string {
@@ -140,18 +135,6 @@ func sanitizeCustomBranchName(name string) string {
 	}
 
 	return name
-}
-
-func (m *Manager) projectDirHashSuffix() string {
-	path := m.projectDir
-	if resolved, err := filepath.EvalSymlinks(path); err == nil && resolved != "" {
-		path = resolved
-	}
-	if abs, err := filepath.Abs(path); err == nil && abs != "" {
-		path = abs
-	}
-	sum := sha256.Sum256([]byte(path))
-	return hex.EncodeToString(sum[:])[:5]
 }
 
 // CreateTask creates a new task with the given content.

@@ -193,7 +193,7 @@ paw/                           # This repository
         ├── log                # Task-specific progress log (for agent progress updates)
         ├── end-task           # Per-task end-task script (called for auto-merge)
         ├── origin             # -> Project root (symlink)
-        ├── {project-name}-{hash}/    # Git worktree (auto-created in git mode)
+        ├── {project-name}/           # Git worktree (auto-created in git mode)
         ├── .tab-lock/         # Tab creation lock (atomic mkdir prevents races)
         │   └── window_id      # Tmux window ID (used in cleanup)
         ├── .session-started   # Session marker (for resume on reopen)
@@ -204,7 +204,7 @@ paw/                           # This repository
 
 $HOME/.local/share/paw/            # Global PAW data (auto mode for git projects)
 └── workspaces/                    # Workspaces for all projects
-    └── {project-name}-{hash}/     # Per-project workspace (same structure as .paw above)
+    └── {project-name}-{hash}/     # Per-project workspace (PAW uses hash for uniqueness)
 ```
 
 ### Workspace Location

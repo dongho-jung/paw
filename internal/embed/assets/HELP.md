@@ -51,7 +51,7 @@ Claude Code-based autonomous agent work environment
   └── agents/{task-name}/
       ├── task               Task content
       ├── origin/            Project root (symlink)
-      └── {project-name}-{hash}/ git worktree (auto-created)
+      └── {project-name}/        git worktree (auto-created)
 
 ## Window Status Icons
 

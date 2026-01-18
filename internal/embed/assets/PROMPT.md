@@ -24,7 +24,7 @@ $PAW_DIR/agents/$TASK_NAME/
 ├── task           # Your task description (READ THIS FIRST)
 ├── log            # Task-specific log file (write progress here)
 ├── origin/        # -> PROJECT_DIR (symlink)
-└── {project-name}-{hash}/  # Your working directory (git worktree)
+└── {project-name}/         # Your working directory (git worktree)
 ```
 
 ---
