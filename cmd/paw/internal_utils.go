@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -18,6 +19,26 @@ import (
 	"github.com/dongho-jung/paw/internal/task"
 	"github.com/dongho-jung/paw/internal/tmux"
 )
+
+// cachedPawBin caches the result of os.Executable() for performance.
+// This avoids repeated syscalls when opening panes.
+var (
+	cachedPawBin     string
+	cachedPawBinOnce sync.Once
+)
+
+// getPawBin returns the path to the paw binary, caching the result.
+// Falls back to "paw" if os.Executable() fails.
+func getPawBin() string {
+	cachedPawBinOnce.Do(func() {
+		var err error
+		cachedPawBin, err = os.Executable()
+		if err != nil {
+			cachedPawBin = "paw"
+		}
+	})
+	return cachedPawBin
+}
 
 var renameWindowCmd = &cobra.Command{
 	Use:   "rename-window [window-id] [name]",

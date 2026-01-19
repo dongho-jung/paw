@@ -62,15 +62,24 @@ func displayTopPane(tm tmux.Client, paneType, command, workDir string) (TopPaneR
 	logging.Debug("-> displayTopPane(type=%s, cmd=%s)", paneType, command)
 	defer logging.Debug("<- displayTopPane")
 
-	// Get current window ID to verify pane ownership
-	currentWindowID, _ := tm.Display("#{window_id}")
-	currentWindowID = strings.TrimSpace(currentWindowID)
+	// Batch query: Get current window ID and all pane state options in a single tmux call
+	// This reduces 4 separate tmux commands to 1
+	values, err := tm.DisplayMultiple(
+		"#{window_id}",
+		"#{@paw_top_pane_id}",
+		"#{@paw_top_pane_window}",
+		"#{@paw_top_pane_type}",
+	)
+	if err != nil || len(values) < 4 {
+		logging.Debug("displayTopPane: DisplayMultiple failed: %v", err)
+		// Fallback: create pane directly without state check
+		return createTopPane(tm, paneType, command, workDir, "")
+	}
 
-	// Check if a top pane already exists
-	existingPaneID, _ := tm.GetOption(topPaneIDKey)
-	existingPaneID = strings.TrimSpace(existingPaneID)
-	existingWindowID, _ := tm.GetOption(topPaneWindowKey)
-	existingWindowID = strings.TrimSpace(existingWindowID)
+	currentWindowID := strings.TrimSpace(values[0])
+	existingPaneID := strings.TrimSpace(values[1])
+	existingWindowID := strings.TrimSpace(values[2])
+	existingType := strings.TrimSpace(values[3])
 
 	// Verify the pane exists AND belongs to the current window
 	// This prevents false positives from tmux reusing pane IDs
@@ -79,17 +88,16 @@ func displayTopPane(tm tmux.Client, paneType, command, workDir string) (TopPaneR
 		existingWindowID == currentWindowID
 
 	if paneValid {
-		// Top pane exists in current window - check if it's the same type
-		existingType, _ := tm.GetOption(topPaneTypeKey)
-		existingType = strings.TrimSpace(existingType)
-
 		if existingType == paneType {
 			// Same type - toggle off (close the pane)
 			logging.Debug("displayTopPane: toggling off existing %s pane", paneType)
 			_ = tm.KillPane(existingPaneID)
-			_ = tm.SetOption(topPaneIDKey, "", true)
-			_ = tm.SetOption(topPaneTypeKey, "", true)
-			_ = tm.SetOption(topPaneWindowKey, "", true)
+			// Batch clear: Set all options to empty in a single call
+			_ = tm.SetMultipleOptions(map[string]string{
+				topPaneIDKey:     "",
+				topPaneTypeKey:   "",
+				topPaneWindowKey: "",
+			})
 			return TopPaneClosed, nil
 		}
 
@@ -105,19 +113,27 @@ func displayTopPane(tm tmux.Client, paneType, command, workDir string) (TopPaneR
 		// Auto-close existing pane and create new one
 		logging.Debug("displayTopPane: auto-closing %s pane to open %s", existingType, paneType)
 		_ = tm.KillPane(existingPaneID)
-		_ = tm.SetOption(topPaneIDKey, "", true)
-		_ = tm.SetOption(topPaneTypeKey, "", true)
-		_ = tm.SetOption(topPaneWindowKey, "", true)
-		// Fall through to create new pane
-	}
-
-	// Clean up stale options if pane doesn't exist or is in a different window
-	if existingPaneID != "" {
+		// Options will be set when creating new pane below
+	} else if existingPaneID != "" {
+		// Clean up stale options if pane doesn't exist or is in a different window
 		logging.Debug("displayTopPane: cleaning up stale options (paneID=%s, window=%s, currentWindow=%s)",
 			existingPaneID, existingWindowID, currentWindowID)
-		_ = tm.SetOption(topPaneIDKey, "", true)
-		_ = tm.SetOption(topPaneTypeKey, "", true)
-		_ = tm.SetOption(topPaneWindowKey, "", true)
+	}
+
+	return createTopPane(tm, paneType, command, workDir, currentWindowID)
+}
+
+// createTopPane creates a new top pane and stores state options.
+// Extracted for reuse and clarity.
+func createTopPane(tm tmux.Client, paneType, command, workDir, currentWindowID string) (TopPaneResult, error) {
+	// Get window ID if not provided (fallback case)
+	if currentWindowID == "" {
+		var err error
+		currentWindowID, err = tm.Display("#{window_id}")
+		if err != nil {
+			return TopPaneBlocked, fmt.Errorf("failed to get window ID: %w", err)
+		}
+		currentWindowID = strings.TrimSpace(currentWindowID)
 	}
 
 	// Create new top pane
@@ -133,11 +149,13 @@ func displayTopPane(tm tmux.Client, paneType, command, workDir string) (TopPaneR
 		return TopPaneBlocked, fmt.Errorf("failed to create top pane: %w", err)
 	}
 
-	// Store pane info for toggle/blocking (including window ID for validation)
+	// Batch set: Store pane info for toggle/blocking in a single call
 	newPaneID = strings.TrimSpace(newPaneID)
-	_ = tm.SetOption(topPaneIDKey, newPaneID, true)
-	_ = tm.SetOption(topPaneTypeKey, paneType, true)
-	_ = tm.SetOption(topPaneWindowKey, currentWindowID, true)
+	_ = tm.SetMultipleOptions(map[string]string{
+		topPaneIDKey:     newPaneID,
+		topPaneTypeKey:   paneType,
+		topPaneWindowKey: currentWindowID,
+	})
 
 	logging.Debug("displayTopPane: created pane %s for type %s in window %s", newPaneID, paneType, currentWindowID)
 	return TopPaneCreated, nil
@@ -162,13 +180,8 @@ var toggleLogCmd = &cobra.Command{
 
 		logPath := appCtx.GetLogPath()
 
-		pawBin, err := os.Executable()
-		if err != nil {
-			pawBin = "paw"
-		}
-
 		// Run log viewer in top pane (closes with q/Esc/Ctrl+O)
-		logCmd := fmt.Sprintf("%s internal log-viewer %s", pawBin, logPath)
+		logCmd := fmt.Sprintf("%s internal log-viewer %s", getPawBin(), logPath)
 
 		result, err := displayTopPane(tm, "log", logCmd, "")
 		if err != nil {
@@ -204,13 +217,8 @@ var toggleHelpCmd = &cobra.Command{
 		sessionName := args[0]
 		tm := tmux.New(sessionName)
 
-		pawBin, err := os.Executable()
-		if err != nil {
-			pawBin = "paw"
-		}
-
 		// Run help viewer in top pane (closes with q/Esc/Ctrl+/)
-		helpCmd := fmt.Sprintf("%s internal help-viewer", pawBin)
+		helpCmd := fmt.Sprintf("%s internal help-viewer", getPawBin())
 
 		result, err := displayTopPane(tm, "help", helpCmd, "")
 		if err != nil {
@@ -285,13 +293,8 @@ var toggleGitStatusCmd = &cobra.Command{
 		gitClient := git.New()
 		mainBranch := gitClient.GetMainBranch(panePath)
 
-		pawBin, err := os.Executable()
-		if err != nil {
-			pawBin = "paw"
-		}
-
 		// Run git viewer in top pane (closes with q/Esc/Ctrl+G)
-		gitCmd := fmt.Sprintf("%s internal git-viewer %s %s", pawBin, panePath, mainBranch)
+		gitCmd := fmt.Sprintf("%s internal git-viewer %s %s", getPawBin(), panePath, mainBranch)
 
 		result, err := displayTopPane(tm, "git", gitCmd, panePath)
 		if err != nil {
@@ -338,13 +341,8 @@ var toggleShowDiffCmd = &cobra.Command{
 		gitClient := git.New()
 		mainBranch := gitClient.GetMainBranch(panePath)
 
-		pawBin, err := os.Executable()
-		if err != nil {
-			pawBin = "paw"
-		}
-
 		// Run diff viewer in top pane (closes with q/Esc/Ctrl+D)
-		diffCmd := fmt.Sprintf("%s internal diff-viewer %s %s", pawBin, panePath, mainBranch)
+		diffCmd := fmt.Sprintf("%s internal diff-viewer %s %s", getPawBin(), panePath, mainBranch)
 
 		result, err := displayTopPane(tm, "diff", diffCmd, panePath)
 		if err != nil {
@@ -386,13 +384,8 @@ var toggleHistoryCmd = &cobra.Command{
 			return err
 		}
 
-		pawBin, err := os.Executable()
-		if err != nil {
-			pawBin = "paw"
-		}
-
 		// Run history picker in top pane
-		historyCmd := fmt.Sprintf("%s internal history-picker %s", pawBin, sessionName)
+		historyCmd := fmt.Sprintf("%s internal history-picker %s", getPawBin(), sessionName)
 
 		result, err := displayTopPane(tm, "history", historyCmd, appCtx.ProjectDir)
 		if err != nil {
@@ -486,12 +479,7 @@ var toggleTemplateCmd = &cobra.Command{
 			return err
 		}
 
-		pawBin, err := os.Executable()
-		if err != nil {
-			pawBin = "paw"
-		}
-
-		templateCmd := fmt.Sprintf("%s internal template-picker %s", pawBin, sessionName)
+		templateCmd := fmt.Sprintf("%s internal template-picker %s", getPawBin(), sessionName)
 
 		result, err := displayTopPane(tm, "template", templateCmd, appCtx.ProjectDir)
 		if err != nil {
@@ -587,11 +575,6 @@ var toggleProjectPickerCmd = &cobra.Command{
 			return err
 		}
 
-		pawBin, err := os.Executable()
-		if err != nil {
-			pawBin = "paw"
-		}
-
 		// Clean up any stale switch target file before showing top pane
 		switchPath := filepath.Join(appCtx.PawDir, constants.ProjectSwitchFileName)
 		_ = os.Remove(switchPath)
@@ -600,7 +583,7 @@ var toggleProjectPickerCmd = &cobra.Command{
 		// Note: The picker writes to switchPath when user selects, and we check it after
 		// Since this is async (pane runs independently), we use a wrapper command
 		// that handles the switch after the picker exits
-		pickerCmd := fmt.Sprintf("%s internal project-picker-wrapper %s", pawBin, sessionName)
+		pickerCmd := fmt.Sprintf("%s internal project-picker-wrapper %s", getPawBin(), sessionName)
 
 		result, err := displayTopPane(tm, "project", pickerCmd, "")
 		if err != nil {

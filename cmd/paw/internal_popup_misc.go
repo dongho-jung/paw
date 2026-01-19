@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 
 	"github.com/spf13/cobra"
@@ -49,13 +48,8 @@ var toggleCmdPaletteCmd = &cobra.Command{
 		sessionName := args[0]
 		tm := tmux.New(sessionName)
 
-		pawBin, err := os.Executable()
-		if err != nil {
-			pawBin = "paw"
-		}
-
 		// Run command palette in top pane
-		paletteCmd := fmt.Sprintf("%s internal cmd-palette-tui %s", pawBin, sessionName)
+		paletteCmd := fmt.Sprintf("%s internal cmd-palette-tui %s", getPawBin(), sessionName)
 
 		result, err := displayTopPane(tm, "palette", paletteCmd, "")
 		if err != nil {
@@ -117,11 +111,7 @@ var cmdPaletteTUICmd = &cobra.Command{
 
 		logging.Debug("cmdPaletteTUICmd: selected command=%s", selected.ID)
 
-		pawBin, err := os.Executable()
-		if err != nil {
-			pawBin = "paw"
-		}
-
+		pawBin := getPawBin()
 		switch selected.ID {
 		case "show-current-task":
 			logging.Debug("cmdPaletteTUICmd: executing show-current-task")
@@ -173,10 +163,7 @@ var finishPickerTUICmd = &cobra.Command{
 		}
 
 		// Execute the selected action
-		pawBin, err := os.Executable()
-		if err != nil {
-			pawBin = "paw"
-		}
+		pawBin := getPawBin()
 
 		// Map TUI action to end-task action flag
 		var endAction string

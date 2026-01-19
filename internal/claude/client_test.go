@@ -342,15 +342,17 @@ func (m *mockTmuxClient) WaitForPane(target string, maxWait time.Duration, minLe
 	return nil
 }
 func (m *mockTmuxClient) DisplayPopup(opts tmux.PopupOpts, command string) error { return nil }
-func (m *mockTmuxClient) SetOption(key, value string, global bool) error         { return nil }
-func (m *mockTmuxClient) GetOption(key string) (string, error)                   { return "", nil }
-func (m *mockTmuxClient) SetEnv(key, value string) error                         { return nil }
-func (m *mockTmuxClient) Bind(opts tmux.BindOpts) error                          { return nil }
-func (m *mockTmuxClient) Unbind(key string) error                                { return nil }
-func (m *mockTmuxClient) Run(args ...string) error                               { return nil }
-func (m *mockTmuxClient) RunWithOutput(args ...string) (string, error)           { return "", nil }
-func (m *mockTmuxClient) Display(format string) (string, error)                  { return "", nil }
-func (m *mockTmuxClient) DisplayMessage(message string, durationMs int) error    { return nil }
+func (m *mockTmuxClient) SetOption(key, value string, global bool) error      { return nil }
+func (m *mockTmuxClient) GetOption(key string) (string, error)                { return "", nil }
+func (m *mockTmuxClient) SetMultipleOptions(options map[string]string) error  { return nil }
+func (m *mockTmuxClient) SetEnv(key, value string) error                      { return nil }
+func (m *mockTmuxClient) Bind(opts tmux.BindOpts) error                       { return nil }
+func (m *mockTmuxClient) Unbind(key string) error                             { return nil }
+func (m *mockTmuxClient) Run(args ...string) error                            { return nil }
+func (m *mockTmuxClient) RunWithOutput(args ...string) (string, error)        { return "", nil }
+func (m *mockTmuxClient) Display(format string) (string, error)               { return "", nil }
+func (m *mockTmuxClient) DisplayMultiple(formats ...string) ([]string, error) { return nil, nil }
+func (m *mockTmuxClient) DisplayMessage(message string, durationMs int) error { return nil }
 
 func TestIsClaudeRunning(t *testing.T) {
 	tests := []struct {

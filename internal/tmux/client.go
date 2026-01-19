@@ -74,6 +74,7 @@ type Client interface {
 	// Options
 	SetOption(key, value string, global bool) error
 	GetOption(key string) (string, error)
+	SetMultipleOptions(options map[string]string) error
 	SetEnv(key, value string) error
 
 	// Keybindings
@@ -84,6 +85,7 @@ type Client interface {
 	Run(args ...string) error
 	RunWithOutput(args ...string) (string, error)
 	Display(format string) (string, error)
+	DisplayMultiple(formats ...string) ([]string, error)
 
 	// Notifications
 	DisplayMessage(message string, durationMs int) error
@@ -578,6 +580,50 @@ func (c *tmuxClient) Unbind(key string) error {
 
 func (c *tmuxClient) Display(format string) (string, error) {
 	return c.RunWithOutput("display-message", "-p", format)
+}
+
+// DisplayMultiple returns multiple tmux variables/options in a single command.
+// formats is a list of tmux format strings (e.g., "#{window_id}", "#{@paw_option}").
+// Returns the values in the same order as the formats.
+// This is more efficient than calling Display multiple times.
+func (c *tmuxClient) DisplayMultiple(formats ...string) ([]string, error) {
+	if len(formats) == 0 {
+		return nil, nil
+	}
+
+	// Use tab as delimiter since it's unlikely to appear in values
+	const delimiter = "\t"
+	combined := strings.Join(formats, delimiter)
+
+	output, err := c.RunWithOutput("display-message", "-p", combined)
+	if err != nil {
+		return nil, err
+	}
+
+	return strings.Split(output, delimiter), nil
+}
+
+// SetMultipleOptions sets multiple global options in a single tmux command.
+// This is more efficient than calling SetOption multiple times.
+func (c *tmuxClient) SetMultipleOptions(options map[string]string) error {
+	if len(options) == 0 {
+		return nil
+	}
+
+	// Build a single command with all options
+	args := make([]string, 0, len(options)*4)
+	first := true
+	for key, value := range options {
+		if !first {
+			args = append(args, ";", "set-option", "-g")
+		} else {
+			args = append(args, "set-option", "-g")
+			first = false
+		}
+		args = append(args, key, value)
+	}
+
+	return c.Run(args...)
 }
 
 // DisplayMessage shows a message in the status bar for the specified duration.
