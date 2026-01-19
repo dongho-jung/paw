@@ -45,11 +45,12 @@ Task description:
 2. Look for conflict markers (<<<<<<< HEAD, =======, >>>>>>> branch)
 3. Resolve each conflict by keeping the correct code that makes sense for the task
 4. Save each resolved file using the Edit tool
-5. After resolving ALL conflicts, run: git add -A
+5. After resolving ALL conflicts, run: git add -A && git reset HEAD .claude 2>/dev/null || true
 
 IMPORTANT:
 - Do NOT abort or skip any files
 - Resolve ALL conflicts before running git add
+- NEVER commit .claude symlink - always unstage it after git add -A
 - Make sure the final code is valid and compiles
 - If unsure, prefer keeping BOTH changes merged intelligently
 
@@ -109,7 +110,7 @@ Task description:
 4. Resolve any issues you find:
    - If there are conflicts, resolve them by editing the files
    - If there's a failed merge state, decide whether to complete or abort it
-   - If files need to be staged, stage them with: git add -A
+   - If files need to be staged, stage them with: git add -A && git reset HEAD .claude 2>/dev/null || true
 5. After resolving all issues, verify the repository is in a clean state
 6. If you need to complete a merge, commit it with an appropriate message
 
