@@ -161,32 +161,6 @@ var cancelTaskCmd = &cobra.Command{
 			}
 		}
 
-		// Save to history using service
-		historyService := service.NewHistoryService(appCtx.GetHistoryDir())
-
-		historySpinner := tui.NewSimpleSpinner("Saving history")
-		historySpinner.Start()
-
-		// Capture pane content
-		paneContent, captureErr := tm.CapturePane(windowID+".0", constants.PaneCaptureLines)
-		if captureErr != nil {
-			logging.Warn("Failed to capture pane content: %v", captureErr)
-			historySpinner.Stop(false, "capture failed")
-		} else if paneContent != "" {
-			taskContent, _ := targetTask.LoadContent()
-			taskOpts := loadTaskOptions(targetTask.AgentDir)
-			verifyMeta, hookMetas, hookOutputs := collectHistoryArtifacts(targetTask)
-			meta := buildHistoryMetadata(appCtx, targetTask, taskOpts, git.New(), mgr.GetWorkingDirectory(targetTask), verifyMeta, hookMetas)
-			if err := historyService.SaveCancelledWithDetails(targetTask.Name, taskContent, paneContent, meta, hookOutputs); err != nil {
-				logging.Warn("Failed to save history: %v", err)
-				historySpinner.Stop(false, "save failed")
-			} else {
-				historySpinner.Stop(true, "saved")
-			}
-		} else {
-			historySpinner.Stop(false, "empty capture")
-		}
-
 		// Cleanup task
 		cleanupSpinner := tui.NewSimpleSpinner("Cleaning up")
 		cleanupSpinner.Start()

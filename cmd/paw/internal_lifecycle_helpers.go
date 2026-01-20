@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,13 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dongho-jung/paw/internal/app"
-	"github.com/dongho-jung/paw/internal/config"
 	"github.com/dongho-jung/paw/internal/constants"
 	"github.com/dongho-jung/paw/internal/git"
 	"github.com/dongho-jung/paw/internal/logging"
-	"github.com/dongho-jung/paw/internal/service"
-	"github.com/dongho-jung/paw/internal/task"
 	"github.com/dongho-jung/paw/internal/tui"
 )
 
@@ -158,15 +153,6 @@ Start analyzing and resolving the merge issue now.`, projectDir, branchToMerge, 
 	return nil
 }
 
-func loadTaskOptions(agentDir string) *config.TaskOptions {
-	opts, err := config.LoadTaskOptions(agentDir)
-	if err != nil {
-		logging.Warn("Failed to load task options: %v", err)
-		return config.DefaultTaskOptions()
-	}
-	return opts
-}
-
 func addAllWithClaudeGuard(gitClient git.Client, workDir, context string) {
 	if workDir == "" || gitClient == nil {
 		return
@@ -215,109 +201,6 @@ func commitChangesIfNeeded(gitClient git.Client, workDir string) bool {
 	}
 
 	return true
-}
-
-func buildHistoryMetadata(appCtx *app.App, t *task.Task, opts *config.TaskOptions, gitClient git.Client, workDir string, verify *service.VerificationMetadata, hooks []service.HookMetadata) *service.HistoryMetadata {
-	meta := &service.HistoryMetadata{
-		TaskName:     t.Name,
-		SessionName:  appCtx.SessionName,
-		ProjectDir:   appCtx.ProjectDir,
-		TaskOptions:  opts,
-		Verification: verify,
-		Hooks:        hooks,
-	}
-
-	now := time.Now()
-	meta.FinishedAt = now.Format(time.RFC3339)
-	if startedAt, ok := readSessionStart(t); ok {
-		meta.StartedAt = startedAt.Format(time.RFC3339)
-		meta.DurationSeconds = int64(now.Sub(startedAt).Seconds())
-	}
-
-	if appCtx.IsGitRepo && gitClient != nil && workDir != "" {
-		commitHash, err := gitClient.GetHeadCommit(workDir)
-		if err != nil {
-			logging.Trace("Failed to read HEAD commit: %v", err)
-		} else if commitHash != "" {
-			branch, _ := gitClient.GetCurrentBranch(workDir)
-			meta.Commit = &service.CommitMetadata{
-				Hash:   commitHash,
-				Branch: branch,
-			}
-		}
-	}
-
-	return meta
-}
-
-func readSessionStart(t *task.Task) (time.Time, bool) {
-	data, err := os.ReadFile(t.GetSessionMarkerPath())
-	if err != nil {
-		return time.Time{}, false
-	}
-	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(string(data)))
-	if err != nil {
-		return time.Time{}, false
-	}
-	return parsed, true
-}
-
-func collectHistoryArtifacts(t *task.Task) (*service.VerificationMetadata, []service.HookMetadata, map[string]string) {
-	var hooks []service.HookMetadata
-	outputs := make(map[string]string)
-
-	hookNames := []string{"pre-task", "post-task", "pre-merge", "post-merge"}
-	for _, name := range hookNames {
-		metaPath := t.GetHookMetaPath(name)
-		if meta := readHookMeta(metaPath); meta != nil {
-			hooks = append(hooks, *meta)
-		}
-		outputPath := t.GetHookOutputPath(name)
-		if output := readFileIfExists(outputPath); output != "" {
-			outputs[name] = output
-		}
-	}
-
-	verifyMeta := readVerificationMeta(t.GetVerifyMetaPath())
-	if output := readFileIfExists(t.GetVerifyOutputPath()); output != "" {
-		outputs["verify"] = output
-	}
-
-	return verifyMeta, hooks, outputs
-}
-
-func readHookMeta(path string) *service.HookMetadata {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	var meta service.HookMetadata
-	if err := json.Unmarshal(data, &meta); err != nil {
-		logging.Trace("Failed to parse hook metadata %s: %v", path, err)
-		return nil
-	}
-	return &meta
-}
-
-func readVerificationMeta(path string) *service.VerificationMetadata {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	var meta service.VerificationMetadata
-	if err := json.Unmarshal(data, &meta); err != nil {
-		logging.Trace("Failed to parse verification metadata %s: %v", path, err)
-		return nil
-	}
-	return &meta
-}
-
-func readFileIfExists(path string) string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	return string(data)
 }
 
 func resolvePushBranch(gitClient git.Client, workDir, fallback string) (string, bool) {

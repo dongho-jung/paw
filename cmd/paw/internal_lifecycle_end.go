@@ -237,53 +237,10 @@ var endTaskCmd = &cobra.Command{
 				}
 			}
 
-			historySpinner := tui.NewSimpleSpinner("Saving task history")
-			historySpinner.Start()
-
-			// Save to history using service
-			historyService := service.NewHistoryService(appCtx.GetHistoryDir())
-
-			// Get pane content: either from pre-captured file or capture now
-			var paneContent string
-			var captureErr error
+			// Clean up temp pane capture file if it exists
 			if paneCaptureFile != "" {
-				// Use pre-captured content (from end-task-ui)
-				content, err := os.ReadFile(paneCaptureFile)
-				if err != nil {
-					logging.Warn("Failed to read pane capture file: %v", err)
-					// Try to capture directly as fallback
-					paneContent, captureErr = tm.CapturePane(windowID+".0", constants.PaneCaptureLines)
-				} else {
-					paneContent = string(content)
-					logging.Debug("Using pre-captured pane content from: %s", paneCaptureFile)
-				}
-				// Clean up temp file
 				_ = os.Remove(paneCaptureFile)
-			} else {
-				// Capture pane content directly
-				paneContent, captureErr = tm.CapturePane(windowID+".0", constants.PaneCaptureLines)
 			}
-
-			if captureErr != nil {
-				logging.Warn("Failed to capture pane content: %v", captureErr)
-			}
-
-			// Save history (includes summary generation which may take a few seconds)
-			historySpinner.Stop(true, "")
-			historySpinner = tui.NewSimpleSpinner("Generating summary")
-			historySpinner.Start()
-
-			taskContent, _ := targetTask.LoadContent()
-			taskOpts := loadTaskOptions(targetTask.AgentDir)
-			verifyMeta, hookMetas, hookOutputs := collectHistoryArtifacts(targetTask)
-			meta := buildHistoryMetadata(appCtx, targetTask, taskOpts, gitClient, workDir, verifyMeta, hookMetas)
-			if err := historyService.SaveCompletedWithDetails(targetTask.Name, taskContent, paneContent, meta, hookOutputs); err != nil {
-				historySpinner.Stop(false, err.Error())
-				logging.Warn("Failed to save history: %v", err)
-			} else {
-				historySpinner.Stop(true, "")
-			}
-
 		} else {
 			// Clean up temp file for drop action too
 			if paneCaptureFile != "" {
