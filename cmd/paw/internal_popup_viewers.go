@@ -31,9 +31,10 @@ const (
 // all content is visible without clipping.
 // Scrollable panes (log, git, help, etc.) use percentage for flexibility.
 var topPaneSizes = map[string]string{
-	"finish":  "20", // 20 lines: fits all finish picker options (git mode has 4 options)
-	"palette": "18", // 18 lines: fits command palette with search + commands
-	// All other panes default to TopPaneSize ("40%")
+	"finish":  "13", // 13 lines: title(1) + blank(1) + 4 options(8) + margin(1) + help(1) + buffer(1)
+	"palette": "13", // 13 lines: title(1) + blank(1) + input(3) + blank(1) + 2 commands(4) + margin(1) + help(1) + buffer(1)
+	"project": "15", // 15 lines: title(1) + blank(1) + input(3) + blank(1) + ~6 projects(6) + margin(1) + help(1) + buffer(1)
+	// Scrollable/AltScreen panes (log, help, git, diff, history, template, prompt) use TopPaneSize ("40%")
 }
 
 // topPaneShortcuts maps pane types to their toggle shortcuts for user feedback
