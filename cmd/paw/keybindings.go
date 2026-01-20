@@ -15,6 +15,14 @@ type KeybindingsContext struct {
 	DisplayName string
 }
 
+// shellPassthrough wraps a command to pass through the key in shell pane.
+// When in shell pane (Ctrl+B popup), the key is sent to shell instead of executing PAW command.
+func shellPassthrough(key, pawCmd string) string {
+	// #{==:a,b} checks equality, #{@option} gets user option value
+	// If current pane is the shell pane, send the key; otherwise run PAW command
+	return fmt.Sprintf(`if -F "#{==:#{pane_id},#{@paw_shell_pane_id}}" "send-keys %s" "%s"`, key, pawCmd)
+}
+
 // buildKeybindings creates tmux keybindings for PAW.
 // Keyboard shortcuts:
 //   - Ctrl+N: New task
@@ -32,6 +40,9 @@ type KeybindingsContext struct {
 //   - Alt+Left/Right: Move window
 //   - Alt+Tab: Cycle pane forward (in task windows) / Cycle options (in new task window)
 //   - Alt+Shift+Tab: Cycle pane backward (in task windows) / Cycle options backward (in new task window)
+//
+// Note: Most Ctrl keybindings pass through to shell when in the shell pane (Ctrl+B popup),
+// except Ctrl+B (toggle shell), Ctrl+Q (quit), and Ctrl+F (finish task).
 func buildKeybindings(ctx KeybindingsContext) []tmux.BindOpts {
 	// Environment variables for proper context resolution in subdirectory sessions
 	// These are embedded directly in the keybindings (not tmux format variables)
@@ -58,11 +69,14 @@ func buildKeybindings(ctx KeybindingsContext) []tmux.BindOpts {
 	cmdAltTab := `if -F "#{m:⭐️*,#{window_name}}" "send-keys Escape Tab" "select-pane -t :.+"`
 	cmdAltShiftTab := `if -F "#{m:⭐️*,#{window_name}}" "send-keys Escape BTab" "select-pane -t :.-"`
 
-	// Ctrl+R: context-aware - show history picker only in new task window (⭐️)
-	// In other windows, pass through Ctrl+R for normal reverse search
-	cmdCtrlR := fmt.Sprintf(`if -F "#{m:⭐️*,#{window_name}}" "run-shell '%s%s internal toggle-history %s'" "send-keys C-r"`, envPrefix, ctx.PawBin, ctx.SessionName)
-	// Ctrl+T: context-aware - show template picker only in new task window (⭐️)
-	cmdCtrlT := fmt.Sprintf(`if -F "#{m:⭐️*,#{window_name}}" "run-shell '%s%s internal toggle-template %s'" "send-keys C-t"`, envPrefix, ctx.PawBin, ctx.SessionName)
+	// Ctrl+R: context-aware with shell passthrough
+	// Priority: shell pane > new task window > pass through
+	cmdCtrlRBase := fmt.Sprintf(`if -F "#{m:⭐️*,#{window_name}}" "run-shell '%s%s internal toggle-history %s'" "send-keys C-r"`, envPrefix, ctx.PawBin, ctx.SessionName)
+	cmdCtrlR := shellPassthrough("C-r", cmdCtrlRBase)
+
+	// Ctrl+T: context-aware with shell passthrough
+	cmdCtrlTBase := fmt.Sprintf(`if -F "#{m:⭐️*,#{window_name}}" "run-shell '%s%s internal toggle-template %s'" "send-keys C-t"`, envPrefix, ctx.PawBin, ctx.SessionName)
+	cmdCtrlT := shellPassthrough("C-t", cmdCtrlTBase)
 
 	return []tmux.BindOpts{
 		// Navigation (Alt-based)
@@ -72,19 +86,21 @@ func buildKeybindings(ctx KeybindingsContext) []tmux.BindOpts {
 		{Key: "M-Right", Command: "next-window", NoPrefix: true},
 
 		// Task commands (Ctrl-based)
-		{Key: "C-n", Command: cmdNewTask, NoPrefix: true},
-		{Key: "C-f", Command: cmdDoneTask, NoPrefix: true},
-		{Key: "C-p", Command: cmdToggleCmdPalette, NoPrefix: true},
-		{Key: "C-q", Command: cmdQuit, NoPrefix: true},
+		// These pass through to shell in shell pane, except Ctrl+F and Ctrl+Q
+		{Key: "C-n", Command: shellPassthrough("C-n", cmdNewTask), NoPrefix: true},
+		{Key: "C-f", Command: cmdDoneTask, NoPrefix: true}, // Always works (finish task)
+		{Key: "C-p", Command: shellPassthrough("C-p", cmdToggleCmdPalette), NoPrefix: true},
+		{Key: "C-q", Command: cmdQuit, NoPrefix: true}, // Always works (quit)
 
 		// Toggle commands (Ctrl-based)
-		{Key: "C-o", Command: cmdToggleLogs, NoPrefix: true},
-		{Key: "C-g", Command: cmdToggleGitStatus, NoPrefix: true},
-		{Key: "C-b", Command: cmdToggleBottom, NoPrefix: true},
-		{Key: "C-_", Command: cmdToggleHelp, NoPrefix: true},          // Ctrl+/ sends C-_
-		{Key: "C-r", Command: cmdCtrlR, NoPrefix: true},               // History search in new task window
-		{Key: "C-t", Command: cmdCtrlT, NoPrefix: true},               // Template picker in new task window
-		{Key: "C-j", Command: cmdToggleProjectPicker, NoPrefix: true}, // Project picker
-		{Key: "C-y", Command: cmdTogglePromptPicker, NoPrefix: true},  // Prompt editor
+		// These pass through to shell in shell pane, except Ctrl+B
+		{Key: "C-o", Command: shellPassthrough("C-o", cmdToggleLogs), NoPrefix: true},
+		{Key: "C-g", Command: shellPassthrough("C-g", cmdToggleGitStatus), NoPrefix: true},
+		{Key: "C-b", Command: cmdToggleBottom, NoPrefix: true},                             // Always works (toggle shell)
+		{Key: "C-_", Command: shellPassthrough("C-_", cmdToggleHelp), NoPrefix: true},      // Ctrl+/ sends C-_
+		{Key: "C-r", Command: cmdCtrlR, NoPrefix: true},                                    // History search in new task window
+		{Key: "C-t", Command: cmdCtrlT, NoPrefix: true},                                    // Template picker in new task window
+		{Key: "C-j", Command: shellPassthrough("C-j", cmdToggleProjectPicker), NoPrefix: true}, // Project picker
+		{Key: "C-y", Command: shellPassthrough("C-y", cmdTogglePromptPicker), NoPrefix: true},  // Prompt editor
 	}
 }
