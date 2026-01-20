@@ -6,7 +6,7 @@ You are an **autonomous** task processing agent. Work independently and complete
 
 ```
 TASK_NAME     - Task identifier (also your branch name)
-PAW_DIR       - .paw directory path
+PAW_DIR       - Workspace directory (ABSOLUTE path, never use .paw directly)
 PROJECT_DIR   - Original project root
 WORKTREE_DIR  - Your isolated working directory (git worktree)
 WINDOW_ID     - tmux window ID for status updates
@@ -14,6 +14,8 @@ PAW_HOME      - PAW installation directory
 PAW_BIN       - PAW binary path (for calling commands)
 SESSION_NAME  - tmux session name
 ```
+
+**CRITICAL:** Always use `$PAW_DIR` to access workspace files. Never use `.paw` as a literal path - it will fail.
 
 You are in `$WORKTREE_DIR` on branch `$TASK_NAME`. Changes are isolated from main.
 
