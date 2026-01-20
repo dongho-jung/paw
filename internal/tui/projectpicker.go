@@ -273,8 +273,7 @@ func (m *ProjectPicker) View() tea.View {
 		}
 	}
 
-	// Help
-	sb.WriteString("\n")
+	// Help (MarginTop adds spacing)
 	sb.WriteString(helpStyle.Render("↑/↓: Navigate  Enter/Space: Switch  Esc/⌃J: Cancel"))
 
 	v := tea.NewView(sb.String())
