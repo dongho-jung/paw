@@ -18,13 +18,23 @@ import (
 )
 
 const (
-	// TopPaneSize is the maximum height for top panes (40% of window)
+	// TopPaneSize is the default height for top panes (40% of window)
 	TopPaneSize = "40%"
 	// tmux option keys for tracking top pane state
 	topPaneIDKey     = "@paw_top_pane_id"
 	topPaneTypeKey   = "@paw_top_pane_type"
 	topPaneWindowKey = "@paw_top_pane_window"
 )
+
+// topPaneSizes maps pane types to their specific sizes.
+// Content-fitting panes (finish, palette) use absolute line counts to ensure
+// all content is visible without clipping.
+// Scrollable panes (log, git, help, etc.) use percentage for flexibility.
+var topPaneSizes = map[string]string{
+	"finish":  "20", // 20 lines: fits all finish picker options (git mode has 4 options)
+	"palette": "18", // 18 lines: fits command palette with search + commands
+	// All other panes default to TopPaneSize ("40%")
+}
 
 // topPaneShortcuts maps pane types to their toggle shortcuts for user feedback
 var topPaneShortcuts = map[string]string{
@@ -136,10 +146,16 @@ func createTopPane(tm tmux.Client, paneType, command, workDir, currentWindowID s
 		currentWindowID = strings.TrimSpace(currentWindowID)
 	}
 
+	// Determine pane size: use specific size for content-fitting panes, default for others
+	paneSize := TopPaneSize
+	if size, ok := topPaneSizes[paneType]; ok {
+		paneSize = size
+	}
+
 	// Create new top pane
 	newPaneID, err := tm.SplitWindowPane(tmux.SplitOpts{
 		Horizontal: false, // vertical split (top/bottom)
-		Size:       TopPaneSize,
+		Size:       paneSize,
 		StartDir:   workDir,
 		Command:    command,
 		Before:     true, // create pane above (top)
