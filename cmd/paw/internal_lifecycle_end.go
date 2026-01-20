@@ -268,14 +268,18 @@ var endTaskCmd = &cobra.Command{
 				logging.Warn("Failed to capture pane content: %v", captureErr)
 			}
 
-			// Save history
+			// Save history (includes summary generation which may take a few seconds)
+			historySpinner.Stop(true, "")
+			historySpinner = tui.NewSimpleSpinner("Generating summary")
+			historySpinner.Start()
+
 			taskContent, _ := targetTask.LoadContent()
 			taskOpts := loadTaskOptions(targetTask.AgentDir)
 			verifyMeta, hookMetas, hookOutputs := collectHistoryArtifacts(targetTask)
 			meta := buildHistoryMetadata(appCtx, targetTask, taskOpts, gitClient, workDir, verifyMeta, hookMetas)
 			if err := historyService.SaveCompletedWithDetails(targetTask.Name, taskContent, paneContent, meta, hookOutputs); err != nil {
-				logging.Warn("Failed to save history: %v", err)
 				historySpinner.Stop(false, err.Error())
+				logging.Warn("Failed to save history: %v", err)
 			} else {
 				historySpinner.Stop(true, "")
 			}
