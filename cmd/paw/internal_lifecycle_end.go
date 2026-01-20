@@ -219,6 +219,8 @@ var endTaskCmd = &cobra.Command{
 		if !skipGitOps {
 			if appCtx.Config != nil && appCtx.Config.PostTaskHook != "" {
 				hookEnv := appCtx.GetEnvVars(targetTask.Name, workDir, windowID)
+				hookSpinner := tui.NewSimpleSpinner("Running post-task hook")
+				hookSpinner.Start()
 				if _, err := service.RunHook(
 					"post-task",
 					appCtx.Config.PostTaskHook,
@@ -229,8 +231,14 @@ var endTaskCmd = &cobra.Command{
 					constants.DefaultHookTimeout,
 				); err != nil {
 					logging.Warn("Post-task hook failed: %v", err)
+					hookSpinner.Stop(false, err.Error())
+				} else {
+					hookSpinner.Stop(true, "")
 				}
 			}
+
+			historySpinner := tui.NewSimpleSpinner("Saving task history")
+			historySpinner.Start()
 
 			// Save to history using service
 			historyService := service.NewHistoryService(appCtx.GetHistoryDir())
@@ -267,6 +275,9 @@ var endTaskCmd = &cobra.Command{
 			meta := buildHistoryMetadata(appCtx, targetTask, taskOpts, gitClient, workDir, verifyMeta, hookMetas)
 			if err := historyService.SaveCompletedWithDetails(targetTask.Name, taskContent, paneContent, meta, hookOutputs); err != nil {
 				logging.Warn("Failed to save history: %v", err)
+				historySpinner.Stop(false, err.Error())
+			} else {
+				historySpinner.Stop(true, "")
 			}
 
 		} else {
@@ -420,6 +431,8 @@ func runAutoMerge(appCtx *app.App, targetTask *task.Task, windowID, workDir stri
 
 	if appCtx.Config != nil && appCtx.Config.PreMergeHook != "" {
 		hookEnv := appCtx.GetEnvVars(targetTask.Name, workDir, windowID)
+		hookSpinner := tui.NewSimpleSpinner("Running pre-merge hook")
+		hookSpinner.Start()
 		if _, err := service.RunHook(
 			"pre-merge",
 			appCtx.Config.PreMergeHook,
@@ -430,6 +443,9 @@ func runAutoMerge(appCtx *app.App, targetTask *task.Task, windowID, workDir stri
 			constants.DefaultHookTimeout,
 		); err != nil {
 			logging.Warn("Pre-merge hook failed: %v", err)
+			hookSpinner.Stop(false, err.Error())
+		} else {
+			hookSpinner.Stop(true, "")
 		}
 	}
 
@@ -493,9 +509,13 @@ func runAutoMerge(appCtx *app.App, targetTask *task.Task, windowID, workDir stri
 
 	// Restore stashed changes by message (not blind pop)
 	if hasLocalChanges {
-		logging.Debug("Restoring stashed changes...")
+		restoreSpinner := tui.NewSimpleSpinner("Restoring stashed changes")
+		restoreSpinner.Start()
 		if err := gitClient.StashPopByMessage(appCtx.ProjectDir, constants.MergeStashMessage); err != nil {
 			logging.Warn("Failed to restore stashed changes: %v", err)
+			restoreSpinner.Stop(false, err.Error())
+		} else {
+			restoreSpinner.Stop(true, "")
 		}
 	}
 
@@ -599,6 +619,8 @@ func performMerge(appCtx *app.App, targetTask *task.Task, windowID, workDir, mai
 
 	if mergeSuccess && appCtx.Config != nil && appCtx.Config.PostMergeHook != "" {
 		hookEnv := appCtx.GetEnvVars(targetTask.Name, workDir, windowID)
+		hookSpinner := tui.NewSimpleSpinner("Running post-merge hook")
+		hookSpinner.Start()
 		if _, err := service.RunHook(
 			"post-merge",
 			appCtx.Config.PostMergeHook,
@@ -609,14 +631,21 @@ func performMerge(appCtx *app.App, targetTask *task.Task, windowID, workDir, mai
 			constants.DefaultHookTimeout,
 		); err != nil {
 			logging.Warn("Post-merge hook failed: %v", err)
+			hookSpinner.Stop(false, err.Error())
+		} else {
+			hookSpinner.Stop(true, "")
 		}
 	}
 
 	// Restore original branch if different from main
 	if currentBranch != "" && currentBranch != mainBranch {
-		logging.Debug("Restoring branch %s...", currentBranch)
+		restoreSpinner := tui.NewSimpleSpinner(fmt.Sprintf("Restoring %s", currentBranch))
+		restoreSpinner.Start()
 		if err := gitClient.Checkout(appCtx.ProjectDir, currentBranch); err != nil {
 			logging.Warn("Failed to restore branch: %v", err)
+			restoreSpinner.Stop(false, err.Error())
+		} else {
+			restoreSpinner.Stop(true, "")
 		}
 	}
 
