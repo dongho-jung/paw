@@ -214,7 +214,7 @@ func ResetDarkModeCache() {
 // detectDarkModeWithRetry performs dark mode detection with multiple methods
 // for improved reliability.
 func detectDarkModeWithRetry() bool {
-	// Method 1: Check COLORFGBG environment variable
+	// Method 1: Check COLORFGBG environment variable (fast, no I/O)
 	// Format: "fg;bg" where bg > 6 typically means light background
 	if colorfgbg := os.Getenv("COLORFGBG"); colorfgbg != "" {
 		parts := strings.Split(colorfgbg, ";")
@@ -236,13 +236,9 @@ func detectDarkModeWithRetry() bool {
 		}
 	}
 
-	// Method 2: Try OSC 11 query via lipgloss with improved handling
-	// Flush stdout and give terminal time to settle
-	_ = os.Stdout.Sync()
-	time.Sleep(10 * time.Millisecond)
-
-	// Run detection with multiple attempts for reliability
-	const attempts = 5
+	// Method 2: Try OSC 11 query via lipgloss with optimized handling
+	// Reduced attempts and timeouts for faster response
+	const attempts = 2
 	darkCount := 0
 	validCount := 0
 
@@ -259,18 +255,13 @@ func detectDarkModeWithRetry() bool {
 			if result {
 				darkCount++
 			}
-		case <-time.After(50 * time.Millisecond):
+		case <-time.After(25 * time.Millisecond):
 			// Timeout - detection failed for this attempt
-		}
-
-		// Small delay between attempts
-		if i < attempts-1 {
-			time.Sleep(15 * time.Millisecond)
 		}
 	}
 
-	// If we got at least some valid responses, use majority vote
-	if validCount >= 2 {
+	// If we got at least one valid response, use it
+	if validCount >= 1 {
 		isDark := darkCount > validCount/2
 		setCachedDarkMode(isDark)
 		return isDark

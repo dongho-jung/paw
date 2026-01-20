@@ -186,7 +186,6 @@ func (m *PRPopup) Result() bool {
 
 // RunPRPopup runs the PR popup UI and returns whether to open the PR in browser.
 func RunPRPopup(url string) (bool, error) {
-	ResetDarkModeCache()
 	m := NewPRPopup(url)
 	p := tea.NewProgram(m)
 

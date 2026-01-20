@@ -368,9 +368,6 @@ func RunInputHistoryPicker(history []string) (InputHistoryAction, string, error)
 		return InputHistoryCancel, "", nil
 	}
 
-	// Reset theme cache to ensure fresh detection on each TUI start
-	ResetDarkModeCache()
-
 	m := NewInputHistoryPicker(history)
 	p := tea.NewProgram(m)
 

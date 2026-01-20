@@ -37,16 +37,13 @@ var doneTaskCmd = &cobra.Command{
 
 		tm := tmux.New(sessionName)
 
-		// Get current window ID
-		windowID, err := tm.Display("#{window_id}")
-		if err != nil {
-			return fmt.Errorf("failed to get window ID: %w", err)
+		// Batch query: Get window ID and name in a single tmux call
+		values, err := tm.DisplayMultiple("#{window_id}", "#{window_name}")
+		if err != nil || len(values) < 2 {
+			return fmt.Errorf("failed to get window info: %w", err)
 		}
-		windowID = strings.TrimSpace(windowID)
-
-		// Get current window name
-		windowName, _ := tm.Display("#{window_name}")
-		windowName = strings.TrimSpace(windowName)
+		windowID := strings.TrimSpace(values[0])
+		windowName := strings.TrimSpace(values[1])
 
 		// Check if this is a task window (has emoji prefix)
 		if !constants.IsTaskWindow(windowName) {
@@ -58,8 +55,9 @@ var doneTaskCmd = &cobra.Command{
 		pawBin, _ := os.Executable()
 		finishCmd := fmt.Sprintf("%s internal finish-picker-tui %s %s", pawBin, sessionName, windowID)
 
-		// Display in top pane - if user presses Ctrl+F again, pane closes automatically
-		result, err := displayTopPane(tm, "finish", finishCmd, "")
+		// Display in top pane with pre-fetched window info
+		windowInfo := &TopPaneWindowInfo{WindowID: windowID, WindowName: windowName}
+		result, err := displayTopPaneWithInfo(tm, "finish", finishCmd, "", windowInfo)
 		if err != nil {
 			logging.Debug("doneTaskCmd: displayTopPane failed: %v", err)
 			return err

@@ -61,6 +61,12 @@ const (
 	TopPaneBlocked
 )
 
+// TopPaneWindowInfo holds pre-fetched window information to avoid redundant tmux queries.
+type TopPaneWindowInfo struct {
+	WindowID   string
+	WindowName string
+}
+
 // displayTopPane creates a top pane for TUI display with toggle and blocking behavior.
 // - If no top pane exists, creates one and runs the command
 // - If the same paneType is already open, closes it (toggle off)
@@ -70,27 +76,51 @@ const (
 // command is the command to run in the pane
 // workDir is the working directory for the pane (can be empty)
 func displayTopPane(tm tmux.Client, paneType, command, workDir string) (TopPaneResult, error) {
+	return displayTopPaneWithInfo(tm, paneType, command, workDir, nil)
+}
+
+// displayTopPaneWithInfo creates a top pane with optional pre-fetched window info.
+// If windowInfo is provided, it skips fetching window_id from tmux, improving performance.
+func displayTopPaneWithInfo(tm tmux.Client, paneType, command, workDir string, windowInfo *TopPaneWindowInfo) (TopPaneResult, error) {
 	logging.Debug("-> displayTopPane(type=%s, cmd=%s)", paneType, command)
 	defer logging.Debug("<- displayTopPane")
 
-	// Batch query: Get current window ID and all pane state options in a single tmux call
-	// This reduces 4 separate tmux commands to 1
-	values, err := tm.DisplayMultiple(
-		"#{window_id}",
-		"#{@paw_top_pane_id}",
-		"#{@paw_top_pane_window}",
-		"#{@paw_top_pane_type}",
-	)
-	if err != nil || len(values) < 4 {
-		logging.Debug("displayTopPane: DisplayMultiple failed: %v", err)
-		// Fallback: create pane directly without state check
-		return createTopPane(tm, paneType, command, workDir, "")
-	}
+	var currentWindowID string
+	var existingPaneID, existingWindowID, existingType string
 
-	currentWindowID := strings.TrimSpace(values[0])
-	existingPaneID := strings.TrimSpace(values[1])
-	existingWindowID := strings.TrimSpace(values[2])
-	existingType := strings.TrimSpace(values[3])
+	if windowInfo != nil {
+		// Use pre-fetched window ID, only fetch pane state options
+		currentWindowID = windowInfo.WindowID
+		values, err := tm.DisplayMultiple(
+			"#{@paw_top_pane_id}",
+			"#{@paw_top_pane_window}",
+			"#{@paw_top_pane_type}",
+		)
+		if err != nil || len(values) < 3 {
+			logging.Debug("displayTopPane: DisplayMultiple failed: %v", err)
+			return createTopPane(tm, paneType, command, workDir, currentWindowID)
+		}
+		existingPaneID = strings.TrimSpace(values[0])
+		existingWindowID = strings.TrimSpace(values[1])
+		existingType = strings.TrimSpace(values[2])
+	} else {
+		// Batch query: Get current window ID and all pane state options in a single tmux call
+		values, err := tm.DisplayMultiple(
+			"#{window_id}",
+			"#{@paw_top_pane_id}",
+			"#{@paw_top_pane_window}",
+			"#{@paw_top_pane_type}",
+		)
+		if err != nil || len(values) < 4 {
+			logging.Debug("displayTopPane: DisplayMultiple failed: %v", err)
+			// Fallback: create pane directly without state check
+			return createTopPane(tm, paneType, command, workDir, "")
+		}
+		currentWindowID = strings.TrimSpace(values[0])
+		existingPaneID = strings.TrimSpace(values[1])
+		existingWindowID = strings.TrimSpace(values[2])
+		existingType = strings.TrimSpace(values[3])
+	}
 
 	// Verify the pane exists AND belongs to the current window
 	// This prevents false positives from tmux reusing pane IDs

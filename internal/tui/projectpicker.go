@@ -307,9 +307,6 @@ func RunProjectPicker(projects []ProjectPickerItem) (ProjectPickerAction, *Proje
 		return ProjectPickerCancel, nil, nil
 	}
 
-	// Reset theme cache to ensure fresh detection on each TUI start
-	ResetDarkModeCache()
-
 	m := NewProjectPicker(projects)
 	p := tea.NewProgram(m)
 

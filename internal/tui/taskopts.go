@@ -222,9 +222,6 @@ func (m *TaskOptsUI) Result() TaskOptsResult {
 
 // RunTaskOptsUI runs the task options UI and returns the result.
 func RunTaskOptsUI(currentOpts *config.TaskOptions, activeTasks []string) (*TaskOptsResult, error) {
-	// Reset theme cache to ensure fresh detection on each TUI start
-	ResetDarkModeCache()
-
 	m := NewTaskOptsUI(currentOpts, activeTasks)
 	p := tea.NewProgram(m)
 

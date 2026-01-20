@@ -127,9 +127,6 @@ func RunTaskInputWithTasksAndContent(activeTasks []string, initialContent string
 
 // RunTaskInputWithOptions runs the task input with active task list, git mode flag, and optional initial content.
 func RunTaskInputWithOptions(activeTasks []string, isGitRepo bool, initialContent string) (*TaskInputResult, error) {
-	// Reset theme cache to ensure fresh detection on each TUI start
-	ResetDarkModeCache()
-
 	m := NewTaskInputWithOptions(activeTasks, isGitRepo)
 	if initialContent != "" {
 		m.SetContent(initialContent)

@@ -587,8 +587,6 @@ func (m *TemplatePicker) Result() (TemplatePickerAction, *service.TemplateEntry,
 
 // RunTemplatePicker runs the template picker and returns the selected content.
 func RunTemplatePicker(templates []service.TemplateEntry, draftContent string) (TemplatePickerAction, *service.TemplateEntry, []service.TemplateEntry, bool, error) {
-	ResetDarkModeCache()
-
 	m := NewTemplatePicker(templates, draftContent)
 	p := tea.NewProgram(m)
 

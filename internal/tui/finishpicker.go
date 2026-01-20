@@ -303,9 +303,6 @@ func RunFinishPicker(isGitRepo bool) (FinishAction, error) {
 	logging.Debug("-> RunFinishPicker(isGitRepo=%v)", isGitRepo)
 	defer logging.Debug("<- RunFinishPicker")
 
-	// Reset theme cache to ensure fresh detection on each TUI start
-	ResetDarkModeCache()
-
 	m := NewFinishPicker(isGitRepo)
 	logging.Debug("RunFinishPicker: starting tea.Program")
 	p := tea.NewProgram(m)

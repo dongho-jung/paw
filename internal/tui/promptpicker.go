@@ -208,9 +208,6 @@ func RunPromptPicker(prompts []PromptEntry) (PromptPickerAction, *PromptEntry, e
 	logging.Debug("-> RunPromptPicker(prompts=%d)", len(prompts))
 	defer logging.Debug("<- RunPromptPicker")
 
-	// Reset theme cache to ensure fresh detection on each TUI start
-	ResetDarkModeCache()
-
 	m := NewPromptPicker(prompts)
 	logging.Debug("RunPromptPicker: starting tea.Program")
 	p := tea.NewProgram(m)

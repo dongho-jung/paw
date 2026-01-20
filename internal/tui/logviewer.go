@@ -1049,9 +1049,6 @@ func (m *LogViewer) copySelection() {
 
 // RunLogViewer runs the log viewer for the given log file.
 func RunLogViewer(logFile string) error {
-	// Reset theme cache to ensure fresh detection on each TUI start
-	ResetDarkModeCache()
-
 	m := NewLogViewer(logFile)
 	p := tea.NewProgram(m)
 	_, err := p.Run()

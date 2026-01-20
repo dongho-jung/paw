@@ -941,9 +941,6 @@ func (m *GitViewer) loadGitOutput() tea.Cmd {
 
 // RunGitViewer runs the git viewer for the given working directory.
 func RunGitViewer(workDir, mainBranch string) error {
-	// Reset theme cache to ensure fresh detection on each TUI start
-	ResetDarkModeCache()
-
 	m := NewGitViewer(workDir, mainBranch)
 	p := tea.NewProgram(m)
 	_, err := p.Run()
