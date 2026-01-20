@@ -389,4 +389,8 @@ const (
 	// Compact size for the finish picker popup.
 	PopupWidthFinish  = "80%"
 	PopupHeightFinish = "15"
+
+	// Compact size for the project picker popup.
+	PopupWidthProject  = "80%"
+	PopupHeightProject = "20"
 )

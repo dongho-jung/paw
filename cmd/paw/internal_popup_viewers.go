@@ -30,14 +30,15 @@ const (
 // Content-fitting panes (finish, palette) use absolute line counts to ensure
 // all content is visible without clipping.
 // Scrollable panes (log, git, help, etc.) use percentage for flexibility.
+// Note: project picker now uses popup instead of top pane for faster rendering.
 var topPaneSizes = map[string]string{
 	"finish":  "13", // 13 lines: title(1) + blank(1) + 4 options(8) + margin(1) + help(1) + buffer(1)
 	"palette": "13", // 13 lines: title(1) + blank(1) + input(3) + blank(1) + 2 commands(4) + margin(1) + help(1) + buffer(1)
-	"project": "15", // 15 lines: title(1) + blank(1) + input(3) + blank(1) + ~6 projects(6) + margin(1) + help(1) + buffer(1)
 	// Scrollable/AltScreen panes (log, help, git, diff, history, template, prompt) use TopPaneSize ("40%")
 }
 
 // topPaneShortcuts maps pane types to their toggle shortcuts for user feedback
+// Note: project picker (⌃J) now uses popup instead of top pane
 var topPaneShortcuts = map[string]string{
 	"log":      "⌃O",
 	"help":     "⌃/",
@@ -45,7 +46,6 @@ var topPaneShortcuts = map[string]string{
 	"diff":     "⌃D",
 	"history":  "⌃R",
 	"template": "⌃T",
-	"project":  "⌃J",
 	"finish":   "⌃F",
 }
 
@@ -607,7 +607,7 @@ var templatePickerCmd = &cobra.Command{
 
 var toggleProjectPickerCmd = &cobra.Command{
 	Use:   "toggle-project-picker [session]",
-	Short: "Toggle project picker top pane to switch between PAW sessions",
+	Short: "Show project picker popup to switch between PAW sessions",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		logging.Debug("-> toggleProjectPickerCmd(session=%s)", args[0])
@@ -622,24 +622,26 @@ var toggleProjectPickerCmd = &cobra.Command{
 			return err
 		}
 
-		// Clean up any stale switch target file before showing top pane
-		switchPath := filepath.Join(appCtx.PawDir, constants.ProjectSwitchFileName)
-		_ = os.Remove(switchPath)
-
-		// Run project picker in top pane
-		// Note: The picker writes to switchPath when user selects, and we check it after
-		// Since this is async (pane runs independently), we use a wrapper command
-		// that handles the switch after the picker exits
+		// Run project picker in popup (faster than top pane)
 		pickerCmd := fmt.Sprintf("%s internal project-picker-wrapper %s", getPawBin(), sessionName)
 
-		result, err := displayTopPane(tm, "project", pickerCmd, "")
+		err = tm.DisplayPopup(tmux.PopupOpts{
+			Width:     constants.PopupWidthProject,
+			Height:    constants.PopupHeightProject,
+			Title:     " Switch Project ",
+			Close:     true,
+			Style:     "fg=terminal,bg=terminal",
+			Directory: appCtx.ProjectDir,
+			Env: map[string]string{
+				"PAW_DIR":     appCtx.PawDir,
+				"PROJECT_DIR": appCtx.ProjectDir,
+			},
+		}, pickerCmd)
 		if err != nil {
-			logging.Debug("toggleProjectPickerCmd: displayTopPane failed: %v", err)
+			logging.Debug("toggleProjectPickerCmd: displayPopup failed: %v", err)
 			return err
 		}
-		if result == TopPaneBlocked {
-			logging.Debug("toggleProjectPickerCmd: blocked by another top pane")
-		}
+
 		return nil
 	},
 }
