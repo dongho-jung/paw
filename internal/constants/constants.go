@@ -385,4 +385,8 @@ const (
 	// Full-screen size for PR popup (shown after PR creation).
 	PopupWidthPR  = PopupWidthFull
 	PopupHeightPR = PopupHeightFull
+
+	// Compact size for the finish picker popup.
+	PopupWidthFinish  = "80%"
+	PopupHeightFinish = "15"
 )

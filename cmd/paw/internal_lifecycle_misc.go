@@ -55,15 +55,22 @@ var doneTaskCmd = &cobra.Command{
 		pawBin, _ := os.Executable()
 		finishCmd := fmt.Sprintf("%s internal finish-picker-tui %s %s", pawBin, sessionName, windowID)
 
-		// Display in top pane with pre-fetched window info
-		windowInfo := &TopPaneWindowInfo{WindowID: windowID, WindowName: windowName}
-		result, err := displayTopPaneWithInfo(tm, "finish", finishCmd, "", windowInfo)
+		// Display as popup to avoid resizing/redrawing task panes.
+		err = tm.DisplayPopup(tmux.PopupOpts{
+			Width:     constants.PopupWidthFinish,
+			Height:    constants.PopupHeightFinish,
+			Title:     " Finish Task ",
+			Close:     true,
+			Style:     "fg=terminal,bg=terminal",
+			Directory: appCtx.ProjectDir,
+			Env: map[string]string{
+				"PAW_DIR":     appCtx.PawDir,
+				"PROJECT_DIR": appCtx.ProjectDir,
+			},
+		}, finishCmd)
 		if err != nil {
-			logging.Debug("doneTaskCmd: displayTopPane failed: %v", err)
+			logging.Debug("doneTaskCmd: displayPopup failed: %v", err)
 			return err
-		}
-		if result == TopPaneBlocked {
-			logging.Debug("doneTaskCmd: blocked by another top pane")
 		}
 
 		return nil
