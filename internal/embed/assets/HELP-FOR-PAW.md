@@ -4,16 +4,16 @@ This guide helps you (the agent) perform PAW-related operations when users ask a
 
 ## Configuration Files
 
-PAW configuration lives in `.paw/config` (project scope).
+PAW configuration lives in `$PAW_DIR/config` (project scope).
 
 ### When to Ask User (Use AskUserQuestion)
 
-**Always ask** before editing `.paw/config`, especially for hooks.
+**Always ask** before editing `$PAW_DIR/config`, especially for hooks.
 
 Example AskUserQuestion:
 ```
 questions:
-  - question: "Update .paw/config with this change?"
+  - question: "Update $PAW_DIR/config with this change?"
     header: "Config"
     options:
       - label: "Proceed"
@@ -53,7 +53,7 @@ pre_worktree_hook: |
 1. Ask user: project or global level?
 2. Edit the appropriate config file:
 
-For project level (`.paw/config`):
+For project level (`$PAW_DIR/config`):
 ```yaml
 pre_worktree_hook: |
   npm install
@@ -95,22 +95,22 @@ paw logs --since 2d --task my-task
 ```
 
 ### Log File Locations
-- `.paw/log` - PAW system log (internal commands, task lifecycle events)
-- `.paw/agents/{task}/log` - Task-specific progress log (for agent progress updates)
+- `$PAW_DIR/log` - PAW system log (internal commands, task lifecycle events)
+- `$PAW_DIR/agents/{task}/log` - Task-specific progress log (for agent progress updates)
 
 ## Common User Requests
 
 ### "Set up automatic npm install when creating worktree"
 
 ```yaml
-# In .paw/config
+# In $PAW_DIR/config
 pre_worktree_hook: npm install
 ```
 
 ### "Run tests before merging"
 
 ```yaml
-# In .paw/config
+# In $PAW_DIR/config
 pre_merge_hook: npm test
 ```
 

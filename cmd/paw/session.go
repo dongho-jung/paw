@@ -167,13 +167,32 @@ func attachToSession(appCtx *app.App, tm tmux.Client) error {
 	// - Workspace was created before .claude support was added
 	// - WriteClaudeFiles failed silently during initial setup
 	// - Workspace is stored in the global workspace location
+	// Also refresh .claude files on version change to pick up updated CLAUDE.md templates.
 	claudeDir := filepath.Join(appCtx.PawDir, constants.ClaudeLink)
+	claudeDirMissing := false
 	if _, err := os.Stat(claudeDir); os.IsNotExist(err) {
-		logging.Log("Creating missing .claude directory for stop-hook support...")
+		claudeDirMissing = true
+	}
+	if claudeDirMissing || versionChanged {
+		reason := "missing"
+		if versionChanged && !claudeDirMissing {
+			reason = "version changed"
+		}
+		logging.Log("Refreshing .claude directory (%s)...", reason)
 		if err := embed.WriteClaudeFiles(claudeDir); err != nil {
 			logging.Warn("Failed to write claude files: %v", err)
 		} else {
-			logging.Log("Claude files created successfully")
+			logging.Log("Claude files refreshed successfully")
+		}
+	}
+
+	// Also refresh HELP-FOR-PAW.md on version change
+	if versionChanged {
+		logging.Log("Refreshing HELP-FOR-PAW.md (version changed)...")
+		if err := embed.WritePawHelpFile(appCtx.PawDir); err != nil {
+			logging.Warn("Failed to write PAW help file: %v", err)
+		} else {
+			logging.Log("PAW help file refreshed successfully")
 		}
 	}
 
