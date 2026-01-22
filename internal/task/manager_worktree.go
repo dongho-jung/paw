@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/dongho-jung/paw/internal/constants"
-	"github.com/dongho-jung/paw/internal/embed"
 	"github.com/dongho-jung/paw/internal/git"
 	"github.com/dongho-jung/paw/internal/logging"
 )
@@ -163,41 +162,14 @@ func (m *Manager) SetupWorktree(task *Task) error {
 		}
 	}
 
-	// Create .claude symlink in worktree (error is non-fatal)
-	claudeLink := filepath.Join(worktreeDir, constants.ClaudeLink)
+	// Create .claude symlink in agent directory (outside worktree, avoids git tracking)
+	// Claude Code searches parent directories, so it will find .claude in AgentDir
+	claudeLink := filepath.Join(filepath.Dir(worktreeDir), constants.ClaudeLink)
 	claudeTarget := filepath.Join(m.pawDir, constants.ClaudeLink)
 	if err := os.Symlink(claudeTarget, claudeLink); err != nil && !os.IsExist(err) {
 		logging.Warn("SetupWorktree: failed to create claude symlink: %v", err)
 	} else {
-		// Protect .claude symlink from being committed (multi-layered defense)
-
-		// Layer 1: Add to .git/info/exclude (worktree-specific exclusion)
-		if err := git.AddToExcludeFile(worktreeDir, constants.ClaudeLink); err != nil {
-			logging.Warn("SetupWorktree: failed to add .claude to exclude file: %v", err)
-		} else {
-			logging.Debug("SetupWorktree: added .claude to .git/info/exclude")
-		}
-
-		// Layer 2: Mark as assume-unchanged (git index protection)
-		// Note: assume-unchanged only works for tracked files, skip if untracked
-		if m.gitClient.IsFileTracked(worktreeDir, constants.ClaudeLink) {
-			if err := m.gitClient.UpdateIndexAssumeUnchanged(worktreeDir, constants.ClaudeLink); err != nil {
-				logging.Warn("SetupWorktree: failed to mark .claude as assume-unchanged: %v", err)
-			} else {
-				logging.Debug("SetupWorktree: marked .claude as assume-unchanged")
-			}
-		}
-
-		// Layer 3: Install pre-commit hook (final safety net)
-		// This automatically unstages .claude if it was accidentally staged
-		hooksDir := m.getWorktreeHooksDir(worktreeDir)
-		if hooksDir != "" {
-			if err := embed.InstallPreCommitHook(hooksDir); err != nil {
-				logging.Warn("SetupWorktree: failed to install pre-commit hook: %v", err)
-			} else {
-				logging.Debug("SetupWorktree: installed pre-commit hook")
-			}
-		}
+		logging.Debug("SetupWorktree: created .claude symlink in agent directory (outside git)")
 	}
 
 	// Execute pre-worktree hook if configured (error is non-fatal)
@@ -238,26 +210,4 @@ func (m *Manager) GetWorkingDirectory(task *Task) string {
 	}
 	// Non-worktree mode: Claude runs in the project directory.
 	return m.projectDir
-}
-
-// getWorktreeHooksDir returns the hooks directory for a worktree.
-// In a worktree, .git is a file pointing to the actual git directory,
-// so we need to resolve it first.
-func (m *Manager) getWorktreeHooksDir(worktreeDir string) string {
-	// Get the actual git directory for this worktree
-	cmd := exec.Command("git", "-C", worktreeDir, "rev-parse", "--git-dir")
-	output, err := cmd.Output()
-	if err != nil {
-		logging.Warn("getWorktreeHooksDir: failed to get git directory: %v", err)
-		return ""
-	}
-
-	gitDir := filepath.Clean(string(output[:len(output)-1])) // Remove trailing newline
-
-	// Make gitDir absolute if it's relative
-	if !filepath.IsAbs(gitDir) {
-		gitDir = filepath.Join(worktreeDir, gitDir)
-	}
-
-	return filepath.Join(gitDir, "hooks")
 }

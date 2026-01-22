@@ -122,12 +122,13 @@ var handleTaskCmd = &cobra.Command{
 		}
 
 		// Setup .claude symlink for stop-hook support
-		// For worktree mode: symlink in worktree directory
+		// For worktree mode: SetupWorktree already creates symlink in agent dir (outside git)
 		// For non-worktree mode: symlink in project directory (Claude runs there)
 		if appCtx.IsWorktreeMode() {
-			// Worktree mode: symlink in worktree (must be done after worktree setup)
+			// Worktree mode: ensure .claude exists in agent dir (handles reopen case)
+			// SetupWorktree creates this for new tasks, but we need it for reopen too
 			if err := t.SetupClaudeSymlink(appCtx.PawDir); err != nil {
-				logging.Warn("Failed to setup claude symlink in worktree: %v", err)
+				logging.Warn("Failed to setup claude symlink in agent dir: %v", err)
 			}
 		} else {
 			// Non-worktree mode: symlink in project directory

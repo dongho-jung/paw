@@ -158,17 +158,9 @@ func addAllWithClaudeGuard(gitClient git.Client, workDir, context string) {
 		return
 	}
 
-	if err := git.AddToExcludeFile(workDir, constants.ClaudeLink); err != nil {
-		logging.Warn("%s: failed to add .claude to exclude file: %v", context, err)
-	}
-
+	// .claude is now in agent directory (outside worktree), no longer needs protection
 	if err := gitClient.AddAll(workDir); err != nil {
 		logging.Warn("%s: failed to add changes: %v", context, err)
-	}
-
-	// Ensure .claude never makes it into the commit, even in edge cases.
-	if err := gitClient.ResetPath(workDir, constants.ClaudeLink); err != nil {
-		logging.Warn("%s: failed to unstage .claude: %v", context, err)
 	}
 }
 

@@ -660,8 +660,8 @@ func TestTaskSetupClaudeSymlink(t *testing.T) {
 		t.Fatalf("SetupClaudeSymlink() error = %v", err)
 	}
 
-	// Check symlink exists in worktree
-	claudeTargetPath := filepath.Join(worktreeDir, ".claude")
+	// Check symlink exists in agent directory (not worktree - outside git)
+	claudeTargetPath := filepath.Join(agentDir, ".claude")
 	info, err := os.Lstat(claudeTargetPath)
 	if err != nil {
 		t.Fatalf("Claude symlink not created: %v", err)
@@ -677,7 +677,7 @@ func TestTaskSetupClaudeSymlink(t *testing.T) {
 	}
 
 	// Resolve and verify the target
-	resolvedTarget := filepath.Join(worktreeDir, target)
+	resolvedTarget := filepath.Join(agentDir, target)
 	absTarget, _ := filepath.Abs(resolvedTarget)
 	absClaudeDir, _ := filepath.Abs(claudeDir)
 
@@ -690,48 +690,35 @@ func TestTaskSetupClaudeSymlink(t *testing.T) {
 	if _, err := os.Stat(symlinkSettings); err != nil {
 		t.Errorf("Settings file not accessible through symlink: %v", err)
 	}
-}
 
-func TestTaskSetupClaudeSymlinkNoWorktree(t *testing.T) {
-	tempDir := t.TempDir()
-	agentDir := filepath.Join(tempDir, "agents", "test-task")
-
-	if err := os.MkdirAll(agentDir, 0755); err != nil {
-		t.Fatalf("Failed to create dir: %v", err)
-	}
-
-	task := New("test-task", agentDir)
-	// Don't set WorktreeDir and don't create worktree directory
-
-	// Should not error - just return nil
-	if err := task.SetupClaudeSymlink(tempDir); err != nil {
-		t.Errorf("SetupClaudeSymlink() should not error without worktree: %v", err)
+	// Verify symlink is NOT in worktree (to confirm it's outside git)
+	worktreeClaudePath := filepath.Join(worktreeDir, ".claude")
+	if _, err := os.Lstat(worktreeClaudePath); !os.IsNotExist(err) {
+		t.Error("Symlink should NOT be created in worktree (must be outside git)")
 	}
 }
 
 func TestTaskSetupClaudeSymlinkNoSource(t *testing.T) {
 	tempDir := t.TempDir()
 	agentDir := filepath.Join(tempDir, "agents", "test-task")
-	worktreeDir := filepath.Join(agentDir, "worktree")
 	pawDir := filepath.Join(tempDir, "paw")
 
-	// Create worktree but NOT .claude source
-	for _, dir := range []string{agentDir, worktreeDir, pawDir} {
+	// Create agent dir but NOT .claude source
+	for _, dir := range []string{agentDir, pawDir} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			t.Fatalf("Failed to create dir: %v", err)
 		}
 	}
 
 	task := New("test-task", agentDir)
-	task.WorktreeDir = worktreeDir
 
 	// Should not error - just return nil when source doesn't exist
 	if err := task.SetupClaudeSymlink(pawDir); err != nil {
 		t.Errorf("SetupClaudeSymlink() should not error without source: %v", err)
 	}
 
-	// Verify no symlink was created
-	claudeTargetPath := filepath.Join(worktreeDir, ".claude")
+	// Verify no symlink was created in agent dir
+	claudeTargetPath := filepath.Join(agentDir, ".claude")
 	if _, err := os.Lstat(claudeTargetPath); !os.IsNotExist(err) {
 		t.Error("Symlink should not be created when source doesn't exist")
 	}

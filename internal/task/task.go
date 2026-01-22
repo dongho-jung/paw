@@ -395,23 +395,27 @@ func (t *Task) SetupSymlinks(projectDir string) error {
 // SetupClaudeSymlink creates a .claude symlink pointing to the PAW directory's
 // .claude folder. This is necessary because Claude Code looks for
 // settings.local.json (which contains stop-hook config) in the current
-// working directory.
+// working directory or its parent directories.
 //
-// For worktree mode: creates symlink in the worktree directory
+// For worktree mode: creates symlink in the agent directory (parent of worktree)
+//   - This keeps .claude outside of git, avoiding accidental commits
+//   - Claude Code will find it when searching parent directories
 // For non-worktree mode: creates symlink in the project directory
 func (t *Task) SetupClaudeSymlink(pawDir string) error {
 	return t.SetupClaudeSymlinkInDir(pawDir, "")
 }
 
 // SetupClaudeSymlinkInDir creates a .claude symlink in the specified target
-// directory. If targetDir is empty, it defaults to the worktree directory.
+// directory. If targetDir is empty, it defaults to the agent directory
+// (which is outside the worktree for git mode).
 // This is used by SetupClaudeSymlink for worktree mode, and can be called
 // directly with the project directory for non-worktree mode.
 func (t *Task) SetupClaudeSymlinkInDir(pawDir, targetDir string) error {
 	if targetDir == "" {
-		targetDir = t.GetWorktreeDir()
+		// Default to agent directory (outside git worktree)
+		targetDir = t.AgentDir
 		if targetDir == "" {
-			return nil // No worktree, nothing to do
+			return nil // No agent dir, nothing to do
 		}
 	}
 
