@@ -660,11 +660,12 @@ func TestTaskSetupClaudeSymlink(t *testing.T) {
 		t.Fatalf("SetupClaudeSymlink() error = %v", err)
 	}
 
-	// Check symlink exists in agent directory (not worktree - outside git)
+	// Check symlink exists in agent directory (outside git worktree)
+	// Claude Code is started with --settings flag pointing to this location
 	claudeTargetPath := filepath.Join(agentDir, ".claude")
 	info, err := os.Lstat(claudeTargetPath)
 	if err != nil {
-		t.Fatalf("Claude symlink not created: %v", err)
+		t.Fatalf("Claude symlink not created in agent dir: %v", err)
 	}
 	if info.Mode()&os.ModeSymlink == 0 {
 		t.Error("Claude path is not a symlink")

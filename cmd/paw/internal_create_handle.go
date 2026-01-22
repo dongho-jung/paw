@@ -397,6 +397,10 @@ func buildStartAgentScript(appCtx *app.App, t *task.Task, taskOpts *config.TaskO
 		modelFlag = fmt.Sprintf(" --model %s", taskOpts.Model)
 	}
 
+	// Settings file path - use agent directory's .claude symlink
+	// This keeps settings outside git worktree while still being accessible
+	settingsPath := filepath.Join(t.AgentDir, ".claude", "settings.local.json")
+
 	if isReopen {
 		// Resume mode: use --continue to automatically continue previous session
 		return fmt.Sprintf(`#!/bin/bash
@@ -411,9 +415,10 @@ export SESSION_NAME='%s'
 export IS_DEMO='1'
 
 # Continue the previous Claude session (--continue auto-selects last session)
-exec claude --continue --dangerously-skip-permissions%s
+# --settings points to agent dir's .claude (outside git worktree)
+exec claude --continue --dangerously-skip-permissions --settings '%s'%s
 `, taskName, appCtx.PawDir, appCtx.ProjectDir, worktreeDirExport, windowID,
-			filepath.Dir(filepath.Dir(pawBin)), pawBinSymlink, sessionName, modelFlag)
+			filepath.Dir(filepath.Dir(pawBin)), pawBinSymlink, sessionName, settingsPath, modelFlag)
 	}
 
 	// New session: start fresh with system prompt
@@ -431,13 +436,14 @@ export IS_DEMO='1'
 
 # System prompt is base64 encoded to avoid shell escaping issues
 # Using heredoc with single-quoted delimiter prevents any shell interpretation
-exec claude --dangerously-skip-permissions%s --system-prompt "$(base64 -d <<'__PROMPT_END__'
+# --settings points to agent dir's .claude (outside git worktree)
+exec claude --dangerously-skip-permissions --settings '%s'%s --system-prompt "$(base64 -d <<'__PROMPT_END__'
 %s
 __PROMPT_END__
 )"
 `, taskName, appCtx.PawDir, appCtx.ProjectDir, worktreeDirExport, windowID,
 		filepath.Dir(filepath.Dir(pawBin)), pawBinSymlink, sessionName,
-		modelFlag, encodedPrompt)
+		settingsPath, modelFlag, encodedPrompt)
 }
 
 // startNewTaskSession handles the setup for a new (non-resumed) task session.

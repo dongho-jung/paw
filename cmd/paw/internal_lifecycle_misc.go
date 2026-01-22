@@ -155,6 +155,9 @@ var resumeAgentCmd = &cobra.Command{
 			worktreeDirExport = fmt.Sprintf("export WORKTREE_DIR='%s'\n", workDir)
 		}
 
+		// Settings file path - use agent directory's .claude symlink
+		settingsPath := filepath.Join(t.AgentDir, ".claude", "settings.local.json")
+
 		startAgentContent := fmt.Sprintf(`#!/bin/bash
 # Auto-generated start-agent script for this task (RESUME MODE)
 export TASK_NAME='%s'
@@ -166,9 +169,10 @@ export PAW_BIN='%s'
 export SESSION_NAME='%s'
 
 # Continue the previous Claude session (--continue auto-selects last session)
-exec claude --continue --dangerously-skip-permissions
+# --settings points to agent dir's .claude (outside git worktree)
+exec claude --continue --dangerously-skip-permissions --settings '%s'
 `, taskName, appCtx.PawDir, appCtx.ProjectDir, worktreeDirExport, windowID,
-			filepath.Dir(filepath.Dir(pawBin)), pawBinSymlink, sessionName)
+			filepath.Dir(filepath.Dir(pawBin)), pawBinSymlink, sessionName, settingsPath)
 
 		startAgentScriptPath := filepath.Join(t.AgentDir, "start-agent")
 		if err := os.WriteFile(startAgentScriptPath, []byte(startAgentContent), 0755); err != nil {
