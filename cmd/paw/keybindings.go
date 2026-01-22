@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dongho-jung/paw/internal/tmux"
 )
@@ -20,7 +21,9 @@ type KeybindingsContext struct {
 func shellPassthrough(key, pawCmd string) string {
 	// #{==:a,b} checks equality, #{@option} gets user option value
 	// If current pane is the shell pane, send the key; otherwise run PAW command
-	return fmt.Sprintf(`if -F "#{==:#{pane_id},#{@paw_shell_pane_id}}" "send-keys %s" "%s"`, key, pawCmd)
+	// Escape double quotes in pawCmd for proper tmux command nesting
+	escapedCmd := strings.ReplaceAll(pawCmd, `"`, `\"`)
+	return fmt.Sprintf(`if -F "#{==:#{pane_id},#{@paw_shell_pane_id}}" "send-keys %s" "%s"`, key, escapedCmd)
 }
 
 // buildKeybindings creates tmux keybindings for PAW.
