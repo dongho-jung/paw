@@ -9,6 +9,7 @@ import (
 
 	"github.com/dongho-jung/paw/internal/config"
 	"github.com/dongho-jung/paw/internal/constants"
+	"github.com/dongho-jung/paw/internal/fileutil"
 	"github.com/dongho-jung/paw/internal/logging"
 )
 
@@ -95,7 +96,7 @@ func (a *App) Initialize() error {
 	// when PAW_DIR points to a global workspace path
 	if a.IsGlobalWorkspace() {
 		projectPathFile := filepath.Join(a.PawDir, constants.ProjectPathFileName)
-		if err := os.WriteFile(projectPathFile, []byte(a.ProjectDir), 0644); err != nil {
+		if err := fileutil.WriteFileAtomic(projectPathFile, []byte(a.ProjectDir), 0644); err != nil {
 			return fmt.Errorf("failed to write project path file: %w", err)
 		}
 	}

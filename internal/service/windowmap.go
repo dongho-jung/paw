@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/dongho-jung/paw/internal/constants"
+	"github.com/dongho-jung/paw/internal/fileutil"
 )
 
 // UpdateWindowMap records the mapping between a window token and full task name.
@@ -20,7 +21,10 @@ func UpdateWindowMap(pawDir, taskName string) (string, error) {
 
 	mapping := map[string]string{}
 	if data, err := os.ReadFile(mapPath); err == nil {
-		_ = json.Unmarshal(data, &mapping)
+		if err := json.Unmarshal(data, &mapping); err != nil {
+			_ = fileutil.BackupCorruptFile(mapPath)
+			mapping = map[string]string{}
+		}
 	}
 
 	mapping[token] = taskName
@@ -28,7 +32,7 @@ func UpdateWindowMap(pawDir, taskName string) (string, error) {
 	if err != nil {
 		return token, fmt.Errorf("failed to marshal window map: %w", err)
 	}
-	if err := os.WriteFile(mapPath, data, 0644); err != nil {
+	if err := fileutil.WriteFileAtomic(mapPath, data, 0644); err != nil {
 		return token, fmt.Errorf("failed to write window map: %w", err)
 	}
 
@@ -48,7 +52,8 @@ func LoadWindowMap(pawDir string) (map[string]string, error) {
 
 	mapping := map[string]string{}
 	if err := json.Unmarshal(data, &mapping); err != nil {
-		return nil, err
+		_ = fileutil.BackupCorruptFile(mapPath)
+		return map[string]string{}, nil
 	}
 	return mapping, nil
 }

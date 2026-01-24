@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"time"
 
+	"github.com/dongho-jung/paw/internal/fileutil"
 	"github.com/dongho-jung/paw/internal/logging"
 )
 
@@ -96,14 +96,14 @@ func RunHook(name, command, workDir string, env []string, outputPath, metaPath s
 	}
 
 	if outputPath != "" {
-		if writeErr := os.WriteFile(outputPath, []byte(result.Output), 0644); writeErr != nil {
+		if writeErr := fileutil.WriteFileAtomic(outputPath, []byte(result.Output), 0644); writeErr != nil {
 			logging.Warn("Hook: failed to write output name=%s err=%v", name, writeErr)
 		}
 	}
 
 	if metaPath != "" {
 		if data, marshalErr := json.MarshalIndent(meta, "", "  "); marshalErr == nil {
-			if writeErr := os.WriteFile(metaPath, data, 0644); writeErr != nil {
+			if writeErr := fileutil.WriteFileAtomic(metaPath, data, 0644); writeErr != nil {
 				logging.Warn("Hook: failed to write metadata name=%s err=%v", name, writeErr)
 			}
 		} else {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dongho-jung/paw/internal/constants"
+	"github.com/dongho-jung/paw/internal/fileutil"
 )
 
 // Status represents the status of a task.
@@ -171,7 +172,7 @@ func (t *Task) GetStatusSignalPath() string {
 // SaveStatus saves the task status to the status file.
 func (t *Task) SaveStatus(status Status) error {
 	t.Status = status
-	return os.WriteFile(t.GetStatusFilePath(), []byte(string(status)), 0644)
+	return fileutil.WriteFileAtomic(t.GetStatusFilePath(), []byte(string(status)), 0644)
 }
 
 // LoadStatus loads the task status from the status file.
@@ -262,7 +263,7 @@ func (t *Task) HasSessionMarker() bool {
 
 // CreateSessionMarker creates the session marker file.
 func (t *Task) CreateSessionMarker() error {
-	return os.WriteFile(t.GetSessionMarkerPath(), []byte(time.Now().Format(time.RFC3339)), 0644)
+	return fileutil.WriteFileAtomic(t.GetSessionMarkerPath(), []byte(time.Now().Format(time.RFC3339)), 0644)
 }
 
 // GetOriginPath returns the path to the origin symlink.
@@ -297,7 +298,7 @@ func (t *Task) RemoveTabLock() error {
 // SaveWindowID saves the window ID to the window_id file.
 func (t *Task) SaveWindowID(windowID string) error {
 	t.WindowID = windowID
-	return os.WriteFile(t.GetWindowIDPath(), []byte(windowID), 0644)
+	return fileutil.WriteFileAtomic(t.GetWindowIDPath(), []byte(windowID), 0644)
 }
 
 // LoadWindowID loads the window ID from the window_id file.
@@ -313,7 +314,7 @@ func (t *Task) LoadWindowID() (string, error) {
 // SaveContent saves the task content to the task file.
 func (t *Task) SaveContent(content string) error {
 	t.Content = content
-	return os.WriteFile(t.GetTaskFilePath(), []byte(content), 0644)
+	return fileutil.WriteFileAtomic(t.GetTaskFilePath(), []byte(content), 0644)
 }
 
 // LoadContent loads the task content from the task file.
@@ -329,7 +330,7 @@ func (t *Task) LoadContent() (string, error) {
 // SavePRNumber saves the PR number to the .pr file.
 func (t *Task) SavePRNumber(prNumber int) error {
 	t.PRNumber = prNumber
-	return os.WriteFile(t.GetPRFilePath(), []byte(fmt.Sprintf("%d", prNumber)), 0644)
+	return fileutil.WriteFileAtomic(t.GetPRFilePath(), []byte(fmt.Sprintf("%d", prNumber)), 0644)
 }
 
 // LoadPRNumber loads the PR number from the .pr file.

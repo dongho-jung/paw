@@ -12,6 +12,7 @@ import (
 
 	"github.com/dongho-jung/paw/internal/claude"
 	"github.com/dongho-jung/paw/internal/config"
+	"github.com/dongho-jung/paw/internal/fileutil"
 	"github.com/dongho-jung/paw/internal/logging"
 	"github.com/dongho-jung/paw/internal/task"
 )
@@ -200,7 +201,7 @@ func (s *HistoryService) save(taskName, taskContent, paneContent string, cancell
 	}
 
 	historyFile := filepath.Join(s.historyDir, filename)
-	if err := os.WriteFile(historyFile, []byte(historyContent.String()), 0644); err != nil {
+	if err := fileutil.WriteFileAtomic(historyFile, []byte(historyContent.String()), 0644); err != nil {
 		return fmt.Errorf("failed to write history file: %w", err)
 	}
 

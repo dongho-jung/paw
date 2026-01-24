@@ -162,9 +162,17 @@ func TestInputHistoryService_CorruptedFile(t *testing.T) {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
-	// Should return error
-	_, err := svc.LoadHistory()
-	if err == nil {
-		t.Error("Expected error for corrupted file, got nil")
+	entries, err := svc.LoadHistory()
+	if err != nil {
+		t.Fatalf("LoadHistory failed: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("Expected 0 entries for corrupted file, got %d", len(entries))
+	}
+	if _, err := os.Stat(historyPath); err == nil || !os.IsNotExist(err) {
+		t.Errorf("Expected corrupted history file to be moved aside")
+	}
+	if matches, _ := filepath.Glob(historyPath + ".corrupt*"); len(matches) == 0 {
+		t.Errorf("Expected a .corrupt backup for input history")
 	}
 }

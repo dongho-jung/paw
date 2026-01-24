@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/dongho-jung/paw/internal/fileutil"
 )
 
 const (
@@ -49,7 +51,8 @@ func (s *TemplateService) LoadTemplates() ([]TemplateEntry, error) {
 
 	var entries []TemplateEntry
 	if err := json.Unmarshal(data, &entries); err != nil {
-		return nil, err
+		_ = fileutil.BackupCorruptFile(path)
+		return nil, nil
 	}
 	return entries, nil
 }
@@ -64,5 +67,5 @@ func (s *TemplateService) SaveTemplates(entries []TemplateEntry) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	return fileutil.WriteFileAtomic(path, data, 0644)
 }

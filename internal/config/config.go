@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/dongho-jung/paw/internal/constants"
+	"github.com/dongho-jung/paw/internal/fileutil"
 	"github.com/dongho-jung/paw/internal/logging"
 )
 
@@ -299,7 +300,7 @@ log_max_backups: %d
 		content += formatHook("post_merge_hook", c.PostMergeHook)
 	}
 
-	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+	if err := fileutil.WriteFileAtomic(configPath, []byte(content), 0644); err != nil {
 		logging.Debug("config.Save: failed to write config: %v", err)
 		return err
 	}

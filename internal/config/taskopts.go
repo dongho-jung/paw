@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/dongho-jung/paw/internal/fileutil"
 )
 
 // Model represents the Claude model to use.
@@ -80,7 +82,7 @@ func (o *TaskOptions) Save(agentDir string) error {
 	}
 
 	optionsPath := GetOptionsPath(agentDir)
-	if err := os.WriteFile(optionsPath, data, 0644); err != nil {
+	if err := fileutil.WriteFileAtomic(optionsPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write task options: %w", err)
 	}
 

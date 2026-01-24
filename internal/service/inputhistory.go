@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"time"
+
+	"github.com/dongho-jung/paw/internal/fileutil"
 )
 
 const (
@@ -95,7 +97,8 @@ func (s *InputHistoryService) LoadHistory() ([]InputHistoryEntry, error) {
 
 	var entries []InputHistoryEntry
 	if err := json.Unmarshal(data, &entries); err != nil {
-		return nil, err
+		_ = fileutil.BackupCorruptFile(historyPath)
+		return nil, nil
 	}
 
 	// Sort by timestamp descending (most recent first)
@@ -133,5 +136,5 @@ func (s *InputHistoryService) saveEntries(entries []InputHistoryEntry) error {
 		return err
 	}
 
-	return os.WriteFile(historyPath, data, 0644)
+	return fileutil.WriteFileAtomic(historyPath, data, 0644)
 }
