@@ -53,11 +53,14 @@ var popupShellCmd = &cobra.Command{
 
 			// Move shell pane to stash window
 			if err := tm.JoinPane(paneID, stashWindowID, tmux.JoinOpts{Detached: true}); err != nil {
-				// Fallback: kill the pane if join fails
+				// JoinPane failed - the pane is likely dead (killed by Ctrl+D or similar)
+				// Clean up the invalid state
 				_ = tm.KillPane(paneID)
 				_ = tm.SetOption("@paw_shell_pane_id", "", true)
 				_ = tm.SetOption("@paw_stashed_shell_pane_id", "", true)
-				return nil
+				// Since the pane was dead, the user actually wanted to SHOW a shell
+				// (they thought there was no shell). Create a new one.
+				return createNewShellPane(tm, sessionName)
 			}
 
 			// Store pane ID in stash and clear visible pane ID
