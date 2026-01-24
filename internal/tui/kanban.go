@@ -280,7 +280,7 @@ func (k *KanbanView) Render() string {
 	}
 
 	columnViews := make([]string, 0, 3) // Pre-allocate for 3 columns
-	maxHeight := k.height - 2          // Reserve space for border only (no title)
+	maxHeight := k.height - 2           // Reserve space for border only (no title)
 
 	for colIdx, col := range columns {
 		// Determine border color for this column (use foreground from cached action style for dim)
@@ -498,7 +498,7 @@ func (k *KanbanView) SelectPreviousTask() {
 		return
 	}
 	current := k.selectedTaskIdx[k.focusedCol]
-	next := current
+	var next int
 	if current <= 0 {
 		// Wrap to last task
 		next = taskCount - 1
@@ -521,7 +521,7 @@ func (k *KanbanView) SelectNextTask() {
 		return
 	}
 	current := k.selectedTaskIdx[k.focusedCol]
-	next := current
+	var next int
 	if current < 0 || current >= taskCount-1 {
 		// Wrap to first task
 		next = 0

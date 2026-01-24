@@ -77,10 +77,11 @@ var endTaskCmd = &cobra.Command{
 
 		// Handle drop and done actions - skip git operations
 		skipGitOps := (endTaskAction == "drop" || endTaskAction == "done")
-		if endTaskAction == "drop" {
+		switch endTaskAction {
+		case "drop":
 			fmt.Println("  Dropping task (discarding changes)...")
 			logging.Log("drop action: discarding changes for task %s", targetTask.Name)
-		} else if endTaskAction == "done" {
+		case "done":
 			fmt.Println("  Finishing task...")
 			logging.Log("done action: cleaning up task %s", targetTask.Name)
 		}

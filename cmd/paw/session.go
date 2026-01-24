@@ -20,7 +20,7 @@ import (
 func startNewSession(appCtx *app.App, tm tmux.Client) error {
 	logging.Debug("Starting new tmux session...")
 
-	// Create/update bin symlink for hook compatibility
+	// Create/update bin symlink for hook execution
 	if _, err := updateBinSymlink(appCtx.PawDir); err != nil {
 		logging.Warn("Failed to create bin symlink: %v", err)
 	}

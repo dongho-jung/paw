@@ -206,12 +206,12 @@ const (
 
 // Prompts directory and file names
 const (
-	PromptsDirName              = "prompts"                 // Directory for custom prompts
-	TaskNamePromptFile          = "task-name.md"            // Task name generation rules
-	MergeConflictPromptFile     = "merge-conflict.md"       // Merge conflict resolution prompt
-	PRDescriptionPromptFile     = "pr-description.md"       // PR title/body template
-	CommitMessagePromptFile     = "commit-message.md"       // Commit message template
-	SystemPromptFile            = "system.md"               // Custom system prompt (overrides embedded)
+	PromptsDirName          = "prompts"           // Directory for custom prompts
+	TaskNamePromptFile      = "task-name.md"      // Task name generation rules
+	MergeConflictPromptFile = "merge-conflict.md" // Merge conflict resolution prompt
+	PRDescriptionPromptFile = "pr-description.md" // PR title/body template
+	CommitMessagePromptFile = "commit-message.md" // Commit message template
+	SystemPromptFile        = "system.md"         // Custom system prompt (overrides embedded)
 )
 
 // Tmux related constants
@@ -389,7 +389,7 @@ const (
 	WindowIDWaitInterval    = 500 * time.Millisecond // Interval between checks
 )
 
-// Popup sizes (percentage-based for compatibility)
+// Popup sizes (percentage-based for consistent terminal sizing)
 const (
 	// Full-screen size for popups.
 	PopupWidthFull  = "100%"

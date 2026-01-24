@@ -45,14 +45,13 @@ type DiffViewer struct {
 	selectEndX   int // End column (screen-relative)
 
 	// Search state
-	searchMode        bool              // whether search input is active
-	searchQuery       string            // current search term (confirmed)
-	searchQueryLower  string            // pre-lowercased search query for performance
-	searchInput       string            // input buffer while typing
-	searchMatches     []int             // display line indices containing matches
-	currentMatchIdx   int               // current match index for n/N navigation
-	cacheMatchLineSet map[int]struct{}  // O(1) lookup for isMatchLine
-	cachePlainLines   []string          // cached plain (stripped) lines
+	searchMode        bool             // whether search input is active
+	searchQuery       string           // current search term (confirmed)
+	searchQueryLower  string           // pre-lowercased search query for performance
+	searchInput       string           // input buffer while typing
+	searchMatches     []int            // display line indices containing matches
+	currentMatchIdx   int              // current match index for n/N navigation
+	cacheMatchLineSet map[int]struct{} // O(1) lookup for isMatchLine
 
 	// Style cache (reused across renders to avoid allocations)
 	styleHighlight    lipgloss.Style
