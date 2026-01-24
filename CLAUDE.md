@@ -309,6 +309,131 @@ Standard icon support (for terminals that support OSC 99):
 - Terminal bell (`\a`) is always sent as additional fallback
 - Statusline messages display via `tmux display-message -d 2000`
 
+## Performance optimizations
+
+PAW uses several techniques to ensure smooth, responsive UI:
+
+### Caching strategies
+
+| Component | Cache Type | Purpose |
+|-----------|------------|---------|
+| theme.go | Padding string cache | Pre-computed space strings for common widths |
+| LogViewer | Display lines cache | Avoids re-filtering/wrapping on every render |
+| LogViewer | Search query cache | Pre-lowercased query + O(1) match lookup map |
+| LogViewer | Lowercase lines cache | Avoids repeated ToLower on visible lines |
+| LogViewer | Style cache | Reuses lipgloss.Style objects across renders |
+| LogViewer | Log level tags | Pre-computed `[L0]`-`[L5]` strings |
+| DiffViewer | Search query cache | Pre-lowercased query + O(1) match lookup map |
+| DiffViewer | Style cache | Reuses lipgloss.Style objects across renders |
+| DiffViewer | Display lines cache | Avoids re-wrapping lines on every render |
+| GitViewer | Search query cache | Pre-lowercased query + O(1) match lookup map |
+| GitViewer | Style cache | Reuses lipgloss.Style objects across renders |
+| GitViewer | Display lines cache | Avoids re-wrapping lines on every render |
+| Scrollbar | Style cache | Package-level styles for dark/light themes |
+| TaskManager | Truncated name cache | Avoids directory scans for window→task mapping |
+| KanbanView | Task count cache | Updated only on Refresh(), not every render |
+| KanbanView | Render cache | Full render output cached when state unchanged |
+| constants | CamelCase cache | `sync.Map` caches `ToCamelCase()` results for repeated conversions |
+
+### Memory allocation optimizations
+
+| Location | Optimization |
+|----------|--------------|
+| `internal/tmux/client.go` | `sync.Pool` for `bytes.Buffer` reuse |
+| `internal/git/client.go` | `sync.Pool` for `bytes.Buffer` reuse |
+| `internal/claude/client.go` | `sync.Pool` for `bytes.Buffer` reuse |
+| `internal/github/client.go` | `sync.Pool` for `bytes.Buffer` reuse |
+| `internal/logging/logger.go` | `sync.Pool` for caller frame `[]uintptr` reuse |
+| `internal/tui/theme.go` | `getPadding()` cache with RWMutex for common widths |
+| `internal/tui/logviewer.go` | Pre-allocated filtered lines with capacity |
+| `internal/tui/logviewer.go` | Cached lipgloss.Style objects (updated on theme change) |
+| `internal/tui/logviewer.go` | Pre-computed log level tags array |
+| `internal/tui/diffviewer.go` | Cached lipgloss.Style objects (updated on theme change) |
+| `internal/tui/gitviewer.go` | Cached lipgloss.Style objects (updated on theme change) |
+| `internal/tui/scrollbar.go` | Package-level style cache for dark/light themes |
+| `internal/tui/scrollbar.go` | `strings.Builder.Grow()` pre-allocation for scrollbar rendering |
+| `internal/tui/kanban.go` | Pre-allocated slices with estimated capacity |
+| `internal/tui/kanban.go` | Package-level `hintPatterns` and indent string |
+| `internal/tui/kanban.go` | `containsLower()` for allocation-free hint detection |
+| `internal/tui/kanban.go` | Cached lipgloss.Style objects for header/task/action |
+| `internal/tui/taskinput.go` | Cached options panel styles (7 styles per theme) |
+| `internal/tui/taskinput_templates.go` | Pre-computed rune slice for placeholder token |
+| `internal/tui/taskinput_options.go` | Pre-computed padded label constants |
+| `internal/tui/spinner.go` | String concatenation instead of `fmt.Sprintf` |
+| `internal/tui/diffviewer.go` | Pre-allocated search match positions slice |
+| `internal/tui/diffviewer.go` | `strings.Builder.Grow()` pre-allocation in View() |
+| `internal/tui/diffviewer.go` | Pre-computed status bar hint widths |
+| `internal/tui/diffviewer.go` | `strconv.Itoa` + string concat for status bar (no fmt.Sprintf) |
+| `internal/tui/gitviewer.go` | Pre-allocated search match positions slice |
+| `internal/tui/gitviewer.go` | `strings.Builder.Grow()` pre-allocation in View() |
+| `internal/tui/gitviewer.go` | Pre-computed status bar hint widths |
+| `internal/tui/gitviewer.go` | `strconv.Itoa` + string concat for status bar (no fmt.Sprintf) |
+| `internal/tui/logviewer.go` | `strings.Builder.Grow()` pre-allocation in View() |
+| `internal/tui/logviewer.go` | Pre-computed status bar hint widths |
+| `internal/tui/logviewer.go` | `strconv.Itoa` + string concat for status bar (no fmt.Sprintf) |
+| `internal/tui/helpviewer.go` | Pre-computed status bar hint widths |
+| `internal/tui/helpviewer.go` | `strconv.Itoa` + string concat for status bar (no fmt.Sprintf) |
+| `internal/tui/kanban.go` | Cached separator string for column headers |
+| `internal/tui/taskinput.go` | Cached View() styles (help, version, warning, tip, cancel hint) |
+| `internal/tui/taskinput.go` | Pre-rendered help text and cached width (avoids lipgloss.Width per render) |
+| `internal/tui/textinput_helpers.go` | Uses `getPadding()` cache for padding strings |
+| `internal/tui/taskinput_options.go` | Pre-allocated lines and parts slices |
+| `internal/tui/cmdpalette.go` | Pre-allocated searchables slice |
+| `internal/tui/projectpicker.go` | Pre-allocated searchables slice |
+| `internal/tui/taskopts.go` | Pre-allocated modelParts slice |
+| `internal/config/taskopts.go` | Package-level validModels slice (avoids allocation per call) |
+| `internal/tui/textarea/textarea.go` | Padding string cache (`getPadding()`) for View() rendering |
+| `internal/tui/textarea/textarea.go` | Rune space slice cache (`repeatSpaces()`) with copy-on-read |
+| `internal/tui/textarea/textarea.go` | `strconv.FormatUint` for line hash (no fmt.Sprintf) |
+| `internal/tui/textarea/textarea.go` | `getPadding()` cache for prompt/line number formatting (no fmt.Sprintf) |
+| `internal/service/taskdiscovery.go` | Single `strings.Split()` shared across functions |
+| `internal/tui/theme.go` | `buildSearchBar()` helper for search bar padding (no fmt.Sprintf) |
+| `internal/tui/gitviewer.go` | Uses `buildSearchBar()` for search mode status bar |
+| `internal/tui/diffviewer.go` | Uses `buildSearchBar()` for search mode status bar |
+| `internal/tui/logviewer.go` | Uses `buildSearchBar()` for search mode status bar |
+| `internal/logging/logger.go` | Pre-computed `levelStrings` array for log level formatting |
+| `internal/tui/gitviewer.go` | Display lines cache for word wrap (invalidated on width/content change) |
+| `internal/tui/diffviewer.go` | Display lines cache for word wrap (invalidated on width/content change) |
+| `internal/embed/embed.go` | Uses `bytes.Contains` instead of custom byte search functions |
+| `internal/constants/constants.go` | `sync.Map` cache for `ToCamelCase()` results |
+| `internal/tui/textarea/internal/memoization/memoization.go` | `strconv.FormatUint`/`strconv.Itoa` for hash formatting (no fmt.Sprintf) |
+
+### Hot path optimizations
+
+- **TaskDiscoveryService**: Lines split once and passed to all extraction functions
+- **LogViewer**: `isMatchLine()` uses O(1) map lookup instead of O(n) slice scan
+- **LogViewer**: Pre-cached lowercase lines avoid repeated `strings.ToLower()` in render
+- **LogViewer**: Pre-computed level tags/filters avoid `fmt.Sprintf` per line
+- **DiffViewer**: `isMatchLine()` uses O(1) map lookup instead of O(n) slice scan
+- **GitViewer**: `isMatchLine()` uses O(1) map lookup instead of O(n) slice scan
+- **KanbanView**: `isCacheValid()` uses cached task count, not recalculated
+- **KanbanView**: `containsLower()` does case-insensitive match without allocation
+- **Render functions**: Early returns when cache is valid
+- **Search highlighting**: Pre-count matches before allocating positions slice
+- **Style caching**: lipgloss.Style objects cached and reused (invalidated only on theme change)
+- **Padding strings**: `getPadding()` returns cached strings for common widths (80, 100, 120, etc.)
+- **String formatting**: String concatenation used instead of `fmt.Sprintf` in hot View() methods
+- **Search bar**: `buildSearchBar()` helper avoids `fmt.Sprintf("/%-*s")` on every render
+- **Logging**: Pre-computed level strings (`L0`-`L5`) avoid `fmt.Sprintf` on every log line
+- **GitViewer/DiffViewer**: `getDisplayLines()` cache avoids re-wrapping on every render call
+- **ToCamelCase**: `sync.Map` cache avoids repeated string conversions in kanban rendering
+
+### Best practices for new code
+
+1. **Pre-allocate slices** when size is known or estimable: `make([]T, 0, capacity)`
+2. **Use sync.Pool** for frequently allocated buffers in hot paths
+3. **Cache computed values** that don't change between renders
+4. **Avoid string operations in loops** - use `strings.Builder` or pre-compute
+5. **Move constants to package level** - avoid allocations per function call
+6. **Cache lipgloss.Style objects** - create once, reuse across renders (invalidate on theme change)
+7. **Pre-lowercase strings** once during data load, not on every render
+8. **Use `getPadding(n)`** instead of `strings.Repeat(" ", n)` for padding strings
+9. **Prefer string concatenation** over `fmt.Sprintf` in View() methods for simple cases
+10. **Pre-compute static format strings** as package-level variables (e.g., log level tags)
+11. **Pre-allocate strings.Builder** with `sb.Grow(estimatedSize)` when output size is predictable
+12. **Pre-compute string widths** for static UI hints (avoid `ansi.StringWidth()` on each render)
+13. **Cache repeated string computations** like separators that depend on width
+
 ## Working rules
 
 ### Verification required
