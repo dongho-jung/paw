@@ -14,7 +14,7 @@ const (
 // detectDoneInContent checks if the content contains the PAW_DONE marker.
 // Returns true if the marker is found within doneMarkerMaxDistance lines from the end
 // AND in the last segment (after the last ⏺ marker, which indicates a new Claude response).
-// This prevents a previously completed task from staying "done" when given new work.
+// If no segment marker is present, this returns false.
 func detectDoneInContent(content string) bool {
 	lines := strings.Split(content, "\n")
 	lines = trimTrailingEmpty(lines)
@@ -24,7 +24,10 @@ func detectDoneInContent(content string) bool {
 
 	// Find the last segment (after the last ⏺ marker)
 	// This ensures we only detect PAW_DONE in the most recent agent response
-	segmentStart := findLastSegmentStart(lines)
+	segmentStart, ok := findLastSegmentStart(lines)
+	if !ok {
+		return false
+	}
 
 	// Check the last N lines from the segment for the marker
 	start := len(lines) - doneMarkerMaxDistance
@@ -40,15 +43,15 @@ func detectDoneInContent(content string) bool {
 }
 
 // findLastSegmentStart finds the index of the last line starting with ⏺.
-// Returns 0 if no segment marker is found (search entire content).
-func findLastSegmentStart(lines []string) int {
+// Returns false if no segment marker is found.
+func findLastSegmentStart(lines []string) (int, bool) {
 	for i := len(lines) - 1; i >= 0; i-- {
 		trimmed := strings.TrimSpace(lines[i])
 		if strings.HasPrefix(trimmed, "⏺") {
-			return i
+			return i, true
 		}
 	}
-	return 0
+	return -1, false
 }
 
 // matchesDoneMarker checks if a line contains the PAW_DONE marker.
@@ -77,9 +80,12 @@ func detectWaitInContent(content string) (bool, string) {
 	// This ensures we only detect wait markers in the most recent Claude response.
 	// If Claude started a new response after a wait state (e.g., user answered AskUserQuestion),
 	// old wait markers from previous segments should not trigger wait detection.
-	segmentStart := findLastSegmentStart(lines)
+	segmentStart, ok := findLastSegmentStart(lines)
+	if !ok {
+		return false, ""
+	}
 
-	index, reason := findWaitMarker(lines)
+	index, reason := findWaitMarker(lines, segmentStart)
 	if index != -1 && index >= segmentStart {
 		// Wait marker must be in the last segment
 		linesAfter := len(lines) - index - 1
@@ -92,7 +98,7 @@ func detectWaitInContent(content string) (bool, string) {
 		}
 	}
 
-	if uiIndex := findAskUserQuestionUIIndex(lines); uiIndex != -1 && uiIndex >= segmentStart {
+	if uiIndex := findAskUserQuestionUIIndex(lines, segmentStart); uiIndex != -1 && uiIndex >= segmentStart {
 		// UI marker must also be in the last segment
 		linesAfter := len(lines) - uiIndex - 1
 		if linesAfter <= waitAskUserMaxDistance {
@@ -126,10 +132,11 @@ func hasInputPrompt(lines []string) bool {
 	return strings.HasPrefix(last, ">")
 }
 
-func findWaitMarker(lines []string) (int, string) {
+func findWaitMarker(lines []string, start int) (int, string) {
 	index := -1
 	reason := ""
-	for i, line := range lines {
+	for i := start; i < len(lines); i++ {
+		line := lines[i]
 		trimmed := strings.TrimSpace(line)
 		switch {
 		case trimmed == waitMarker:
@@ -143,8 +150,8 @@ func findWaitMarker(lines []string) (int, string) {
 	return index, reason
 }
 
-func findAskUserQuestionUIIndex(lines []string) int {
-	for i := len(lines) - 1; i >= 0; i-- {
+func findAskUserQuestionUIIndex(lines []string, start int) int {
+	for i := len(lines) - 1; i >= start; i-- {
 		trimmed := strings.TrimSpace(lines[i])
 		for _, marker := range askUserQuestionUIMarkers {
 			if strings.Contains(trimmed, marker) {

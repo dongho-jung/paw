@@ -7,6 +7,7 @@ import (
 
 func TestDetectWaitInContentAskUserQuestionUI(t *testing.T) {
 	content := strings.Join([]string{
+		"⏺ Waiting for input",
 		"Which fruit would you like to pick?",
 		"> 1. Orange",
 		"  A citrus fruit",
@@ -28,6 +29,7 @@ func TestDetectWaitInContentAskUserQuestionUI(t *testing.T) {
 
 func TestDetectWaitInContentMarkerWithoutPrompt(t *testing.T) {
 	content := strings.Join([]string{
+		"⏺ Working on it...",
 		"Working on it...",
 		"PAW_WAITING",
 	}, "\n")
@@ -99,14 +101,14 @@ func TestDetectWaitInContentSegmentAware(t *testing.T) {
 			expectReason: "",
 		},
 		{
-			name: "no segment markers with AskUserQuestion - should detect (backward compat)",
+			name: "no segment markers with AskUserQuestion - should not detect",
 			content: strings.Join([]string{
 				"Working on task",
 				"AskUserQuestion",
 				"Which option?",
 			}, "\n"),
-			expectWait:   true,
-			expectReason: "AskUserQuestion",
+			expectWait:   false,
+			expectReason: "",
 		},
 		{
 			name: "input prompt at end - should detect regardless of segment",
@@ -144,6 +146,7 @@ func TestDetectDoneInContent(t *testing.T) {
 		{
 			name: "done marker at end",
 			content: strings.Join([]string{
+				"⏺ Response",
 				"All tests passed.",
 				"PAW_DONE",
 				"Ready for review. Press ⌃F to finish.",
@@ -153,6 +156,7 @@ func TestDetectDoneInContent(t *testing.T) {
 		{
 			name: "done marker only",
 			content: strings.Join([]string{
+				"⏺ Response",
 				"Task completed.",
 				"PAW_DONE",
 			}, "\n"),
@@ -161,6 +165,7 @@ func TestDetectDoneInContent(t *testing.T) {
 		{
 			name: "done marker with whitespace",
 			content: strings.Join([]string{
+				"⏺ Response",
 				"Task completed.",
 				"  PAW_DONE  ",
 			}, "\n"),
@@ -169,6 +174,7 @@ func TestDetectDoneInContent(t *testing.T) {
 		{
 			name: "done marker with Claude Code prefix",
 			content: strings.Join([]string{
+				"⏺ Response",
 				"Task completed.",
 				"⏺ PAW_DONE",
 				"Ready for review.",
@@ -178,6 +184,7 @@ func TestDetectDoneInContent(t *testing.T) {
 		{
 			name: "no done marker",
 			content: strings.Join([]string{
+				"⏺ Response",
 				"Still working on it...",
 				"Running tests...",
 			}, "\n"),
@@ -186,7 +193,7 @@ func TestDetectDoneInContent(t *testing.T) {
 		{
 			name: "done marker too far from end",
 			content: func() string {
-				lines := []string{"PAW_DONE"}
+				lines := []string{"⏺ Response", "PAW_DONE"}
 				// Add more than doneMarkerMaxDistance lines after
 				for i := 0; i < doneMarkerMaxDistance+10; i++ {
 					lines = append(lines, "more output...")
@@ -203,6 +210,7 @@ func TestDetectDoneInContent(t *testing.T) {
 		{
 			name: "partial match should not detect",
 			content: strings.Join([]string{
+				"⏺ Response",
 				"PAW_DONE_NOT",
 				"still working",
 			}, "\n"),
@@ -247,14 +255,14 @@ func TestDetectDoneInContent(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "done marker without any segment markers (backward compat)",
+			name: "done marker without any segment markers",
 			content: strings.Join([]string{
 				"Some output without segment markers",
 				"Task completed.",
 				"PAW_DONE",
 				"Ready for review.",
 			}, "\n"),
-			expected: true,
+			expected: false,
 		},
 	}
 

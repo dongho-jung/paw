@@ -44,37 +44,37 @@ func TestHasDoneMarker(t *testing.T) {
 	}{
 		{
 			name:    "marker at end",
-			content: "Some output\nVerification complete\nPAW_DONE\n",
+			content: "⏺ Response\nSome output\nVerification complete\nPAW_DONE\n",
 			want:    true,
 		},
 		{
 			name:    "marker with trailing whitespace",
-			content: "Some output\n  PAW_DONE  \n",
+			content: "⏺ Response\nSome output\n  PAW_DONE  \n",
 			want:    true,
 		},
 		{
-			name:    "marker in middle (within last 20 lines)",
-			content: "Line 1\nPAW_DONE\nReady for review\n",
+			name:    "marker in middle (within last segment)",
+			content: "⏺ Response\nLine 1\nPAW_DONE\nReady for review\n",
 			want:    true,
 		},
 		{
 			name:    "marker with Claude Code prefix",
-			content: "Some output\n⏺ PAW_DONE\nReady for review\n",
+			content: "⏺ Response\nSome output\n⏺ PAW_DONE\nReady for review\n",
 			want:    true,
 		},
 		{
 			name:    "no marker",
-			content: "Some output\nReady for review\n",
+			content: "⏺ Response\nSome output\nReady for review\n",
 			want:    false,
 		},
 		{
 			name:    "partial marker",
-			content: "PAW_DONE_EXTRA\n",
+			content: "⏺ Response\nPAW_DONE_EXTRA\n",
 			want:    false,
 		},
 		{
 			name:    "marker embedded in text",
-			content: "Text PAW_DONE text\n",
+			content: "⏺ Response\nText PAW_DONE text\n",
 			want:    false,
 		},
 		{
@@ -98,23 +98,13 @@ func TestHasDoneMarker(t *testing.T) {
 			want:    false,
 		},
 		{
-			name:    "done marker without segment markers (backward compat)",
+			name:    "done marker without segment markers",
 			content: "Some output\nTask completed.\nPAW_DONE\nReady for review.\n",
-			want:    true,
-		},
-		{
-			name:    "done marker without segment marker but within strict distance",
-			content: "Line 1\nLine 2\nLine 3\nPAW_DONE\nLine 4\nLine 5\n",
-			want:    true, // Within 20 lines from end
-		},
-		{
-			name:    "old done marker without segment marker (beyond strict distance)",
-			content: "PAW_DONE\n" + generateLines(25) + "New work started...\n",
-			want:    false, // PAW_DONE is more than 20 lines from end, no segment marker
+			want:    false,
 		},
 		{
 			name:    "old done marker with new segment marker",
-			content: "PAW_DONE\n" + generateLines(25) + "⏺ New response\nWorking...\n",
+			content: "⏺ Old response\nPAW_DONE\n" + generateLines(25) + "⏺ New response\nWorking...\n",
 			want:    false, // PAW_DONE is in old segment
 		},
 		// Stale marker tests (user input after PAW_DONE)
@@ -172,37 +162,37 @@ func TestHasWaitingMarker(t *testing.T) {
 	}{
 		{
 			name:    "marker at end",
-			content: "Some output\nWorking on it...\nPAW_WAITING\n",
+			content: "⏺ Response\nSome output\nWorking on it...\nPAW_WAITING\n",
 			want:    true,
 		},
 		{
 			name:    "marker with trailing whitespace",
-			content: "Some output\n  PAW_WAITING  \n",
+			content: "⏺ Response\nSome output\n  PAW_WAITING  \n",
 			want:    true,
 		},
 		{
 			name:    "marker with UI after (within distance)",
-			content: "Some output\nPAW_WAITING\n🔒 Plan\n> 1. Option A\n  Description\n2. Option B\n  Description\nEnter to select\n",
+			content: "⏺ Response\nSome output\nPAW_WAITING\n🔒 Plan\n> 1. Option A\n  Description\n2. Option B\n  Description\nEnter to select\n",
 			want:    true,
 		},
 		{
 			name:    "marker with Claude Code prefix",
-			content: "Some output\n⏺ PAW_WAITING\nWaiting for input...\n",
+			content: "⏺ Response\nSome output\n⏺ PAW_WAITING\nWaiting for input...\n",
 			want:    true,
 		},
 		{
 			name:    "no marker",
-			content: "Some output\nStill working...\n",
+			content: "⏺ Response\nSome output\nStill working...\n",
 			want:    false,
 		},
 		{
 			name:    "partial marker",
-			content: "PAW_WAITING_EXTRA\n",
+			content: "⏺ Response\nPAW_WAITING_EXTRA\n",
 			want:    false,
 		},
 		{
 			name:    "marker embedded in text",
-			content: "Text PAW_WAITING text\n",
+			content: "⏺ Response\nText PAW_WAITING text\n",
 			want:    false,
 		},
 		{
@@ -221,12 +211,17 @@ func TestHasWaitingMarker(t *testing.T) {
 			want:    false,
 		},
 		{
+			name:    "marker without segment markers",
+			content: "Some output\nPAW_WAITING\nWaiting...\n",
+			want:    false,
+		},
+		{
 			name:    "waiting after done (new work started)",
 			content: "⏺ First response\nPAW_DONE\nReady.\n⏺ New question response\nPAW_WAITING\n> 1. Option\n",
 			want:    true,
 		},
 		{
-			name:    "waiting after done without segment marker (real bug scenario)",
+			name:    "waiting after done in new segment",
 			content: "⏺ PAW_DONE\n⏺ New response\n  PAW_WAITING\n☐ Notify\nEnter to select\n",
 			want:    true,
 		},
@@ -367,7 +362,7 @@ func TestHasAskUserQuestionInLastSegment(t *testing.T) {
 		{
 			name:    "AskUserQuestion without segment marker",
 			content: "Working on task...\nAskUserQuestion:\n  - question: Ready?\n",
-			want:    true,
+			want:    false,
 		},
 		{
 			name:    "AskUserQuestion mentioned in text (not tool call)",

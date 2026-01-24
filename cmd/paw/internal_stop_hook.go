@@ -459,7 +459,10 @@ func hasAskUserQuestionInLastSegment(content string) bool {
 	}
 
 	// Find the last segment (after the last ⏺ marker)
-	segmentStart := findLastSegmentStartStopHook(lines)
+	segmentStart, ok := findLastSegmentStartStopHookWithFlag(lines)
+	if !ok {
+		return false
+	}
 
 	// Check if any line in the last segment contains "AskUserQuestion"
 	for _, line := range lines[segmentStart:] {
@@ -483,7 +486,10 @@ func hasWaitingMarker(content string) bool {
 	}
 
 	// Find the last segment (after the last ⏺ marker)
-	segmentStart := findLastSegmentStartStopHook(lines)
+	segmentStart, ok := findLastSegmentStartStopHookWithFlag(lines)
+	if !ok {
+		return false
+	}
 
 	// Check the last N lines from the segment for the marker
 	// Use a larger distance than doneMarker since UI may render after PAW_WAITING
@@ -515,21 +521,18 @@ func matchesWaitingMarkerStopHook(line string) bool {
 	return false
 }
 
-// doneMarkerNoSegmentDistance is the max distance to search for PAW_DONE when no segment marker is found.
-// This is much stricter than doneMarkerMaxDistance to prevent false positives from old markers.
-const doneMarkerNoSegmentDistance = 20
-
 // hasDoneMarker checks if the pane content contains the PAW_DONE marker.
 // The marker must appear on its own line (possibly with whitespace)
 // AND in the last segment (after the last ⏺ marker, which indicates a new Claude response).
 // This prevents a previously completed task from staying "done" when given new work.
+// If no segment marker is present, this returns false.
 //
 // Additionally, if user input is detected after PAW_DONE (indicating a new request was
 // submitted but Claude hasn't responded yet), the marker is considered stale and false is returned.
 func hasDoneMarker(content string) bool {
 	lines := strings.Split(content, "\n")
 	// Trim trailing empty lines to ensure we check the actual content,
-	// not empty lines from terminal scroll regions (consistent with detectDoneInContent in wait.go)
+	// not empty lines from terminal scroll regions (consistent with detectDoneInContent in wait_detect.go).
 	lines = trimTrailingEmptyLines(lines)
 	if len(lines) == 0 {
 		return false
@@ -538,17 +541,11 @@ func hasDoneMarker(content string) bool {
 	// Find the last segment (after the last ⏺ marker)
 	// This ensures we only detect PAW_DONE in the most recent agent response
 	segmentStart, hasSegment := findLastSegmentStartStopHookWithFlag(lines)
-
-	// Determine how far back to search for the marker
-	var maxDistance int
-	if hasSegment {
-		// With segment marker: use generous distance (agent may output text after PAW_DONE)
-		maxDistance = doneMarkerMaxDistance
-	} else {
-		// Without segment marker: use strict distance to prevent false positives
-		// from old PAW_DONE markers that were output in previous responses
-		maxDistance = doneMarkerNoSegmentDistance
+	if !hasSegment {
+		return false
 	}
+	// Use generous distance (agent may output text after PAW_DONE).
+	maxDistance := doneMarkerMaxDistance
 
 	start := len(lines) - maxDistance
 	if start < segmentStart {
@@ -637,23 +634,19 @@ func isUIDecoration(line string) bool {
 		return false
 	}
 	// Check for common UI decoration patterns (box-drawing characters)
-	firstRune := []rune(line)[0]
-	switch firstRune {
-	case '╭', '╰', '│', '─', '├', '┤', '┬', '┴', '┼', '╮', '╯', '┌', '┐', '└', '┘':
-		return true
+	for _, r := range line {
+		switch r {
+		case '╭', '╰', '│', '─', '├', '┤', '┬', '┴', '┼', '╮', '╯', '┌', '┐', '└', '┘':
+			return true
+		default:
+			return false
+		}
 	}
 	return false
 }
 
-// findLastSegmentStartStopHook finds the index of the last line starting with ⏺.
-// Returns 0 if no segment marker is found (search entire content).
-func findLastSegmentStartStopHook(lines []string) int {
-	idx, _ := findLastSegmentStartStopHookWithFlag(lines)
-	return idx
-}
-
 // findLastSegmentStartStopHookWithFlag finds the index of the last line starting with ⏺.
-// Returns (index, true) if found, or (0, false) if no segment marker is found.
+// Returns (index, true) if found, or (-1, false) if no segment marker is found.
 func findLastSegmentStartStopHookWithFlag(lines []string) (int, bool) {
 	for i := len(lines) - 1; i >= 0; i-- {
 		trimmed := strings.TrimSpace(lines[i])
@@ -661,7 +654,7 @@ func findLastSegmentStartStopHookWithFlag(lines []string) (int, bool) {
 			return i, true
 		}
 	}
-	return 0, false
+	return -1, false
 }
 
 // matchesDoneMarkerStopHook checks if a line contains the PAW_DONE marker.
