@@ -91,7 +91,7 @@ var cmdPaletteTUICmd = &cobra.Command{
 		commands := []tui.Command{
 			{
 				Name:        "Show Current Task",
-				Description: "Display current task content in shell pane",
+				Description: "Display current task content in a popup",
 				ID:          "show-current-task",
 			},
 			{

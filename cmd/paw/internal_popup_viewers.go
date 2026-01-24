@@ -295,6 +295,24 @@ var helpViewerCmd = &cobra.Command{
 	},
 }
 
+var taskViewerCmd = &cobra.Command{
+	Use:    "task-viewer [filepath]",
+	Short:  "Run the task content viewer",
+	Args:   cobra.ExactArgs(1),
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		taskFilePath := args[0]
+
+		// Read task file content
+		content, err := os.ReadFile(taskFilePath)
+		if err != nil {
+			return fmt.Errorf("failed to read task file: %w", err)
+		}
+
+		return tui.RunTaskViewer(string(content))
+	},
+}
+
 var gitViewerCmd = &cobra.Command{
 	Use:    "git-viewer [work-dir] [main-branch]",
 	Short:  "Run the git viewer",

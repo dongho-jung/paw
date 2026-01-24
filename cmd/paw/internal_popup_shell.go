@@ -182,7 +182,7 @@ func createNewShellPane(tm tmux.Client, sessionName string) error {
 
 var showCurrentTaskCmd = &cobra.Command{
 	Use:    "show-current-task [session]",
-	Short:  "Display current task content in shell pane",
+	Short:  "Display current task content in a popup",
 	Args:   cobra.ExactArgs(1),
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -237,18 +237,16 @@ var showCurrentTaskCmd = &cobra.Command{
 			return nil
 		}
 
-		// Send cat command to the user pane (pane .1)
-		userPane := windowID + ".1"
-		if !tm.HasPane(userPane) {
-			_ = tm.DisplayMessage("User pane not found", 2000)
-			return nil
-		}
+		// Run task viewer in top pane (closes with q/Esc)
+		taskViewerCmd := shellJoin(getPawBin(), "internal", "task-viewer", taskFilePath)
 
-		// Send the cat command to display task content
-		catCmd := fmt.Sprintf("cat %s", shellQuote(taskFilePath))
-		if err := tm.SendKeys(userPane, catCmd, "Enter"); err != nil {
-			logging.Debug("Failed to send cat command: %v", err)
-			return fmt.Errorf("failed to send command to pane: %w", err)
+		result, err := displayTopPane(tm, "task", taskViewerCmd, "")
+		if err != nil {
+			logging.Debug("showCurrentTaskCmd: displayTopPane failed: %v", err)
+			return err
+		}
+		if result == TopPaneBlocked {
+			logging.Debug("showCurrentTaskCmd: blocked by another top pane")
 		}
 
 		logging.Log("Displayed task content for: %s", t.Name)
