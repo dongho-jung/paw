@@ -1,12 +1,15 @@
 package main
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 
+	"github.com/dongho-jung/paw/internal/constants"
 	"github.com/dongho-jung/paw/internal/git"
 	"github.com/dongho-jung/paw/internal/logging"
 	"github.com/dongho-jung/paw/internal/task"
@@ -206,5 +209,51 @@ var finishPickerTUICmd = &cobra.Command{
 		logging.Debug("finishPickerTUICmd: calling end-task-ui with action=%s", endAction)
 		endCmd := exec.Command(pawBin, "internal", "end-task-ui", sessionName, windowID, "--action", endAction)
 		return endCmd.Run()
+	},
+}
+
+var taskNameInputTUICmd = &cobra.Command{
+	Use:    "task-name-input-tui [session]",
+	Short:  "Run task name input TUI (called from popup)",
+	Args:   cobra.ExactArgs(1),
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sessionName := args[0]
+
+		appCtx, err := getAppFromSession(sessionName)
+		if err != nil {
+			return err
+		}
+
+		// Setup logging
+		_, cleanup := setupLoggerFromApp(appCtx, "task-name-input-tui", "")
+		defer cleanup()
+
+		logging.Debug("-> taskNameInputTUICmd(session=%s)", sessionName)
+		defer logging.Debug("<- taskNameInputTUICmd")
+
+		// Run the task name input TUI
+		action, taskName, err := tui.RunTaskNameInput()
+		if err != nil {
+			logging.Debug("taskNameInputTUICmd: RunTaskNameInput failed: %v", err)
+			return err
+		}
+
+		logging.Debug("taskNameInputTUICmd: action=%d, taskName=%s", action, taskName)
+
+		if action == tui.TaskNameInputCancel || taskName == "" {
+			logging.Debug("taskNameInputTUICmd: cancelled or empty name")
+			return nil
+		}
+
+		// Write the task name to a selection file for the caller to read
+		selectionPath := filepath.Join(appCtx.PawDir, constants.TaskNameSelectionFile)
+		if err := os.WriteFile(selectionPath, []byte(taskName), 0644); err != nil {
+			logging.Warn("taskNameInputTUICmd: failed to write selection file: %v", err)
+			return err
+		}
+
+		logging.Debug("taskNameInputTUICmd: wrote task name to %s", selectionPath)
+		return nil
 	},
 }

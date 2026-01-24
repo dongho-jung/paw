@@ -55,11 +55,12 @@ const (
 
 // TaskInput provides an inline text input for task content.
 type TaskInput struct {
-	textarea    textarea.Model
-	submitted   bool
-	cancelled   bool
-	width       int
-	height      int
+	textarea              textarea.Model
+	submitted             bool
+	cancelled             bool
+	requestTaskNamePopup  bool
+	width                 int
+	height                int
 	options     *config.TaskOptions
 	activeTasks []string // Active task names for dependency selection
 	isDark      bool     // Cached dark mode detection (must be detected before bubbletea starts)
@@ -164,10 +165,11 @@ type jumpToTaskMsg struct {
 
 // TaskInputResult contains the result of the task input.
 type TaskInputResult struct {
-	Content    string
-	Options    *config.TaskOptions
-	Cancelled  bool
-	JumpTarget *JumpTarget // Non-nil if user requested to jump to an external project task
+	Content               string
+	Options               *config.TaskOptions
+	Cancelled             bool
+	JumpTarget            *JumpTarget // Non-nil if user requested to jump to an external project task
+	RequestTaskNamePopup  bool        // True if user pressed Alt+Enter with empty content
 }
 
 // NewTaskInputWithOptions creates a new task input model with active task list and git mode flag.
@@ -543,7 +545,9 @@ func (m *TaskInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.submitted = true
 				return m, tea.Quit
 			}
-			return m, nil
+			// Empty content: request task name popup
+			m.requestTaskNamePopup = true
+			return m, tea.Quit
 
 		case "tab":
 			if m.focusPanel == FocusPanelLeft {

@@ -200,8 +200,9 @@ const (
 	TemplateSelectionFile = ".template-selection" // Temp file for Ctrl+T template selection
 	TemplateDraftFile     = ".template-draft"     // Temp file for Ctrl+T template creation
 	StatusSignalFileName  = ".status-signal"      // Temp file for Claude to signal status directly
-	ProjectSwitchFileName = ".project-switch"     // Temp file for project picker to signal switch target
-	ProjectPathFileName   = ".project-path"       // Stores project path for global workspaces
+	ProjectSwitchFileName   = ".project-switch"      // Temp file for project picker to signal switch target
+	ProjectPathFileName     = ".project-path"        // Stores project path for global workspaces
+	TaskNameSelectionFile   = ".task-name-selection" // Temp file for Alt+Enter task name input
 )
 
 // Prompts directory and file names
@@ -406,4 +407,8 @@ const (
 	// Compact size for the project picker popup.
 	PopupWidthProject  = "80%"
 	PopupHeightProject = "20"
+
+	// Compact size for the task name input popup.
+	PopupWidthTaskName  = "60%"
+	PopupHeightTaskName = "10"
 )

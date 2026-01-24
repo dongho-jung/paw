@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dongho-jung/paw/internal/app"
 	"github.com/dongho-jung/paw/internal/config"
 	"github.com/dongho-jung/paw/internal/constants"
 	"github.com/dongho-jung/paw/internal/logging"
@@ -168,6 +169,24 @@ var newTaskCmd = &cobra.Command{
 				}
 				// detach-client -E replaces the client, so this line may not be reached
 				return nil
+			}
+
+			// Handle task name popup request (Alt+Enter with empty content)
+			if result.RequestTaskNamePopup {
+				logging.Debug("Task name popup requested")
+				taskName := showTaskNamePopup(sessionName, appCtx)
+				if taskName == "" {
+					// User cancelled or popup failed
+					continue
+				}
+				// Create task with the entered name as both branch name and content
+				if err := createTaskWithName(sessionName, appCtx, taskName); err != nil {
+					logging.Error("Failed to create task with name: %v", err)
+					fmt.Printf("Failed to create task: %v\n", err)
+				}
+				// Refresh active tasks list
+				activeTasks = getActiveTaskNames(appCtx.AgentsDir)
+				continue
 			}
 
 			if result.Content == "" {
@@ -470,5 +489,108 @@ func ensureMainWindowInSession(sessionName string) error {
 	}
 
 	logging.Log("Main window created in session %s: %s", sessionName, windowID)
+	return nil
+}
+
+// showTaskNamePopup shows a popup for entering a task name directly.
+// Returns the entered task name, or empty string if cancelled/failed.
+func showTaskNamePopup(sessionName string, appCtx *app.App) string {
+	tm := tmux.New(sessionName)
+	pawBin, _ := os.Executable()
+
+	// Build the task name input TUI command
+	tuiCmd := shellJoin(pawBin, "internal", "task-name-input-tui", sessionName)
+
+	// Show the popup
+	err := tm.DisplayPopup(tmux.PopupOpts{
+		Width:     constants.PopupWidthTaskName,
+		Height:    constants.PopupHeightTaskName,
+		Title:     " Enter Task Name ",
+		Close:     true,
+		Style:     "fg=terminal,bg=terminal",
+		Directory: appCtx.ProjectDir,
+		Env: map[string]string{
+			"PAW_DIR":     appCtx.PawDir,
+			"PROJECT_DIR": appCtx.ProjectDir,
+		},
+	}, tuiCmd)
+	if err != nil {
+		logging.Debug("showTaskNamePopup: DisplayPopup failed: %v", err)
+		return ""
+	}
+
+	// Read the selection file
+	selectionPath := filepath.Join(appCtx.PawDir, constants.TaskNameSelectionFile)
+	data, err := os.ReadFile(selectionPath)
+	if err != nil {
+		logging.Debug("showTaskNamePopup: no selection file: %v", err)
+		return ""
+	}
+
+	// Delete the file after reading
+	_ = os.Remove(selectionPath)
+
+	taskName := strings.TrimSpace(string(data))
+	logging.Debug("showTaskNamePopup: got task name: %s", taskName)
+	return taskName
+}
+
+// createTaskWithName creates a task with the given name as both the branch name and content.
+func createTaskWithName(sessionName string, appCtx *app.App, taskName string) error {
+	logging.Debug("createTaskWithName: creating task with name: %s", taskName)
+
+	// Create content from the task name (convert kebab-case to readable format)
+	content := "Task: " + taskName
+
+	// Save content to temp file for spawn-task to read
+	tmpFile, err := os.CreateTemp("", "paw-task-content-*.txt")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	if _, err := tmpFile.WriteString(content); err != nil {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpFile.Name())
+		return fmt.Errorf("failed to write task content: %w", err)
+	}
+	_ = tmpFile.Close()
+
+	// Create options with custom branch name
+	taskOpts := config.DefaultTaskOptions()
+	taskOpts.BranchName = taskName
+
+	// Save options to temp file
+	optsTmpFile, err := os.CreateTemp("", "paw-task-opts-*.json")
+	if err != nil {
+		_ = os.Remove(tmpFile.Name())
+		return fmt.Errorf("failed to create options temp file: %w", err)
+	}
+	optsData, _ := json.Marshal(taskOpts)
+	if _, err := optsTmpFile.Write(optsData); err != nil {
+		_ = optsTmpFile.Close()
+		_ = os.Remove(optsTmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
+		return fmt.Errorf("failed to write task options: %w", err)
+	}
+	_ = optsTmpFile.Close()
+
+	// Initialize input history service
+	inputHistorySvc := service.NewInputHistoryService(appCtx.PawDir)
+
+	// Spawn task creation in a separate window (non-blocking)
+	pawBin, _ := os.Executable()
+	spawnArgs := []string{"internal", "spawn-task", sessionName, tmpFile.Name(), optsTmpFile.Name()}
+	spawnCmd := exec.Command(pawBin, spawnArgs...)
+	if err := spawnCmd.Start(); err != nil {
+		_ = os.Remove(tmpFile.Name())
+		_ = os.Remove(optsTmpFile.Name())
+		return fmt.Errorf("failed to start spawn-task: %w", err)
+	}
+
+	// Save content to input history
+	if err := inputHistorySvc.SaveInput(content); err != nil {
+		logging.Warn("Failed to save input history: %v", err)
+	}
+
+	logging.Debug("createTaskWithName: task spawned, content file: %s, opts file: %s", tmpFile.Name(), optsTmpFile.Name())
 	return nil
 }

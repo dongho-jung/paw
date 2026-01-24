@@ -59,6 +59,7 @@ func init() {
 	internalCmd.AddCommand(prPopupTUICmd)
 	internalCmd.AddCommand(togglePromptPickerCmd)
 	internalCmd.AddCommand(promptPickerTUICmd)
+	internalCmd.AddCommand(taskNameInputTUICmd)
 
 	// Utility commands
 	internalCmd.AddCommand(renameWindowCmd)
