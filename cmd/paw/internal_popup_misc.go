@@ -155,16 +155,35 @@ var finishPickerTUICmd = &cobra.Command{
 		// Detect if there are commits to merge (only for git repos)
 		hasCommits := false
 		if appCtx.IsGitRepo {
-			// Find task by window ID to get the branch name
+			tm := tmux.New(sessionName)
 			mgr := task.NewManager(appCtx.AgentsDir, appCtx.ProjectDir, appCtx.PawDir, appCtx.IsGitRepo, appCtx.Config)
+			mgr.SetTmuxClient(tm)
+
+			// Try to find task by window ID first
 			targetTask, err := mgr.FindTaskByWindowID(windowID)
-			if err == nil {
+			if err != nil {
+				logging.Debug("finishPickerTUICmd: FindTaskByWindowID failed: %v, trying fallback", err)
+				// Fallback: get window name from tmux and find task by truncated name
+				windowName, nameErr := tm.Display("#{window_name}")
+				if nameErr == nil {
+					if taskNameFromWindow, ok := constants.ExtractTaskName(windowName); ok {
+						targetTask, _ = mgr.FindTaskByTruncatedName(taskNameFromWindow)
+						if targetTask != nil {
+							logging.Debug("finishPickerTUICmd: found task via fallback: %s", targetTask.Name)
+						}
+					}
+				}
+			}
+
+			if targetTask != nil {
 				gitClient := git.New()
 				mainBranch := gitClient.GetMainBranch(appCtx.ProjectDir)
 				workDir := mgr.GetWorkingDirectory(targetTask)
 				commits, _ := gitClient.GetBranchCommits(workDir, targetTask.Name, mainBranch, 1)
 				hasCommits = len(commits) > 0
 				logging.Debug("finishPickerTUICmd: hasCommits=%v (branch=%s, main=%s)", hasCommits, targetTask.Name, mainBranch)
+			} else {
+				logging.Warn("finishPickerTUICmd: could not find task for windowID=%s", windowID)
 			}
 		}
 

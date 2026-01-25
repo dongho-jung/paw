@@ -25,7 +25,9 @@ var doneTaskCmd = &cobra.Command{
 
 		appCtx, err := getAppFromSession(sessionName)
 		if err != nil {
-			return err
+			// Log and return nil to avoid run-shell output error in pane
+			logging.Warn("doneTaskCmd: getAppFromSession failed: %v", err)
+			return nil
 		}
 
 		// Setup logging
@@ -40,7 +42,9 @@ var doneTaskCmd = &cobra.Command{
 		// Batch query: Get window ID and name in a single tmux call
 		values, err := tm.DisplayMultiple("#{window_id}", "#{window_name}")
 		if err != nil || len(values) < 2 {
-			return fmt.Errorf("failed to get window info: %w", err)
+			// Log and return nil to avoid run-shell output error in pane
+			logging.Warn("doneTaskCmd: failed to get window info: %v", err)
+			return nil
 		}
 		windowID := strings.TrimSpace(values[0])
 		windowName := strings.TrimSpace(values[1])
@@ -55,6 +59,10 @@ var doneTaskCmd = &cobra.Command{
 		finishCmd := shellJoin(getPawBin(), "internal", "finish-picker-tui", sessionName, windowID)
 
 		// Display as popup to avoid resizing/redrawing task panes.
+		// Note: With -E flag, popup returns exit code of command inside.
+		// We intentionally ignore this error to avoid run-shell outputting
+		// ugly error messages to the current pane. Errors inside the popup
+		// are handled by the popup command itself (shown in a pane, etc.)
 		err = tm.DisplayPopup(tmux.PopupOpts{
 			Width:     constants.PopupWidthFinish,
 			Height:    constants.PopupHeightFinish,
@@ -68,8 +76,10 @@ var doneTaskCmd = &cobra.Command{
 			},
 		}, finishCmd)
 		if err != nil {
-			logging.Debug("doneTaskCmd: displayPopup failed: %v", err)
-			return err
+			// Log but don't return error - popup command errors are handled
+			// inside the popup itself. Returning error causes run-shell to
+			// output error message to the current pane which is ugly.
+			logging.Debug("doneTaskCmd: displayPopup returned: %v", err)
 		}
 
 		return nil
