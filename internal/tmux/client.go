@@ -29,7 +29,7 @@ var bufferPool = sync.Pool{
 var configPath string
 
 func init() {
-	// Write PAW-specific tmux config to temp directory
+	// Write PAW-specific tmux config to a secure location
 	content, err := embed.GetTmuxConfig()
 	if err != nil {
 		// Fallback: use /dev/null to ignore user's config
@@ -37,9 +37,24 @@ func init() {
 		return
 	}
 
-	tmpDir := os.TempDir()
-	configPath = filepath.Join(tmpDir, "paw-tmux.conf")
-	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil { //nolint:gosec // G306: tmux config needs to be readable
+	// Security: Use user-specific directory instead of shared temp directory
+	// to prevent other users from reading/modifying the config
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		// Fallback to temp directory with restrictive permissions
+		cacheDir = os.TempDir()
+	}
+
+	// Create PAW-specific subdirectory with restrictive permissions
+	pawCacheDir := filepath.Join(cacheDir, "paw")
+	if err := os.MkdirAll(pawCacheDir, 0700); err != nil {
+		configPath = "/dev/null"
+		return
+	}
+
+	configPath = filepath.Join(pawCacheDir, "tmux.conf")
+	// Use mode 0600 for user-only access
+	if err := os.WriteFile(configPath, []byte(content), 0600); err != nil {
 		// Fallback: use /dev/null to ignore user's config
 		configPath = "/dev/null"
 	}
@@ -334,6 +349,15 @@ func (c *tmuxClient) KillWindow(target string) error {
 
 func (c *tmuxClient) RenameWindow(target, name string) error {
 	logging.Trace("tmux.RenameWindow: target=%s name=%s", target, name)
+
+	// Security: Validate window name to prevent unexpected tmux behavior
+	// Window names should not contain control characters
+	for _, r := range name {
+		if r < 32 || r == 127 { // Control characters (including null, newline, tab, etc.)
+			return fmt.Errorf("invalid characters in window name")
+		}
+	}
+
 	err := c.Run("rename-window", "-t", target, name)
 	if err != nil {
 		logging.Trace("tmux.RenameWindow: failed err=%v", err)

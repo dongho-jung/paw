@@ -388,6 +388,7 @@ func respawnMainWindow(appCtx *app.App, tm tmux.Client) error {
 }
 
 // updateBinSymlink creates or updates the .paw/bin symlink to point to the current paw binary.
+// Uses atomic rename to prevent race conditions (TOCTOU vulnerability).
 func updateBinSymlink(pawDir string) error {
 	// Get current executable path
 	exe, err := os.Executable()
@@ -410,12 +411,22 @@ func updateBinSymlink(pawDir string) error {
 		}
 	}
 
-	// Remove existing symlink/file if exists
-	_ = os.Remove(symlink)
+	// Security: Use atomic rename to prevent race conditions
+	// Create symlink at a temporary location first, then atomically rename
+	tmpSymlink := symlink + ".tmp"
 
-	// Create new symlink
-	if err := os.Symlink(exe, symlink); err != nil {
-		return fmt.Errorf("failed to create symlink: %w", err)
+	// Clean up any existing temp symlink
+	_ = os.Remove(tmpSymlink)
+
+	// Create new symlink at temp location
+	if err := os.Symlink(exe, tmpSymlink); err != nil {
+		return fmt.Errorf("failed to create temp symlink: %w", err)
+	}
+
+	// Atomically rename to final location (this replaces any existing file)
+	if err := os.Rename(tmpSymlink, symlink); err != nil {
+		_ = os.Remove(tmpSymlink) // Clean up temp on failure
+		return fmt.Errorf("failed to rename symlink: %w", err)
 	}
 
 	return nil
