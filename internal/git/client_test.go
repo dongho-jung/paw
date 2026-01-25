@@ -1054,3 +1054,66 @@ func TestHasRemote(t *testing.T) {
 		t.Error("HasRemote() = true for non-existent remote 'upstream', want false")
 	}
 }
+
+// TestIsValidGitRef tests the security validation function for git ref names.
+func TestIsValidGitRef(t *testing.T) {
+	// Test both exported and internal functions to ensure they behave the same
+	tests := []struct {
+		name  string
+		ref   string
+		valid bool
+	}{
+		// Valid refs
+		{"simple branch", "main", true},
+		{"feature branch", "feature/my-feature", true},
+		{"with numbers", "feature-123", true},
+		{"with dots", "v1.0.0", true},
+		{"underscore", "my_branch", true},
+
+		// Invalid refs - empty
+		{"empty string", "", false},
+
+		// Invalid refs - starts with dash (could be interpreted as flag)
+		{"starts with dash", "-branch", false},
+		{"starts with double dash", "--all", false},
+
+		// Invalid refs - shell metacharacters
+		{"semicolon", "branch;rm -rf /", false},
+		{"ampersand", "branch&&echo", false},
+		{"pipe", "branch|cat", false},
+		{"dollar sign", "branch$HOME", false},
+		{"backtick", "branch`whoami`", false},
+		{"parentheses", "branch$(id)", false},
+		{"less than", "branch<file", false},
+		{"greater than", "branch>file", false},
+
+		// Invalid refs - whitespace
+		{"space", "branch name", false},
+		{"tab", "branch\tname", false},
+		{"newline", "branch\nname", false},
+		{"carriage return", "branch\rname", false},
+
+		// Invalid refs - quotes
+		{"single quote", "branch'name", false},
+		{"double quote", "branch\"name", false},
+
+		// Invalid refs - other dangerous chars
+		{"backslash", "branch\\name", false},
+		{"null byte", "branch\x00name", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test internal function
+			got := isValidGitRef(tt.ref)
+			if got != tt.valid {
+				t.Errorf("isValidGitRef(%q) = %v, want %v", tt.ref, got, tt.valid)
+			}
+			// Test exported function (should behave the same)
+			gotExported := IsValidGitRef(tt.ref)
+			if gotExported != tt.valid {
+				t.Errorf("IsValidGitRef(%q) = %v, want %v", tt.ref, gotExported, tt.valid)
+			}
+		})
+	}
+}

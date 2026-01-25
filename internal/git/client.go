@@ -126,6 +126,40 @@ type gitClient struct {
 // Compile-time check that gitClient implements Client interface.
 var _ Client = (*gitClient)(nil)
 
+// IsValidGitRef validates that a git ref name doesn't contain dangerous characters.
+// This is a security measure to prevent command injection via malformed ref names.
+// Git refs should not contain: spaces, shell metacharacters, or start with '-'.
+func IsValidGitRef(ref string) bool {
+	if ref == "" {
+		return false
+	}
+	// Refs should not start with '-' (could be interpreted as flag)
+	if strings.HasPrefix(ref, "-") {
+		return false
+	}
+	// Check for dangerous characters that could cause injection
+	// Git ref names already have restrictions, but we add extra safety
+	for _, r := range ref {
+		switch r {
+		case ' ', '\t', '\n', '\r', // whitespace
+			';', '&', '|', // shell command separators
+			'$', '`', // variable/command substitution
+			'(', ')', // subshells
+			'<', '>', // redirects
+			'\\', // escape character
+			'"', '\'', // quotes
+			'\x00': // null byte
+			return false
+		}
+	}
+	return true
+}
+
+// isValidGitRef is an internal alias for backward compatibility.
+func isValidGitRef(ref string) bool {
+	return IsValidGitRef(ref)
+}
+
 // New creates a new git client.
 func New() Client {
 	return &gitClient{
@@ -597,8 +631,17 @@ func (c *gitClient) CheckoutTheirs(dir, path string) error {
 // FindMergeCommit finds the merge commit where branch was merged into another branch.
 // Returns empty string if not found.
 func (c *gitClient) FindMergeCommit(dir, branch, into string) (string, error) {
+	// Security: validate ref names to prevent command injection
+	if !isValidGitRef(branch) {
+		return "", fmt.Errorf("invalid branch name: %q", branch)
+	}
+	if !isValidGitRef(into) {
+		return "", fmt.Errorf("invalid target branch name: %q", into)
+	}
+
 	// Find merge commits that mention the branch name in the commit message
 	// or find the actual merge commit by ancestry
+	// Note: --grep is passed as a separate argument to avoid flag injection
 	output, err := c.runOutput(dir, "log", into, "--merges", "--oneline", "--grep="+branch, "-1", "--format=%H")
 	if err != nil {
 		return "", err
@@ -608,7 +651,9 @@ func (c *gitClient) FindMergeCommit(dir, branch, into string) (string, error) {
 	}
 
 	// Alternative: find by ancestry-path
-	output, err = c.runOutput(dir, "log", into, "--merges", "--oneline", "--ancestry-path", branch+".."+into, "-1", "--format=%H")
+	// Construct range expression safely after validation
+	rangeExpr := branch + ".." + into
+	output, err = c.runOutput(dir, "log", into, "--merges", "--oneline", "--ancestry-path", rangeExpr, "-1", "--format=%H")
 	if err != nil {
 		return "", err
 	}
@@ -677,10 +722,20 @@ func (c *gitClient) Checkout(dir, target string) error {
 // GetBranchCommits returns commit information for commits unique to a branch.
 // It returns commits that are in 'branch' but not in 'baseBranch'.
 func (c *gitClient) GetBranchCommits(dir, branch, baseBranch string, maxCount int) ([]CommitInfo, error) {
+	// Security: validate ref names to prevent command injection
+	if !isValidGitRef(branch) {
+		return nil, fmt.Errorf("invalid branch name: %q", branch)
+	}
+	if !isValidGitRef(baseBranch) {
+		return nil, fmt.Errorf("invalid base branch name: %q", baseBranch)
+	}
+
 	// Use git log with a specific format to get commits unique to the branch
-	args := []string{"log", "--oneline", "--format=%H %s", fmt.Sprintf("%s..%s", baseBranch, branch)}
+	// Construct range expression safely after validation
+	rangeExpr := baseBranch + ".." + branch
+	args := []string{"log", "--oneline", "--format=%H %s", rangeExpr}
 	if maxCount > 0 {
-		args = append(args, fmt.Sprintf("-n%d", maxCount))
+		args = append(args, "-n"+fmt.Sprint(maxCount))
 	}
 
 	output, err := c.runOutput(dir, args...)

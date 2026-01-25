@@ -210,7 +210,16 @@ var syncWithMainUICmd = &cobra.Command{
 
 // getBehindCount returns how many commits the current branch is behind origin/main
 func getBehindCount(workDir, currentBranch, remoteMain string) (string, error) {
-	cmd := exec.Command("git", "rev-list", "--count", currentBranch+".."+remoteMain) //nolint:gosec // G204: branch names come from git itself
+	// Security: Validate ref names to prevent command injection
+	if !git.IsValidGitRef(currentBranch) {
+		return "0", fmt.Errorf("invalid current branch name: %q", currentBranch)
+	}
+	if !git.IsValidGitRef(remoteMain) {
+		return "0", fmt.Errorf("invalid remote main name: %q", remoteMain)
+	}
+
+	rangeExpr := currentBranch + ".." + remoteMain
+	cmd := exec.Command("git", "rev-list", "--count", rangeExpr) //nolint:gosec // G204: branch names validated above
 	cmd.Dir = workDir
 	output, err := cmd.Output()
 	if err != nil {
