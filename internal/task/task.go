@@ -435,11 +435,37 @@ func (t *Task) SetupClaudeSymlinkInDir(pawDir, targetDir string) error {
 		return nil // Source doesn't exist, nothing to link
 	}
 
-	// Remove existing symlink/dir if present
-	if err := os.Remove(claudeTarget); err != nil && !os.IsNotExist(err) {
-		// If it's a directory, try to remove it
-		if err := os.RemoveAll(claudeTarget); err != nil {
-			return fmt.Errorf("failed to remove old .claude: %w", err)
+	// Security: Check what type of file exists at claudeTarget before removal
+	// to prevent symlink following attacks (deleting arbitrary files via symlink)
+	if fi, err := os.Lstat(claudeTarget); err == nil {
+		if fi.Mode()&os.ModeSymlink != 0 {
+			// It's a symlink - safe to remove directly
+			if err := os.Remove(claudeTarget); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("failed to remove old .claude symlink: %w", err)
+			}
+		} else if fi.IsDir() {
+			// It's a real directory - verify it's safe to remove by checking
+			// that it's within the expected target directory
+			absTarget, err := filepath.Abs(claudeTarget)
+			if err != nil {
+				return fmt.Errorf("failed to resolve .claude path: %w", err)
+			}
+			absTargetDir, err := filepath.Abs(targetDir)
+			if err != nil {
+				return fmt.Errorf("failed to resolve target dir path: %w", err)
+			}
+			// Ensure the directory is within the target directory
+			if !strings.HasPrefix(absTarget, absTargetDir+string(filepath.Separator)) {
+				return fmt.Errorf("refusing to remove .claude: path traversal detected")
+			}
+			if err := os.RemoveAll(claudeTarget); err != nil {
+				return fmt.Errorf("failed to remove old .claude directory: %w", err)
+			}
+		} else {
+			// It's a regular file - just remove it
+			if err := os.Remove(claudeTarget); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("failed to remove old .claude file: %w", err)
+			}
 		}
 	}
 
