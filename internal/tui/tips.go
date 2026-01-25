@@ -32,30 +32,32 @@ var tips = []string{
 	"Press ⌃J to switch projects (session picker)",
 
 	// Keyboard shortcuts - Toggle panels
-	"Press ⌃P to open command palette",
+	"Press ⌃P to open command palette (type to filter)",
 	"Press ⌃G to toggle git viewer",
 	"Press ⌃O to toggle logs",
 	"Press ⌃B to toggle bottom shell",
-	"Press ⌃/ for help",
+	"Press ⌃/ to open help",
 	"Press ⌃Y to edit prompts",
-	"Press ⌃Q to quit paw",
+	"Press ⌃Q to detach (session keeps running)",
 
 	// Mouse interactions
 	"Use mouse to select and copy text",
 	"Click on a task in kanban to jump to it",
 	"Scroll with mouse wheel in kanban",
+	"Drag pane borders to resize",
 
 	// Workflow tips
-	"Each task runs in its own git worktree",
-	"Tasks can run in parallel without conflicts",
-	"Worktree mode keeps main branch clean",
+	"Git mode: each task gets its own worktree",
+	"Git mode keeps tasks isolated for parallel work",
+	"Worktree mode keeps the main branch clean",
 	"Task history is saved for easy reuse",
+	"Templates support ___ placeholders; Tab jumps forward",
 
 	// Configuration
-	"Configure notifications in .paw/config",
-	"Run 'paw check --fix' to verify dependencies",
+	"Configure hooks and logging in .paw/config",
+	"Run 'paw check' to verify dependencies",
 	"Run 'paw attach' to reconnect sessions",
-	"Run 'paw history show' to review past work",
+	"Run 'paw history' to review past work",
 }
 
 // versionHashRegex matches the git hash suffix in version strings.
