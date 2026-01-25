@@ -69,7 +69,9 @@ func buildKeybindings(ctx KeybindingsContext) []tmux.BindOpts {
 	// appear as raw escape codes (e.g., "51;109;28M") in the parent shell.
 	// Disabling mouse mode first sends the proper disable sequences to the terminal.
 	// The client-attached hook in tmux_config.go re-enables mouse mode on reconnect.
-	cmdQuit := `set-option mouse off \; detach-client`
+	// Note: We use run-shell because Go's exec.Command doesn't pass '\;' as a tmux
+	// command separator - it passes it as a literal argument, causing parse errors.
+	cmdQuit := `run-shell 'tmux set-option mouse off; tmux detach-client'`
 	cmdToggleLogs := buildPawRunShell("toggle-log", ctx.SessionName)
 	cmdToggleGitStatus := buildPawRunShell("toggle-git-status", ctx.SessionName)
 	cmdToggleBottom := buildPawRunShell("popup-shell", ctx.SessionName)
