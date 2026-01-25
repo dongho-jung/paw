@@ -200,8 +200,34 @@ func (r *RecoveryManager) getWorktreeHead(worktreeDir string) (string, error) {
 		// It's a reference, resolve it
 		refName := strings.TrimPrefix(head, "ref: ")
 		refName = strings.TrimSpace(refName)
+
+		// Security: Validate that refName is a valid git ref path
+		// It should only contain refs/heads/*, refs/tags/*, or similar
+		if !strings.HasPrefix(refName, "refs/") {
+			return "", fmt.Errorf("invalid ref format: %s", refName)
+		}
+		// Check for path traversal attempts
+		if strings.Contains(refName, "..") || strings.Contains(refName, "//") {
+			return "", fmt.Errorf("invalid ref path: %s", refName)
+		}
+
+		// Construct the ref path relative to gitdir's parent (the .git directory)
 		refPath := filepath.Join(gitdir, "..", refName)
-		refData, err := os.ReadFile(refPath) //nolint:gosec // G304: refPath is constructed from validated git paths
+
+		// Security: Verify the resolved path is within the expected git directory
+		absRefPath, err := filepath.Abs(refPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve ref path: %w", err)
+		}
+		absGitParent, err := filepath.Abs(filepath.Join(gitdir, ".."))
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve git parent path: %w", err)
+		}
+		if !strings.HasPrefix(absRefPath, absGitParent+string(filepath.Separator)) {
+			return "", fmt.Errorf("ref path traversal detected: %s", refName)
+		}
+
+		refData, err := os.ReadFile(refPath) //nolint:gosec // G304: refPath is validated above
 		if err != nil {
 			return "", fmt.Errorf("failed to resolve ref %s: %w", refName, err)
 		}
