@@ -155,10 +155,14 @@ var finishPickerTUICmd = &cobra.Command{
 		// Detect if there are commits or pending changes to merge (only for git repos)
 		hasCommits := false
 		hasChanges := false
+		hasRemote := false
 		if appCtx.IsGitRepo {
 			tm := tmux.New(sessionName)
 			mgr := task.NewManager(appCtx.AgentsDir, appCtx.ProjectDir, appCtx.PawDir, appCtx.IsGitRepo, appCtx.Config)
 			mgr.SetTmuxClient(tm)
+
+			gitClient := git.New()
+			hasRemote = gitClient.HasRemote(appCtx.ProjectDir, "origin")
 
 			// Try to find task by window ID first
 			targetTask, err := mgr.FindTaskByWindowID(windowID)
@@ -177,7 +181,6 @@ var finishPickerTUICmd = &cobra.Command{
 			}
 
 			if targetTask != nil {
-				gitClient := git.New()
 				mainBranch := gitClient.GetMainBranch(appCtx.ProjectDir)
 				workDir := mgr.GetWorkingDirectory(targetTask)
 				hasChanges = gitClient.HasChanges(workDir)
@@ -190,7 +193,7 @@ var finishPickerTUICmd = &cobra.Command{
 				} else {
 					hasCommits = len(commits) > 0
 				}
-				logging.Debug("finishPickerTUICmd: hasCommits=%v hasChanges=%v (branch=%s, main=%s)", hasCommits, hasChanges, targetTask.Name, mainBranch)
+				logging.Debug("finishPickerTUICmd: hasCommits=%v hasChanges=%v hasRemote=%v (branch=%s, main=%s)", hasCommits, hasChanges, hasRemote, targetTask.Name, mainBranch)
 			} else {
 				logging.Warn("finishPickerTUICmd: could not find task for windowID=%s", windowID)
 			}
@@ -198,7 +201,7 @@ var finishPickerTUICmd = &cobra.Command{
 
 		// Run the finish picker
 		hasWork := hasCommits || hasChanges
-		action, err := tui.RunFinishPicker(appCtx.IsGitRepo, hasWork)
+		action, err := tui.RunFinishPicker(appCtx.IsGitRepo, hasWork, hasRemote)
 		if err != nil {
 			logging.Debug("finishPickerTUICmd: RunFinishPicker failed: %v", err)
 			return err

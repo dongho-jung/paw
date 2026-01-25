@@ -28,6 +28,7 @@ type Client interface {
 	IsGitRepo(dir string) bool
 	GetRepoRoot(dir string) (string, error)
 	GetMainBranch(dir string) string
+	HasRemote(dir, remote string) bool
 
 	// Worktree
 	WorktreeAdd(projectDir, worktreeDir, branch string, createBranch bool) error
@@ -213,6 +214,20 @@ func (c *gitClient) GetMainBranch(dir string) string {
 	}
 
 	return constants.DefaultMainBranch
+}
+
+// HasRemote checks if a remote with the given name exists.
+func (c *gitClient) HasRemote(dir, remote string) bool {
+	output, err := c.runOutput(dir, "remote")
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(output, "\n") {
+		if strings.TrimSpace(line) == remote {
+			return true
+		}
+	}
+	return false
 }
 
 // Worktree

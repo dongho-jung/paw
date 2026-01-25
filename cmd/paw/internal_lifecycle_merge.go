@@ -196,13 +196,27 @@ var mergeTaskCmd = &cobra.Command{
 
 		mergeSuccess := true
 
-		// Fetch from origin
-		fetchSpinner := tui.NewSimpleSpinner("Fetching from origin")
-		fetchSpinner.Start()
-		if err := gitClient.Fetch(appCtx.ProjectDir, "origin"); err != nil {
-			fetchSpinner.Stop(false, err.Error())
+		// Check if remote origin exists
+		hasRemote := gitClient.HasRemote(appCtx.ProjectDir, "origin")
+
+		// Fetch from origin (only if remote exists)
+		if hasRemote {
+			fetchSpinner := tui.NewSimpleSpinner("Fetching from origin")
+			fetchSpinner.Start()
+			if err := gitClient.Fetch(appCtx.ProjectDir, "origin"); err != nil {
+				fetchSpinner.Stop(false, err.Error())
+			} else {
+				fetchSpinner.Stop(true, "")
+			}
 		} else {
-			fetchSpinner.Stop(true, "")
+			fmt.Println("  ○ No remote origin (local repo)")
+		}
+
+		// Check if main branch exists before checkout
+		if !gitClient.BranchExists(appCtx.ProjectDir, mainBranch) {
+			fmt.Printf("\n  ✗ Branch '%s' does not exist\n", mainBranch)
+			fmt.Println("    This appears to be a new repository without a main branch.")
+			return nil
 		}
 
 		// Checkout main
@@ -214,13 +228,15 @@ var mergeTaskCmd = &cobra.Command{
 		} else {
 			checkoutSpinner.Stop(true, "")
 
-			// Pull latest
-			pullSpinner := tui.NewSimpleSpinner("Pulling latest")
-			pullSpinner.Start()
-			if err := gitClient.Pull(appCtx.ProjectDir); err != nil {
-				pullSpinner.Stop(false, err.Error())
-			} else {
-				pullSpinner.Stop(true, "")
+			// Pull latest (only if remote exists)
+			if hasRemote {
+				pullSpinner := tui.NewSimpleSpinner("Pulling latest")
+				pullSpinner.Start()
+				if err := gitClient.Pull(appCtx.ProjectDir); err != nil {
+					pullSpinner.Stop(false, err.Error())
+				} else {
+					pullSpinner.Stop(true, "")
+				}
 			}
 
 			// Squash merge
@@ -298,19 +314,21 @@ var mergeTaskCmd = &cobra.Command{
 				}
 			}
 
-			// If merge succeeded, push
+			// If merge succeeded, push (only if remote exists)
 			if mergeSuccess {
 				if !mergeConflictOccurred {
 					mergeSpinner.Stop(true, "")
 				}
 
-				pushMainSpinner := tui.NewSimpleSpinner("Pushing " + mainBranch)
-				pushMainSpinner.Start()
-				if err := gitClient.Push(appCtx.ProjectDir, "origin", mainBranch, false); err != nil {
-					pushMainSpinner.Stop(false, err.Error())
-					mergeSuccess = false
-				} else {
-					pushMainSpinner.Stop(true, "")
+				if hasRemote {
+					pushMainSpinner := tui.NewSimpleSpinner("Pushing " + mainBranch)
+					pushMainSpinner.Start()
+					if err := gitClient.Push(appCtx.ProjectDir, "origin", mainBranch, false); err != nil {
+						pushMainSpinner.Stop(false, err.Error())
+						mergeSuccess = false
+					} else {
+						pushMainSpinner.Stop(true, "")
+					}
 				}
 			}
 

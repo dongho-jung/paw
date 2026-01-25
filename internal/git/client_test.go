@@ -1026,3 +1026,31 @@ func TestStashDropByMessageNotFound(t *testing.T) {
 		t.Errorf("StashDropByMessage() error = %v, want nil for non-existent stash", err)
 	}
 }
+
+func TestHasRemote(t *testing.T) {
+	client := New()
+	gitDir := setupGitRepo(t)
+
+	// Create initial commit
+	createCommit(t, gitDir, "README.md", "test", "Initial commit")
+
+	// No remote initially (local repo)
+	if client.HasRemote(gitDir, "origin") {
+		t.Error("HasRemote() = true for repo without remote, want false")
+	}
+
+	// Add a remote
+	if err := runGitCmd(gitDir, "remote", "add", "origin", "https://github.com/example/repo.git").Run(); err != nil {
+		t.Fatalf("Failed to add remote: %v", err)
+	}
+
+	// Should have remote now
+	if !client.HasRemote(gitDir, "origin") {
+		t.Error("HasRemote() = false after adding remote, want true")
+	}
+
+	// Check for non-existent remote
+	if client.HasRemote(gitDir, "upstream") {
+		t.Error("HasRemote() = true for non-existent remote 'upstream', want false")
+	}
+}

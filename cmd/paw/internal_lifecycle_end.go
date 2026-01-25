@@ -518,15 +518,33 @@ func acquireMergeLock(lockFile, taskName string) bool {
 
 // performMerge executes the git merge operation.
 func performMerge(appCtx *app.App, targetTask *task.Task, windowID, workDir, mainBranch, currentBranch string, gitClient git.Client, mergeTimer *logging.Timer) bool {
-	// Fetch latest from origin
-	fetchSpinner := tui.NewSimpleSpinner("Fetching from origin")
-	fetchSpinner.Start()
-	logging.Debug("Fetching from origin...")
-	if err := gitClient.Fetch(appCtx.ProjectDir, "origin"); err != nil {
-		logging.Warn("Failed to fetch: %v", err)
-		fetchSpinner.Stop(false, err.Error())
+	// Check if remote origin exists
+	hasRemote := gitClient.HasRemote(appCtx.ProjectDir, "origin")
+
+	// Fetch latest from origin (only if remote exists)
+	if hasRemote {
+		fetchSpinner := tui.NewSimpleSpinner("Fetching from origin")
+		fetchSpinner.Start()
+		logging.Debug("Fetching from origin...")
+		if err := gitClient.Fetch(appCtx.ProjectDir, "origin"); err != nil {
+			logging.Warn("Failed to fetch: %v", err)
+			fetchSpinner.Stop(false, err.Error())
+		} else {
+			fetchSpinner.Stop(true, "")
+		}
 	} else {
-		fetchSpinner.Stop(true, "")
+		logging.Debug("No remote 'origin' found, skipping fetch")
+		fmt.Println("  ○ No remote origin (local repo)")
+	}
+
+	// Check if main branch exists before checkout
+	if !gitClient.BranchExists(appCtx.ProjectDir, mainBranch) {
+		logging.Warn("Main branch %s does not exist", mainBranch)
+		mergeTimer.StopWithResult(false, "main branch not found")
+		fmt.Printf("\n  ✗ Branch '%s' does not exist\n", mainBranch)
+		fmt.Println("    This appears to be a new repository without a main branch.")
+		fmt.Println("    Consider renaming your task branch to main instead of merging.")
+		return false
 	}
 
 	// Checkout main
@@ -541,15 +559,17 @@ func performMerge(appCtx *app.App, targetTask *task.Task, windowID, workDir, mai
 	}
 	checkoutSpinner.Stop(true, "")
 
-	// Pull latest
-	pullSpinner := tui.NewSimpleSpinner("Pulling latest changes")
-	pullSpinner.Start()
-	logging.Debug("Pulling latest changes...")
-	if err := gitClient.Pull(appCtx.ProjectDir); err != nil {
-		logging.Warn("Failed to pull: %v", err)
-		pullSpinner.Stop(false, err.Error())
-	} else {
-		pullSpinner.Stop(true, "")
+	// Pull latest (only if remote exists)
+	if hasRemote {
+		pullSpinner := tui.NewSimpleSpinner("Pulling latest changes")
+		pullSpinner.Start()
+		logging.Debug("Pulling latest changes...")
+		if err := gitClient.Pull(appCtx.ProjectDir); err != nil {
+			logging.Warn("Failed to pull: %v", err)
+			pullSpinner.Stop(false, err.Error())
+		} else {
+			pullSpinner.Stop(true, "")
+		}
 	}
 
 	// Merge task branch (squash)

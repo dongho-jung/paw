@@ -53,12 +53,20 @@ type FinishPicker struct {
 	stylesCached      bool
 }
 
-// gitOptions returns the options for git mode.
+// gitOptions returns the options for git mode with remote.
 func gitOptions() []FinishOption {
 	return []FinishOption{
 		{Action: FinishActionMergePush, Name: "Merge & Push", Description: "Merge to main, push to remote, and clean up"},
 		{Action: FinishActionMerge, Name: "Merge", Description: "Merge branch to main (local only) and clean up"},
 		{Action: FinishActionPR, Name: "PR", Description: "Push branch and create a pull request"},
+		{Action: FinishActionDrop, Name: "Drop", Description: "Discard all changes and clean up", Warning: true},
+	}
+}
+
+// gitOptionsNoRemote returns the options for git mode without remote origin.
+func gitOptionsNoRemote() []FinishOption {
+	return []FinishOption{
+		{Action: FinishActionMerge, Name: "Merge", Description: "Merge branch to main (local only) and clean up"},
 		{Action: FinishActionDrop, Name: "Drop", Description: "Discard all changes and clean up", Warning: true},
 	}
 }
@@ -74,8 +82,9 @@ func doneOptions() []FinishOption {
 // NewFinishPicker creates a new finish picker.
 // isGitRepo: whether the project is a git repository
 // hasCommits: whether there are commits to merge (only relevant if isGitRepo is true)
-func NewFinishPicker(isGitRepo, hasCommits bool) *FinishPicker {
-	logging.Debug("-> NewFinishPicker(isGitRepo=%v, hasCommits=%v)", isGitRepo, hasCommits)
+// hasRemote: whether the repository has a remote origin
+func NewFinishPicker(isGitRepo, hasCommits, hasRemote bool) *FinishPicker {
+	logging.Debug("-> NewFinishPicker(isGitRepo=%v, hasCommits=%v, hasRemote=%v)", isGitRepo, hasCommits, hasRemote)
 	defer logging.Debug("<- NewFinishPicker")
 
 	// Detect dark mode BEFORE bubbletea starts
@@ -83,7 +92,11 @@ func NewFinishPicker(isGitRepo, hasCommits bool) *FinishPicker {
 
 	var options []FinishOption
 	if isGitRepo && hasCommits {
-		options = gitOptions()
+		if hasRemote {
+			options = gitOptions()
+		} else {
+			options = gitOptionsNoRemote()
+		}
 	} else {
 		// Non-git or no commits: just show Done and Drop
 		options = doneOptions()
@@ -324,11 +337,11 @@ func (m *FinishPicker) Result() FinishAction {
 }
 
 // RunFinishPicker runs the finish picker and returns the selected action.
-func RunFinishPicker(isGitRepo, hasCommits bool) (FinishAction, error) {
-	logging.Debug("-> RunFinishPicker(isGitRepo=%v, hasCommits=%v)", isGitRepo, hasCommits)
+func RunFinishPicker(isGitRepo, hasCommits, hasRemote bool) (FinishAction, error) {
+	logging.Debug("-> RunFinishPicker(isGitRepo=%v, hasCommits=%v, hasRemote=%v)", isGitRepo, hasCommits, hasRemote)
 	defer logging.Debug("<- RunFinishPicker")
 
-	m := NewFinishPicker(isGitRepo, hasCommits)
+	m := NewFinishPicker(isGitRepo, hasCommits, hasRemote)
 	logging.Debug("RunFinishPicker: starting tea.Program")
 	p := tea.NewProgram(m)
 
