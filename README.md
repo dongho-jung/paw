@@ -7,6 +7,8 @@
 ![](./.github/assets/demo_2.png)
 ![](./.github/assets/demo_3.png)
 
+https://github.com/user-attachments/assets/6403a790-40be-4bc8-89a0-a110d771870b
+
 생각나는대로 에이전트에게 이것저것 시키고 싶은데, 두가지 어려움이 있었습니다:
   1. 동시에 이것저것 시키다보면, **서로 작업하다가 충돌이 나곤 한다**. -> "충돌을 해결하느라 더 많은 시간과 공수를 쓰게 된다."
   2. 동시에 이것저것 시키다보면, **각각의 진행상황을 파악하기가 어렵다**. -> "개발 사이클이 늘어지고 몰입이 깨진다."
@@ -68,7 +70,7 @@ make uninstall
 - window(task)간 이동: `alt + left/right key`
 - pane간 cycle: `alt + tab`
 - 작업 마무리(Finish): `ctrl + f`
-- paw 나가기(Quit): `ctrl + q` 
+- paw 나가기(Quit): `ctrl + q`
 
 ## 추가 조작
 - `ctrl + r`: 이전에 작성한 task 불러오기
@@ -77,3 +79,4 @@ make uninstall
 - `ctrl + o`: Log Viewer
 - `ctrl + p`: Command Pallete
 - `ctrl + j`: Switch Projects
+- `ctrl + b`: 하단 터미널 토글
